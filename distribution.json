@@ -25,7 +25,7 @@
     "bin/pi.cmd": "41252e54274177bdb0d69f371801458f86c2220084411763a3647948ac028eea",
     "bin/pi.ps1": "e8b10b50ec2981e5bcfe052957dd64f1fe33ff1c88e440393aecaee1d909c9be",
     "customization/Maintain-Pi.ps1": "5e5eafbb35d9f9750c869cee27ce9aa1b9a57224bac1cf3fe8c4073df8c0ee1f",
-    "customization/Pi Agent 本机配置维护手册.md": "18d5eb5b32ae3da7629da1c77b27ce3586a3622bdb5f8f2ca1125c6c7a64ca5c",
+    "customization/Pi Agent 本机配置维护手册.md": "7db51a010c54a4069cdb26c91aacaab9195744e3ec91efe5ebf4202c5436123f",
     "customization/Pi-Maintenance.bat": "e2bacf46ec94432f274691cbf96ff834c5b0b96130f3c21cff117ff0b74760e4",
     "customization/README.md": "694f52f75131cb73971a4c9162fdcefd7f8f79ff11c31e013f346815f0ce7dc5",
     "customization/checks/benchmark-startup.mjs": "e0a6965ba5bd421d1395f3d52202f74b348b9739d62c6fb89f5bbe4ce6a6b925",

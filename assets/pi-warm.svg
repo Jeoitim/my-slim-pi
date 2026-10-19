@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="104" height="104" viewBox="0 0 104 104" role="img" aria-labelledby="title desc">
+<title id="title">My Slim Pi · Claude Warm</title>
+<desc id="desc">The Pi startup block mark in the claude-warm orange palette.</desc>
+<defs><linearGradient id="warm" gradientUnits="userSpaceOnUse" x1="12" y1="12" x2="92" y2="92"><stop stop-color="#b9654b"/><stop offset=".55" stop-color="#d97757"/><stop offset="1" stop-color="#efa37d"/></linearGradient></defs>
+<rect width="104" height="104" rx="18" fill="#1f1e1c"/>
+<g fill="url(#warm)" shape-rendering="crispEdges"><rect x="12" y="12" width="10" height="20"/><rect x="22" y="12" width="10" height="20"/><rect x="32" y="12" width="10" height="20"/><rect x="42" y="12" width="10" height="20"/><rect x="52" y="12" width="10" height="20"/><rect x="62" y="12" width="10" height="20"/><rect x="12" y="32" width="10" height="20"/><rect x="22" y="32" width="10" height="20"/><rect x="52" y="32" width="10" height="20"/><rect x="62" y="32" width="10" height="20"/><rect x="12" y="52" width="10" height="20"/><rect x="22" y="52" width="10" height="20"/><rect x="32" y="52" width="10" height="20"/><rect x="42" y="52" width="10" height="20"/><rect x="72" y="52" width="10" height="20"/><rect x="82" y="52" width="10" height="20"/><rect x="12" y="72" width="10" height="20"/><rect x="22" y="72" width="10" height="20"/><rect x="72" y="72" width="10" height="20"/><rect x="82" y="72" width="10" height="20"/></g>
+</svg>

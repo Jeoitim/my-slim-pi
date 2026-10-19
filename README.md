@@ -1,4 +1,6 @@
-# My Slim Pi
+<p align="center"><img src="assets/pi-warm.svg" width="104" height="104" alt="My Slim Pi — Claude Warm 橙色启动图标" /></p>
+<h1 align="center">My Slim Pi</h1>
+<p align="center">Windows 原生 · Claude Warm · 按需加载</p>
 
 原版 Pi 之上的个人精简配置集：Windows 原生运行、Claude 风格界面、清晰审批、免费搜索优先，以及按需记忆与技能。
 
@@ -23,7 +25,7 @@
 
 安装会校验分享文件、还原锁定依赖（使用随包预构建文件，不运行 npm 生命周期脚本）、应用兼容补丁、构建扩展并运行离线检查；不调用真实模型或收费搜索。首次安装需要联网下载依赖。
 
-启动安装目录的 `bin/pi.cmd`，通过 `/login` 或自己的 `models.json` 配置供应商；也可用 CC Switch 管理。搜索 Key 在 `customization/Pi-Maintenance.bat` → 3 中隐藏输入。新安装不指定个人默认模型，选择后自动记住。
+启动安装目录的 `bin/pi.cmd`，通过 `/login` 或自己的 `models.json` 配置供应商；也可用 CC Switch 管理。搜索 Key 在 `customization/Pi-Maintenance.bat` → 3 中隐藏输入。新安装不指定个人默认模型，选择后自动记住。默认主题为 **`claude-warm`**，使用暖深色背景和橙色强调色；可通过 `/theme` 切换。
 
 可选 `-AddToPath` 将安装目录的 bin 加入当前用户 PATH，新终端中可运行 `pi`；默认不修改 PATH。Windows Terminal 的 `bellStyle: "all"` 可按需自行设置。
 
@@ -63,7 +65,7 @@ distribution.json      文件 SHA256、Pi 与组件版本
 Install.bat            一键安装入口
 ```
 
-安装后的日常使用见[维护手册](agent/customization/Pi%20Agent%20本机配置维护手册.md)。源码编辑和同步见[维护仓库](docs/MAINTAINING.md)。
+安装后的日常使用及自定义工具清单见[维护手册](agent/customization/Pi%20Agent%20本机配置维护手册.md)。源码编辑和同步见[维护仓库](docs/MAINTAINING.md)。
 
 ## 备份本机定制
 
@@ -77,4 +79,4 @@ npm run audit:share
 git diff
 ```
 
-导出会去除个人默认模型、规范化个人路径，并适配隔离安装；不会导出凭据、记忆、信任状态、依赖、缓存或本机供应商专属测试。提交前检查差异；Git 备份不替代本机私有配置和记忆备份。仓库初始只保存在本机，没有自动发布或推送。
+导出会去除个人默认模型、规范化个人路径，并适配隔离安装；不会导出凭据、记忆、信任状态、依赖、缓存或本机供应商专属测试。提交前检查差异；Git 备份不替代本机私有配置和记忆备份。远端：[Jeoitim/my-slim-pi](https://github.com/Jeoitim/my-slim-pi)。推送与分享由用户或外部维护 agent 管理。
