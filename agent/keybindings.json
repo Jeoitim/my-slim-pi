@@ -1,0 +1,7 @@
+{
+  "app.message.followUp": ["ctrl+alt+enter"],
+  "app.thinking.cycle": [
+    "shift+tab",
+    "ctrl+alt+e"
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "providers": {
+    "my-provider": {
+      "baseUrl": "https://api.example.com/v1",
+      "api": "openai-completions",
+      "apiKey": "MY_MODEL_API_KEY",
+      "compat": {"supportsDeveloperRole": false},
+      "models": [{"id":"model-id","name":"My model","reasoning":false,"input":["text"],"contextWindow":128000,"maxTokens":8192}]
+    }
+  }
+}

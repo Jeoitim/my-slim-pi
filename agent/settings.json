@@ -1,0 +1,80 @@
+{
+  "editorPaddingX": 2,
+  "autocompleteMaxVisible": 5,
+  "hideThinkingBlock": false,
+  "theme": "claude-warm",
+  "collapseChangelog": true,
+  "defaultTools": [
+    "read",
+    "powershell",
+    "edit",
+    "write"
+  ],
+  "quietStartup": false,
+  "packages": [
+    {
+      "source": "npm:pi-cc-extensions@1.0.5",
+      "extensions": []
+    },
+    {
+      "source": "npm:pi-hermes-memory@0.9.10",
+      "extensions": []
+    },
+    {
+      "source": "npm:pi-hashline-edit-pro@6.4.6",
+      "extensions": []
+    },
+    {
+      "source": "npm:pi-mcp-adapter@5.3.1",
+      "extensions": [],
+      "skills": []
+    },
+    {
+      "source": "npm:pi-permission-suite@0.2.3",
+      "extensions": []
+    },
+    {
+      "source": "npm:pi-subagents@0.78.0",
+      "extensions": [],
+      "skills": [],
+      "prompts": []
+    },
+    {
+      "source": "npm:principal-pi-skills@4.14.0",
+      "extensions": [],
+      "prompts": []
+    },
+    {
+      "source": "npm:@anishthite/pi-themes@0.1.9",
+      "extensions": [],
+      "themes": [
+        "themes/ayu-*.json",
+        "themes/catppuccin-*.json",
+        "themes/github-*.json"
+      ]
+    },
+    "npm:@narumitw/pi-btw@0.61.2"
+  ],
+  "markdown": {
+    "mermaid": "final"
+  },
+  "extensions": [
+    "-builtin:mcp",
+    "-./extensions/timrt-suite/index.ts",
+    "./npm/node_modules/pi-hermes-memory/src/timrt-fast.mjs",
+    "./npm/node_modules/pi-hashline-edit-pro/timrt-fast.mjs",
+    "./npm/node_modules/pi-mcp-adapter/timrt-fast.mjs",
+    "./npm/node_modules/pi-cc-extensions/extensions/timrt-fast.mjs",
+    "./extensions/timrt-suite/timrt-fast.mjs"
+  ],
+  "defaultProjectTrust": "ask",
+  "compaction": {
+    "enabled": true,
+    "reserveTokens": 16384,
+    "keepRecentTokens": 20000
+  },
+  "retry": {
+    "enabled": true,
+    "maxRetries": 3
+  }
+}

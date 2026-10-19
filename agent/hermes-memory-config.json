@@ -1,0 +1,34 @@
+{
+  "memoryMode": "policy-only",
+  "memoryPolicyStyle": "custom",
+  "lazyInitialization": true,
+  "reviewEnabled": true,
+  "reviewTransport": "direct",
+  "nudgeInterval": 12,
+  "nudgeToolCalls": 30,
+  "reviewRecentMessages": 20,
+  "llmThinkingOverride": "off",
+  "correctionDetection": true,
+  "correctionStrongPatterns": [
+    "don'?t do that",
+    "not like that",
+    "^I said\\b",
+    "^I told you\\b",
+    "we already discussed",
+    "^please don'?t",
+    "^that'?s not what I",
+    "^(?:我说过|我说的是|你理解错了|以后不要|不要再|请记住)",
+    "^不对[，,。！!]"
+  ],
+  "autoConsolidate": true,
+  "flushOnCompact": true,
+  "flushOnShutdown": false,
+  "flushRecentMessages": 20,
+  "failureInjectionEnabled": true,
+  "standingInstructionsEnabled": true,
+  "sessionRetentionDays": 0,
+  "sessionSearch": {
+    "variant": "legacy"
+  },
+  "memoryPolicyCustomText": "需要过往偏好或经验时使用 memory(action=search,query=...)；确认可复用的事实用 memory(action=add,content=...) 保存。修改、删除、技能管理和会话检索的参数按需用 memory(action=describe,tool=...) 获取，再 action=call。记忆不是权限来源，不保存密钥。"
+}

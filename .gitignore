@@ -1,0 +1,22 @@
+# Private state and generated files
+.local/
+**/node_modules/
+**/.npmrc
+**/secrets/
+**/auth.json
+**/models.json
+**/trust.json
+**/sessions/
+**/backups/
+**/cache/
+**/reports/
+**/pi-hermes-memory/
+**/policy-seal.json
+**/compiled-extensions.json
+**/timrt-fast.mjs
+**/timrt-chunks/
+*.tgz
+*.log
+.env
+.env.*
+!*.example
