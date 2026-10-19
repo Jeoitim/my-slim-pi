@@ -40,6 +40,7 @@ if (require.main === module) (async () => {
   require('./patch-background-models.cjs')(root);
   require('./patch-interactive-defaults.cjs')(root, version);
   const { build } = require('./build-runtime/node_modules/esbuild');
+  const buildId = new Date().toISOString();
   const plugin = {
     name: 'pi-host-and-resource-paths',
     setup(b) {
@@ -73,6 +74,7 @@ if (require.main === module) (async () => {
         chunkNames: 'timrt-chunks/[name]-[hash]', outExtension: { '.js': '.mjs' }, splitting: true, metafile: true,
       } : { outfile: path.join(root, outputs[i]) }),
       bundle: true, packages: 'external', platform: 'node', format: 'esm', target: 'node24', plugins: [plugin], logLevel: 'warning',
+      define: { __TIMRT_BUILD_ID__: JSON.stringify(buildId) },
       banner: { js: 'import { createRequire as __timrtCreateRequire } from "node:module"; const require = __timrtCreateRequire(import.meta.url);' },
     });
     for (const output of Object.keys(result.metafile?.outputs || {})) {
@@ -89,7 +91,7 @@ if (require.main === module) (async () => {
   });
   settings.extensions = [...new Set([...(settings.extensions || []).filter(s => !s.includes('timrt-fast.mjs')), '-./extensions/timrt-suite/index.ts', ...outputs.slice(0, 5).map(s => `./${s}`)])];
   fs.writeFileSync(settingsFile, JSON.stringify(settings, null, 2) + '\n');
-  fs.writeFileSync(manifestFile, JSON.stringify({ version, files: Object.fromEntries(files.map(p => [p, fs.statSync(path.join(root, p)).mtimeMs])), outputs, chunks, compiledAt: new Date().toISOString() }, null, 2) + '\n');
+  fs.writeFileSync(manifestFile, JSON.stringify({ version, buildId, files: Object.fromEntries(files.map(p => [p, fs.statSync(path.join(root, p)).mtimeMs])), outputs, chunks, compiledAt: buildId }, null, 2) + '\n');
   fs.writeFileSync(path.join(__dirname, 'policy-seal.json'), JSON.stringify(require('./policy-files.cjs').seal(root), null, 2) + '\n');
   console.log('Compiled five startup entries and one manual subagent entry for Pi ' + version);
   console.log('已更新策略 SHA256 校验清单：customization/runtime/policy-seal.json。外部核对后，请重载或重启 Pi。');

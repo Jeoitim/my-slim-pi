@@ -54,6 +54,7 @@ for(const path of [...new Set(selected)].sort()){
   if(path.endsWith('.mjs') || path.endsWith('.ts')){
     text=text.replaceAll("const root = join(homedir(), '.pi/agent');","const root = process.env.PI_CODING_AGENT_DIR || join(homedir(), '.pi/agent');");
     text=text.replaceAll("const root = join(homedir(), '.pi', 'agent');","const root = process.env.PI_CODING_AGENT_DIR || join(homedir(), '.pi', 'agent');");
+    text=text.replaceAll("const agentDir = join(homedir(), '.pi', 'agent');","const agentDir = process.env.PI_CODING_AGENT_DIR || join(homedir(), '.pi', 'agent');");
   }
   if(path==='customization/runtime/patch-permission-runner.cjs')text=text.replace('const agentRoot = join(homedir(), ".pi", "agent");','const agentRoot = process.env.PI_CODING_AGENT_DIR || join(homedir(), ".pi", "agent");');
   if(path==='bin/pi-launcher.js')text=text.replace('const agentDir = path.dirname(__dirname);','const agentDir = path.dirname(__dirname);\nprocess.env.PI_CODING_AGENT_DIR = agentDir;');

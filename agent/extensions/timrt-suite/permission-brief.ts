@@ -1,5 +1,5 @@
 /** Compact execution contract. This is guidance; enforcement remains in the tool hooks. */
-export function permissionBrief(state: {mode:string;approvalHold:boolean;taskAgents:boolean}, model: string, status?: {unavailable:boolean;choice:string;remainingSeconds?:number;humanFallback?:"pause"|"ask"}, healthy = true, parser?: {state:string;reason:string}): string {
+export function permissionBrief(state: {mode:string;approvalHold:boolean;taskAgents:boolean}, model: string, status?: {unavailable:boolean;choice:string;remainingSeconds?:number;humanFallback?:"pause"|"ask"}, healthy = true, parser?: {state:string;reason:string},runtime?:{brief:string}): string {
   const operation = state.mode === "auto"
     ? "AUTO：read/grep/find/ls 等读取及已确认只读命令免审；其余原始调用、完整参数/脚本交内部审批，批准即执行。"
     : state.mode === "act" ? "ACT：明确只读和普通写入/执行直接通过；高风险删除及需核对范围的执行交内部审批，批准即执行。"
@@ -12,6 +12,6 @@ export function permissionBrief(state: {mode:string;approvalHold:boolean;taskAge
     operation,
     "AUTO/ACT 中变量、内联、多语句、测试及解析不支持不直接触发人工；无需每次 explain_call，测试/预览标志也不免审。",
     `${state.mode === "ask" ? "ASK 人工窗口持续等待；拒绝、取消或新指示使当前调用不执行" : status?.humanFallback === "ask" ? "已启用人工兜底：审批不确定或故障时询问，90 秒无回应则跳过并在回答中说明，等下一轮授权" : "默认无人值守：审批低置信、关键证据缺失或服务故障时暂停并提醒，不弹窗等待"}；删除逐次审，根目录清空/绕过维护入口改策略硬拒绝，拒绝后不改写重试。`,
-    `审批模型：${model}；状态：${service}${parser?.state === "unavailable" ? "；AST 只读加速暂不可用（"+parser.reason+"），保留字面量读取，其余按当前模式判断" : ""}${state.approvalHold ? "；清理审批已暂停，等新用户指示" : ""}；任务：${state.taskAgents ? "本任务已授权子代理" : "默认当前会话，子代理未授权（内部审批除外）"}。`,
+    `审批模型：${model}；状态：${service}${parser?.state === "unavailable" ? "；AST 只读加速暂不可用（"+parser.reason+"），保留字面量读取，其余按当前模式判断" : ""}${state.approvalHold ? "；清理审批已暂停，等新用户指示" : ""}；任务：${state.taskAgents ? "本任务已授权子代理" : "默认当前会话，子代理未授权（内部审批除外）"}${runtime ? "；"+runtime.brief : ""}。`,
   ].join("\n");
 }

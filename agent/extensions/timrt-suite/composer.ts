@@ -27,7 +27,7 @@ export function frame(width: number, left: string, right: string, edge: (s: stri
   return edge(top ? "╭" : "╰") + l + edge("─".repeat(fill)) + r + edge(top ? "╮" : "╯");
 }
 
-export function installComposer(pi: ExtensionAPI, permissions: { mode: PermissionMode; taskAgents: boolean; policyOk?: boolean }) {
+export function installComposer(pi: ExtensionAPI, permissions: { mode: PermissionMode; taskAgents: boolean; policyOk?: boolean;reloadRequired?:boolean }) {
   let ctx: ExtensionContext;
   let footerData: any;
   let refresh: (() => void) | undefined;
@@ -77,7 +77,7 @@ export function installComposer(pi: ExtensionAPI, permissions: { mode: Permissio
       const model = ctx.model?.name || "pi";
       const effort = ctx.model?.reasoning ? fg("mdHeading", `✦ ${effortLabel(ctx.model, pi.getThinkingLevel())}`) : "";
       const left = ` ${fg("muted", `◷ ${duration}`)} ${fg("dim", "·")} ${fg("accent", model)}${effort && width > 44 ? ` ${fg("dim", "·")} ${effort}` : ""}${hidden ? fg("muted", ` ↑${hidden}`) : ""} `;
-      const right = ` ${permissions.policyOk === false ? fg("error", "⚠ 策略变化") : permissionBadge(permissions.mode, t.appearance)}${permissions.taskAgents ? fg("accent", " ⋈") : ""} `;
+      const right = ` ${permissions.reloadRequired ? fg("warning", "↻ /reload ") : ""}${permissions.policyOk === false ? fg("error", "⚠ 策略变化") : permissionBadge(permissions.mode, t.appearance)}${permissions.taskAgents ? fg("accent", " ⋈") : ""} `;
       return frame(width, left, right, s => fg("border", s), true);
     }
     protected renderBottomBorder(width: number, hidden: number): string {

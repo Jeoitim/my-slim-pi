@@ -60,6 +60,11 @@ try {
   const modeBlocked = await session.extensionRunner.emitToolCall({ type: 'tool_call', toolCallId: 'check-escalation', toolName: 'set_approval_mode', input: { mode: 'act' } });
   assert.ok(modeBlocked?.block);
   const ctx = session.extensionRunner.createToolContext('verification', undefined);
+  const runtimeResult=await session.extensionRunner.getToolDefinition('explain_call').execute('verify-runtime',{tool:'read',args:{path:'README.md'}},undefined,undefined,ctx);
+  const runtime=JSON.parse(runtimeResult.content[0].text).runtime;
+  assert.equal(runtime.loadedBuild,JSON.parse(readFileSync(join(root,'customization/runtime/compiled-extensions.json'),'utf8')).buildId);
+  assert.equal(runtime.reloadRequired,false,'a fresh compiled session uses the current build');
+  console.log('Loaded runtime build identity: OK');
   const recall = session.extensionRunner.getToolDefinition('memory_search');
   const memory = await recall.execute('verify-memory', { query: 'timrt', limit: 3 }, undefined, undefined, ctx);
   assert.ok(!memory.isError, JSON.stringify(memory.content));

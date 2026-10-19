@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import { analyzePowerShell, nativeRead } from "./shell-analysis.ts";
 
 export const DELETE_REASON = "删除操作未获本次审批；不得执行、改用脚本或委派绕过。";
+export const SCRIPT_EVIDENCE_LIMIT = {perFile:96_000,total:192_000};
 
 /** Deliberately conservative command guard; this is a tool policy, not an OS sandbox. */
 export function deletionRisk(text: string): boolean {
@@ -106,7 +107,7 @@ export function inspectDeletionScripts(command: string, cwd: string, shell = "ba
   opaque ||= opaqueExecution(command);
   let reviewRequired = /\b(?:execFile(?:Sync)?|execSync|spawn(?:Sync)?|child_process|Start-Process)\b/i.test(command);
   if (stdinInterpreter(command) && !(command.match(MENTIONED) || []).length) opaque = true;
-  let remaining = 48_000;
+  let remaining = SCRIPT_EVIDENCE_LIMIT.total;
   const inline: string[] = [];
   if (shell === "powershell" && /(?:^|\s)-(?:Command|c|e)(?:\s|$)/i.test(command)) for (const row of analyzePowerShell(command).commands) {
     if (!INTERPRETERS.test(basename(row.name || ""))) continue;
@@ -131,7 +132,7 @@ export function inspectDeletionScripts(command: string, cwd: string, shell = "ba
       try {
         const bytes = readFileSync(file);
         const source = bytes.toString("utf8");
-        const length = Math.min(32_000, remaining);
+        const length = Math.min(SCRIPT_EVIDENCE_LIMIT.perFile, remaining);
         const truncated = source.length > length;
         scripts.push({ path: file, sha256: createHash("sha256").update(bytes).digest("hex"), source: source.slice(0, length), truncated });
         remaining -= Math.min(source.length, length);
@@ -156,7 +157,7 @@ export function inspectDeletionScripts(command: string, cwd: string, shell = "ba
   // Reading a cleanup script is not executing it; only invoked programs are inspected.
   if (!safeShellRead(command, shell)) scan(command, cwd, 0);
   for (const source of inline) { opaque ||= opaqueExecution(source); scan(source, cwd, 0); }
-  return { risk: risk || opaque || reviewRequired, opaque, scripts, reviewRequired };
+  return { risk: risk || opaque || reviewRequired, destructive:risk, opaque, scripts, reviewRequired };
 }
 
 export function scriptDeletionRisk(command: string, cwd: string): boolean {

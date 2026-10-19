@@ -13,6 +13,7 @@ import { inspectDeletionCall, approveDeletion } from "./deletion-review.ts";
 import { approvalEvidence, approvalReason, deletionPreparation } from "./approval-evidence.ts";
 import { confirmApprovalWithAlert, type ApprovalDialogOptions } from "./terminal-notifications.ts";
 import { readOnlyCall, protectedMutation, catastrophicCall, policyHealth } from "./call-policy.ts";
+import { createRuntimeStatus } from "./runtime-status.ts";
 
 export type PermissionMode = "auto" | "act" | "ask" | "plan";
 export const modeInfo = {
@@ -28,7 +29,14 @@ export function permissionBadge(mode: PermissionMode, appearance: string): strin
 
 export function installPermissions(pi: ExtensionAPI, review = createApprovalReviewer(pi)) {
   const rules = new RuleEngine();
-  const state = { mode: "auto" as PermissionMode, taskAgents: false, loaded: false, denied: false, development: false, maintenance:false, approvalHold: false, policyOk: true };
+  const state = { mode: "auto" as PermissionMode, taskAgents: false, loaded: false, denied: false, development: false, maintenance:false, approvalHold: false, policyOk: true,reloadRequired:false };
+  const runtime=createRuntimeStatus(getAgentDir());
+  let maintenanceReload=false;
+  const runtimeInfo=()=>{
+    const info=runtime();
+    if(maintenanceReload && !info.reloadRequired){info.reloadRequired=true;info.warning="维护已完成，本会话未重载，请 /reload";info.brief+="；"+info.warning;}
+    return info;
+  };
   let maintaining=false;
   const readSkills = new Set<string>();
   let nativeManager: any;
@@ -91,6 +99,8 @@ export function installPermissions(pi: ExtensionAPI, review = createApprovalRevi
   const agentTools = new Set<string>();
   const publish = (ctx: ExtensionContext) => {
     state.policyOk = health.ok;
+    const info=runtimeInfo();state.reloadRequired=info.reloadRequired;
+    ctx.ui.setStatus("timrt-runtime",info.reloadRequired ? "⚠ "+info.warning : undefined);
     ctx.ui.setStatus("pi-permission-suite", health.ok ? permissionBadge(state.mode, ctx.ui.theme.appearance) : "\x1b[31m⚠ 策略变化·只读\x1b[39m");
     pi.events.emit("timrt:permissions", { mode: state.mode, taskAgents: state.taskAgents });
   };
@@ -199,9 +209,15 @@ export function installPermissions(pi: ExtensionAPI, review = createApprovalRevi
           },
         });
         pi.appendEntry("timrt-self-maintenance",{files:result.files,backup:result.backup});
+        maintenanceReload=true;publish(ctx);
+        ctx.ui.notify("Pi 维护已完成；当前会话仍运行旧代码，请 /reload 或重启。","warning");
         return {content:[{type:"text",text:JSON.stringify(result)}]};
       } finally {maintaining=false;}
     },
+  });
+  pi.registerCommand("runtime-status",{
+    description:"查看本会话加载的构建版本、加载时间、源码状态和重载需求。",
+    handler:async(_args,ctx)=>{const info=runtimeInfo();ctx.ui.notify(JSON.stringify(info,null,2),info.reloadRequired?"warning":"info");},
   });
   pi.registerTool({
     name: "explain_call", label: "Explain permission",
@@ -210,7 +226,7 @@ export function installPermissions(pi: ExtensionAPI, review = createApprovalRevi
     annotations: { readOnlyHint: true, destructiveHint: false },
     async execute(_id, params, _signal, _update, ctx) {
       const verdict = await classify(params.tool, params.args, ctx);
-      return {content:[{type:"text",text:JSON.stringify(verdict)}]};
+      return {content:[{type:"text",text:JSON.stringify({...verdict,runtime:runtimeInfo()})}]};
     },
   });
   const classify = async (name: string, input: Record<string, any>, ctx: ExtensionContext) => {
@@ -301,11 +317,11 @@ export function installPermissions(pi: ExtensionAPI, review = createApprovalRevi
       let reason = approved ? undefined : "ASK 未获本次人工授权，当前调用未执行。";
       if(generation!==requestGeneration)reason="人工确认期间出现新的用户指示，旧调用未执行，请重新核对。";
       if(approved && fingerprint!==undefined && fingerprint!==JSON.stringify(inspectDeletionScripts(String(input.command||""),ctx.cwd,name).scripts.map(s=>[s.path,s.sha256])))reason="脚本在人工确认期间发生变化，旧授权无效，本次未执行。";
-      return reason && (inspected || deletionPreparation(name,input)) ? hold(reason) : reason;
+      return reason && (inspected?.kind === "cleanup" || deletionPreparation(name,input)) ? hold(reason) : reason;
     }
     if (inspected) {
       const reason = await approveDeletion(state.mode, name, input, ctx, currentUserRequest, reviewCall, sessionModelReference(ctx), (title, message,opts) => confirmApprovalWithAlert(pi, ctx, title, message,opts));
-      return reason && ["auto", "act"].includes(state.mode) ? hold(reason) : reason;
+      return reason && inspected.kind === "cleanup" && ["auto", "act"].includes(state.mode) ? hold(reason) : reason;
     }
     if (state.mode === "plan") return "PLAN 仅允许只读操作。";
     if (state.mode === "act") return;
@@ -368,7 +384,7 @@ export function installPermissions(pi: ExtensionAPI, review = createApprovalRevi
     const options = event.systemPromptOptions;
     if (!options.appendSystemPrompt.includes(policy.trim())) options.sections["timrt-policy"] = policy;
     const reviewerStatus = (review as any).status?.(latestCtx);
-    options.sections["timrt-permissions"] = permissionBrief(state, latestCtx ? approvalModelLabel(latestCtx) : "跟随会话", reviewerStatus, health.ok, shellAnalysisStatus());
+    options.sections["timrt-permissions"] = permissionBrief(state, latestCtx ? approvalModelLabel(latestCtx) : "跟随会话", reviewerStatus, health.ok, shellAnalysisStatus(),runtimeInfo());
   });
   pi.on("tool_call", async (event, ctx) => {
     const reason = await check(event.toolName, event.input as any, ctx);

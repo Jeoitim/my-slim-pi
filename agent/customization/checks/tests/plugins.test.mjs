@@ -4,7 +4,7 @@ import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { mkdtempSync, readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
-const agentDir = join(homedir(), '.pi', 'agent');
+const agentDir = process.env.PI_CODING_AGENT_DIR || join(homedir(), '.pi', 'agent');
 const version = readFileSync(join(agentDir, 'install', 'current-version'), 'utf8').trim();
 const modules = join(agentDir, 'install', 'releases', version, 'node_modules');
 const { createJiti } = await import(pathToFileURL(join(modules, 'jiti', 'lib', 'jiti.mjs')));
