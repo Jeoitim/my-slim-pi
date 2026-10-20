@@ -5,6 +5,9 @@ import {spawnSync} from 'node:child_process';
 import {resolve,join} from 'node:path';
 const root=process.cwd(),manifest=JSON.parse(readFileSync('distribution.json','utf8'));
 test('all package versions match the restored npm lock',()=>{
+ const host=JSON.parse(readFileSync(`agent/install/releases/${manifest.piVersion}/package-lock.json`,'utf8'));
+ assert.equal(host.packages[''].dependencies['@earendil-works/pi-coding-agent'],manifest.piVersion);
+ assert.equal(host.packages['node_modules/@earendil-works/pi-coding-agent'].version,manifest.piVersion);
  const lock=JSON.parse(readFileSync('agent/npm/package-lock.json','utf8'));
  for(const [name,version] of Object.entries(manifest.packages)){
   assert.equal(lock.packages[''].dependencies[name],version);
@@ -42,3 +45,32 @@ test('installer refuses a drive root as a destination',()=>{
  const run=spawnSync('pwsh',['-NoLogo','-NoProfile','-File',join(root,'scripts/Install-MySlimPi.ps1'),'-AgentRoot','C:\\','-Plan'],{encoding:'utf8'});
  assert.notEqual(run.status,0);
 });
+
+const psLiteral=value=>"'"+value.replaceAll("'","''")+"'";
+for(const missing of ['pi','node','npm.cmd','pwsh.exe']) {
+ test(`installer prerequisite handling: ${missing === 'pi' ? 'Pi need not be preinstalled' : 'missing '+missing}`,()=>{
+  mkdirSync('.local',{recursive:true});
+  const fixture=mkdtempSync(join(root,'.local','prerequisite-'));
+  const target=join(fixture,'target'),harness=join(fixture,'check.ps1');
+  writeFileSync(harness,`
+$ErrorActionPreference='Stop'
+function Get-Command {
+ param([string]$Name,$ErrorAction)
+ if ($Name -eq '${missing}') { return $null }
+ if ($Name -match '^pi(?:\\.|$)') { throw 'Must not probe a global Pi installation' }
+ Microsoft.PowerShell.Core\\Get-Command -Name $Name -ErrorAction $ErrorAction
+}
+& ${psLiteral(join(root,'scripts/Install-MySlimPi.ps1'))} -AgentRoot ${psLiteral(target)} -Plan
+`);
+  const result=spawnSync('pwsh',['-NoLogo','-NoProfile','-File',harness],{encoding:'utf8'});
+  if(missing==='pi') {
+   assert.equal(result.status,0,result.stderr);
+   assert.match(result.stdout,/无需预装或全局安装 Pi/);
+  } else {
+   assert.notEqual(result.status,0);
+   assert.match(result.stderr,/无需预装 Pi/);
+   assert.match(result.stderr,missing==='pwsh.exe' ? /PowerShell 7/ : /Node.js 24\+/);
+  }
+  assert.equal(existsSync(target),false);
+ });
+}

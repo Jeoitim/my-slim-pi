@@ -5,12 +5,14 @@ param(
     [ValidateSet('All','KeepLatestTwo')][string]$BackupMode = 'KeepLatestTwo',
     [ValidateSet('brave','tavily','exa')][string]$KeyProvider,
     [switch]$Gui,
-    [switch]$Apply
+    [switch]$Apply,
+    [string]$AgentRoot
 )
 $ErrorActionPreference = 'Stop'
-$script:AgentRoot = [IO.Path]::GetFullPath((Split-Path -Parent $PSScriptRoot))
+$script:AgentRoot = if ($AgentRoot) { [IO.Path]::GetFullPath($AgentRoot) } else { [IO.Path]::GetFullPath((Split-Path -Parent $PSScriptRoot)) }
 $env:PI_CODING_AGENT_DIR = $script:AgentRoot
-$script:MaintenanceRoot = Join-Path $script:AgentRoot 'customization'
+$env:PI_MAINTENANCE_TARGET = $script:AgentRoot
+$script:MaintenanceRoot = $PSScriptRoot
 $script:ManualPath = Join-Path $PSScriptRoot 'Pi Agent 本机配置维护手册.md'
 $script:Utf8 = New-Object Text.UTF8Encoding($false)
 $OutputEncoding = $script:Utf8
@@ -53,13 +55,17 @@ function Protect-PiPath([string]$Path, [switch]$File) {
 }
 function Test-PiConfigPath([string]$Relative) {
     $name = $Relative.Replace('/','\')
-    return $name -match '^(settings\.json|models\.json|auth\.json|mcp\.json|keybindings\.json|pi-cc-extensions\.json|pi-btw\.json|hermes-memory-config\.json|APPEND_SYSTEM\.md|pi-hermes-memory\\STANDING\.md|secrets\\web-keys\.json|extensions\\pi-permission-suite\\config\.json|extensions\\subagent\\config\.json|skills\\(?:pi-maintenance|principal)\\SKILL\.md|customization\\(?:README\.md|Pi Agent 本机配置维护手册\.md)|agents\\[^\\]+\.md|themes\\[^\\]+\.json|extensions\\timrt-suite\\[^\\]+\.(ts|ps1))$'
+    return $name -match '^(settings\.json|trust\.json|models\.json|auth\.json|mcp\.json|keybindings\.json|pi-cc-extensions\.json|pi-btw\.json|hermes-memory-config\.json|APPEND_SYSTEM\.md|pi-hermes-memory\\STANDING\.md|secrets\\web-keys\.json|extensions\\pi-permission-suite\\config\.json|extensions\\subagent\\config\.json|skills\\(?:pi-maintenance|principal)\\SKILL\.md|customization\\(?:README\.md|Pi Agent 本机配置维护手册\.md|Maintain-Pi\.ps1|Pi-Maintenance\.bat)|customization\\runtime\\[^\\]+\.(cjs|mjs)|customization\\checks\\(?:tests\\)?[^\\]+\.(mjs|ps1)|bin\\pi(?:-launcher\.js|\.cmd)|agents\\[^\\]+\.md|themes\\[^\\]+\.json|extensions\\timrt-suite\\[^\\]+\.(ts|ps1))$'
 }
 function Get-PiConfigFiles {
-    $files = @('settings.json','mcp.json','keybindings.json','pi-cc-extensions.json','pi-btw.json','hermes-memory-config.json','APPEND_SYSTEM.md','pi-hermes-memory\STANDING.md','extensions\pi-permission-suite\config.json','extensions\subagent\config.json','skills\pi-maintenance\SKILL.md','skills\principal\SKILL.md','customization\README.md','customization\Pi Agent 本机配置维护手册.md')
+    $files = @('settings.json','trust.json','mcp.json','keybindings.json','pi-cc-extensions.json','pi-btw.json','hermes-memory-config.json','APPEND_SYSTEM.md','pi-hermes-memory\STANDING.md','extensions\pi-permission-suite\config.json','extensions\subagent\config.json','skills\pi-maintenance\SKILL.md','skills\principal\SKILL.md','customization\README.md','customization\Pi Agent 本机配置维护手册.md','customization\Maintain-Pi.ps1','customization\Pi-Maintenance.bat','bin\pi-launcher.js','bin\pi.cmd')
     foreach ($group in @(@{Path='agents';Filter='*.md'},@{Path='themes';Filter='*.json'},@{Path='extensions\timrt-suite';Filter='*.ts'},@{Path='extensions\timrt-suite';Filter='*.ps1'})) {
         $directory = Resolve-PiChild $script:AgentRoot $group.Path
         if (Test-Path -LiteralPath $directory) { $files += Get-ChildItem -LiteralPath $directory -File -Filter $group.Filter | ForEach-Object { $group.Path + '\' + $_.Name } }
+    }
+    foreach ($relative in @('customization\runtime','customization\checks','customization\checks\tests')) {
+        $directory = Resolve-PiChild $script:AgentRoot $relative
+        if (Test-Path -LiteralPath $directory) { $files += Get-ChildItem -LiteralPath $directory -File | Where-Object { Test-PiConfigPath ($relative + '\' + $_.Name) } | ForEach-Object { $relative + '\' + $_.Name } }
     }
     return @($files | Select-Object -Unique)
 }
@@ -93,7 +99,7 @@ function Get-PiRestorePlan([string]$Snapshot) {
     $plan = @(foreach ($relative in $manifest.files) {
         $source = Resolve-PiChild $snapshotPath $relative
         $target = Resolve-PiChild $script:AgentRoot $relative
-        # Older snapshots contain launchers/build scripts: preserve the current maintenance/runtime layout.
+        # Restore managed source, including the maintainer/builder; never generated seals or dependencies.
         if (-not (Test-PiConfigPath $relative)) { continue }
         if (-not (Test-Path -LiteralPath $source -PathType Leaf)) { throw "快照缺少文件：$relative" }
         if ($manifest.hashes) {

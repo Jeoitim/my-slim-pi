@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { createRequire } = require('node:module');
-const root = path.resolve(__dirname, '../..');
+const root = path.resolve(process.env.PI_MAINTENANCE_TARGET || path.join(__dirname, '../..'));
 const version = fs.readFileSync(path.join(root, 'install/current-version'), 'utf8').trim();
 const host = path.join(root, 'install/releases', version, 'node_modules');
 const sources = [
@@ -25,7 +25,7 @@ files.push(`install/releases/${version}/node_modules/@earendil-works/pi-coding-a
 files.push('npm/node_modules/pi-cc-extensions/extensions/feature/shell/startup-header.ts');
 const hostChunks = path.join(host, '@earendil-works/pi-coding-agent/dist/bundle/chunks');
 if (fs.existsSync(hostChunks)) files.push(...fs.readdirSync(hostChunks).filter(n => n.endsWith('.js')).map(n => path.relative(root, path.join(hostChunks, n)).replaceAll('\\', '/')));
-const manifestFile = path.join(__dirname, 'compiled-extensions.json');
+const manifestFile = path.join(root, 'customization/runtime/compiled-extensions.json');
 const valid = () => {
   try {
     const old = JSON.parse(fs.readFileSync(manifestFile, 'utf8'));
@@ -47,7 +47,7 @@ if (require.main === module) (async () => {
   require('./patch-portable-paths.cjs')(root);
   require('./patch-background-models.cjs')(root);
   require('./patch-interactive-defaults.cjs')(root, version);
-  const { build } = require('./build-runtime/node_modules/esbuild');
+  const { build } = require(path.join(root, 'customization/runtime/build-runtime/node_modules/esbuild'));
   const buildId = new Date().toISOString();
   const plugin = {
     name: 'pi-host-and-resource-paths',
@@ -92,7 +92,7 @@ if (require.main === module) (async () => {
   settings.extensions = [...new Set([...(settings.extensions || []).filter(s => !s.includes('timrt-fast.mjs')), '-./extensions/timrt-suite/index.ts', ...outputs.slice(0, 4).map(s => `./${s}`)])];
   fs.writeFileSync(settingsFile, JSON.stringify(settings, null, 2) + '\n');
   fs.writeFileSync(manifestFile, JSON.stringify({ version, buildId, files: Object.fromEntries(files.map(p => [p, fs.statSync(path.join(root, p)).mtimeMs])), outputs, chunks, compiledAt: buildId }, null, 2) + '\n');
-  fs.writeFileSync(path.join(__dirname, 'policy-seal.json'), JSON.stringify(require('./policy-files.cjs').seal(root), null, 2) + '\n');
+  fs.writeFileSync(path.join(root, 'customization/runtime/policy-seal.json'), JSON.stringify(require('./policy-files.cjs').seal(root), null, 2) + '\n');
   console.log('Compiled four startup entries and one manual subagent entry for Pi ' + version);
   console.log('已更新策略 SHA256 校验清单：customization/runtime/policy-seal.json。外部核对后，请重载或重启 Pi。');
   } catch (error) {

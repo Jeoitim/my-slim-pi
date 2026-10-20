@@ -10,10 +10,11 @@ param(
     $ErrorActionPreference = 'Stop'
     if ($PSVersionTable.PSVersion.Major -lt 7) { throw 'PowerShell 7 is required. Open pwsh and run this installer again.' }
     if ($env:OS -ne 'Windows_NT') { throw 'My Slim Pi requires Windows.' }
-    $node = Get-Command node -ErrorAction Stop
-    $null = Get-Command npm.cmd -ErrorAction Stop
+    $node = Get-Command node -ErrorAction SilentlyContinue
+    $npm = Get-Command npm.cmd -ErrorAction SilentlyContinue
+    if (-not $node -or -not $npm) { throw 'Node.js 24+ (including npm) is required. Install it and reopen PowerShell 7. Pi itself does not need to be preinstalled.' }
     $version = & $node.Source -p 'process.versions.node'
-    if ($LASTEXITCODE -ne 0 -or [int]($version.Split('.')[0]) -lt 24) { throw 'Node.js 24+ and npm are required.' }
+    if ($LASTEXITCODE -ne 0 -or $version -notmatch '^\d+\.' -or [int]($version.Split('.')[0]) -lt 24) { throw 'A working Node.js 24+ with npm is required. Pi itself will be installed automatically.' }
     $target = [IO.Path]::GetFullPath($AgentRoot)
     if (-not $Plan -and -not $Update -and (Test-Path -LiteralPath $target) -and @(Get-ChildItem -LiteralPath $target -Force).Count -gt 0) {
         throw 'Target already contains files. Use -AgentRoot for a separate install, or explicitly use -Update to back up and update existing files.'

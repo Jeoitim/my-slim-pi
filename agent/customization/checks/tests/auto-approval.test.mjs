@@ -6,7 +6,7 @@ import { mkdtempSync, writeFileSync, readFileSync, mkdirSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import {root,suite,jiti,harness,APPROVE,GARBAGE,EXEC} from './auto-harness.mjs';
 
-test('maintenance declarations are task-scoped, reject kernel edits and cannot clear a cleanup hold',async()=>{
+test('maintenance declarations are task-scoped, reject unrequested core edits and cannot clear a cleanup hold',async()=>{
   const h=await harness(()=>APPROVE),tool=h.tools.get('maintain_pi');
   assert.deepEqual(tool.prepareLoadout().hiddenDeclarations,['maintain_pi']);
   const params={changes:[{path:'extensions/timrt-suite/permissions.ts',sha256:null,content:'unsafe'}]};
@@ -19,21 +19,36 @@ test('maintenance declarations are task-scoped, reject kernel edits and cannot c
   assert.equal(h.requests.length,0);
 });
 
-test('ASK confirms reads, writes and deletion separately without a timeout or model approval',async()=>{
+test('ASK shares AUTO read exemptions and confirms other calls without a timeout or model approval',async()=>{
   const h=await harness(()=>{throw Error('ASK must never call automatic reviewer');});h.setMode('ask');
+  const policyText=readFileSync(join(root,'APPEND_SYSTEM.md'),'utf8');
+  assert.match(policyText,/ASK 与 AUTO 共用只读免审判断/);
+  assert.doesNotMatch(policyText,/含读取均须人工/);
   let prompts=0,approve=true;
   h.ctx.ui.confirm=async(_title,message,opts)=>{prompts++;assert.equal(opts.timeout,undefined);assert.match(message,/无等待超时/);return approve;};
   assert.equal(await h.call('read',{path:join(h.ctx.cwd,'cleanup.ps1')}),undefined);
+  for (const [tool,args] of [
+    ['grep',{pattern:'Remove-Item',path:h.ctx.cwd}],
+    ['find',{pattern:'*.ps1',path:h.ctx.cwd}],
+    ['ls',{path:h.ctx.cwd}],
+    ['powershell',{command:'Get-Date'}],
+    ['bash',{command:'pwd'}],
+  ]) assert.equal(await h.call(tool,args),undefined);
+  assert.equal(prompts,0);
   assert.equal(await h.call('powershell',EXEC),undefined);
   assert.equal(await h.call('powershell',{command:'Remove-Item -LiteralPath ./cache -Recurse'}),undefined);
-  assert.equal(prompts,3);assert.equal(h.requests.length,0);
+  assert.equal(prompts,2);assert.equal(h.requests.length,0);
   const classification=await h.tools.get('explain_call').execute('x',{tool:'read',args:{path:'a.txt'}},undefined,undefined,h.ctx);
-  assert.equal(JSON.parse(classification.content[0].text).route,'human');
+  assert.equal(JSON.parse(classification.content[0].text).route,'allow');
+  const writeClassification=await h.tools.get('explain_call').execute('x',{tool:'powershell',args:EXEC},undefined,undefined,h.ctx);
+  assert.equal(JSON.parse(writeClassification.content[0].text).route,'human');
   approve=false;
   assert.equal((await h.call('powershell',EXEC)).block,true);
   h.ctx.hasUI=false;
-  assert.equal((await h.call('read',{path:'a.txt'})).block,true);
-  assert.equal(prompts,4);
+  assert.equal(await h.call('read',{path:'a.txt'}),undefined);
+  assert.equal((await h.call('powershell',EXEC)).block,true);
+  assert.equal(prompts,3);
+  assert.equal(h.requests.length,0);
 });
 
 test('ASK invalidates approval when script bytes or the user request change while waiting',async()=>{
@@ -218,7 +233,7 @@ test('the four-line execution brief describes rules, actual model and live outag
   const changed=await h.brief();
   assert.match(changed,/New model name/); assert.match(changed,/状态：正常/);
   h.setMode('ask');
-  assert.match(await h.brief(),/ASK：每次实际工具调用/);
+  assert.match(await h.brief(),/ASK：与 AUTO 共用只读免审判断/);
 });
 
 test('ordinary script approvals expire if bytes or human instructions change during review', async () => {

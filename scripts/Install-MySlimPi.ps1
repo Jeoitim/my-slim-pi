@@ -6,6 +6,8 @@ param(
     [switch]$AddToPath
 )
 $ErrorActionPreference = 'Stop'
+if ($PSVersionTable.PSVersion.Major -lt 7) { throw '需要 PowerShell 7。请在 pwsh 中运行安装脚本，或双击 Install.bat；无需预装 Pi。' }
+if ($env:OS -ne 'Windows_NT') { throw '此安装器仅支持 Windows。' }
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $payload = Join-Path $repoRoot 'agent'
 $manifest = Get-Content -LiteralPath (Join-Path $repoRoot 'distribution.json') -Raw | ConvertFrom-Json
@@ -19,11 +21,13 @@ for ($cursor=$target; $cursor; $cursor=Split-Path -Parent $cursor) {
     if ((Test-Path -LiteralPath $cursor) -and ((Get-Item -LiteralPath $cursor -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)) { throw '安装路径包含链接，停止。' }
     if ($cursor -eq [IO.Path]::GetPathRoot($cursor)) { break }
 }
-$node = (Get-Command node -ErrorAction Stop).Source
-$npm = (Get-Command npm.cmd -ErrorAction Stop).Source
-$pwsh = (Get-Command pwsh.exe -ErrorAction Stop).Source
+$node = (Get-Command node -ErrorAction SilentlyContinue).Source
+$npm = (Get-Command npm.cmd -ErrorAction SilentlyContinue).Source
+$pwsh = (Get-Command pwsh.exe -ErrorAction SilentlyContinue).Source
+if (-not $node -or -not $npm) { throw '未找到 Node.js 或 npm。请先安装 Node.js 24+（含 npm），重新打开 PowerShell 7 后再运行；无需预装 Pi。' }
+if (-not $pwsh) { throw '未在 PATH 中找到 pwsh.exe。请安装 PowerShell 7 并重新打开终端；无需预装 Pi。' }
 $nodeVersion = & $node -p 'process.versions.node'
-if ([int]($nodeVersion.Split('.')[0]) -lt $manifest.nodeMajor) { throw '需要 Node.js 24 或更新版本。' }
+if ($LASTEXITCODE -ne 0 -or $nodeVersion -notmatch '^\d+\.' -or [int]($nodeVersion.Split('.')[0]) -lt $manifest.nodeMajor) { throw '需要可正常运行的 Node.js 24 或更新版本（含 npm）；无需预装 Pi。' }
 $rows = @($manifest.files.PSObject.Properties)
 foreach ($row in $rows) {
     if ([IO.Path]::IsPathRooted($row.Name) -or $row.Name.Split('/') -contains '..') { throw '分发清单包含越界路径。' }
@@ -40,6 +44,7 @@ foreach ($row in $rows) {
 }
 Write-Host "My Slim Pi / Pi $($manifest.piVersion) / $($rows.Count) files / $(@($manifest.packages.PSObject.Properties).Count) pinned packages"
 Write-Host "目标：$target"
+Write-Host "将安装锁定版本的 Pi $($manifest.piVersion)、社区组件和构建工具；无需预装或全局安装 Pi。"
 if ($Plan) { Write-Host '仅预览：未下载依赖、未修改配置或 PATH。'; return }
 $exists = (Test-Path -LiteralPath $target) -and @(Get-ChildItem -LiteralPath $target -Force).Count -gt 0
 if ($exists -and -not $Update) { throw '目标已有配置。默认不覆盖；确认后使用 -Update（会备份被替换文件）。也可用 -AgentRoot 选择新目录。' }

@@ -111,3 +111,28 @@ try { Set-PiWebKey -Provider brave -Gui } catch { $blocked = $true }
 Assert-Maintenance $blocked 'Invalid short input should be rejected.'
 Assert-Maintenance ((Get-FileHash -LiteralPath $keyFile -Algorithm SHA256).Hash -eq $beforeCancel) 'Invalid GUI entry changed existing keys.'
 Write-Host 'Maintenance checks passed: path boundaries, private backup scope and DACL, hashed restore, safety backup, tamper rejection, cancellation, delete-all plan, latest-two retention and secure Brave entry preserving existing keys.' -ForegroundColor Green
+
+# The saved independent entry must restore the maintainer, builder and launcher even if the live entry is broken.
+$recoveryEntry = Join-Path $fixture 'recovery-entry\Maintain-Pi.ps1'
+New-Item -ItemType Directory -Path (Split-Path -Parent $recoveryEntry) -Force | Out-Null
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot '..\..\Maintain-Pi.ps1') -Destination $recoveryEntry
+foreach ($relative in @('customization\Maintain-Pi.ps1','customization\runtime\build-extensions.cjs','bin\pi-launcher.js')) {
+    $target = Join-Path $fixture $relative
+    New-Item -ItemType Directory -Path (Split-Path -Parent $target) -Force | Out-Null
+    [IO.File]::WriteAllText($target,'original-core')
+}
+$coreBackup = New-PiBackup -Label core-recovery
+$corePlan = @(Get-PiRestorePlan $coreBackup)
+foreach ($relative in @('customization\Maintain-Pi.ps1','customization\runtime\build-extensions.cjs','bin\pi-launcher.js')) {
+    Assert-Maintenance ($corePlan.Relative -contains $relative) 'Core source missing from backup/restore plan.'
+    [IO.File]::WriteAllText((Join-Path $fixture $relative),'broken-core')
+}
+Assert-Maintenance (-not (Test-PiConfigPath 'customization\runtime\policy-seal.json')) 'Generated seal must not be restored as trusted source.'
+$recoveryShell = (Get-Process -Id $PID).Path
+$recoveryCode = ". '$($recoveryEntry.Replace("'","''"))' -AgentRoot '$($fixture.Replace("'","''"))'; function Read-Host { param(`$Prompt) 'RESTORE' }; Restore-PiBackup '$($coreBackup.Replace("'","''"))' -Commit"
+& $recoveryShell -NoLogo -NoProfile -Command $recoveryCode
+Assert-Maintenance ($LASTEXITCODE -eq 0) 'Independent saved maintenance entry failed to restore core files.'
+foreach ($relative in @('customization\Maintain-Pi.ps1','customization\runtime\build-extensions.cjs','bin\pi-launcher.js')) {
+    Assert-Maintenance ([IO.File]::ReadAllText((Join-Path $fixture $relative)) -eq 'original-core') 'Core restoration did not recover the saved original.'
+}
+Write-Host 'Core backup and independent-entry recovery checks passed.' -ForegroundColor Green

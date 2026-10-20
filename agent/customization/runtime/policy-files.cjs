@@ -2,8 +2,8 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
-const direct = ['settings.json', 'APPEND_SYSTEM.md', 'agents/approver.md', 'trust.json', 'extensions/pi-permission-suite/config.json', 'customization/Maintain-Pi.ps1'];
-const trees = ['extensions/timrt-suite', 'customization/runtime', 'npm/node_modules/pi-permission-suite'];
+const direct = ['settings.json', 'APPEND_SYSTEM.md', 'agents/approver.md', 'trust.json', 'extensions/pi-permission-suite/config.json', 'customization/Maintain-Pi.ps1', 'customization/Pi-Maintenance.bat', 'bin/pi-launcher.js', 'bin/pi.cmd'];
+const trees = ['extensions/timrt-suite', 'customization/runtime', 'customization/checks', 'customization/checks/tests', 'npm/node_modules/pi-permission-suite'];
 const normalize = p => p.replaceAll('\\', '/').toLowerCase();
 function protectedPath(root, target) {
   const relative = normalize(path.relative(root, path.resolve(target)));

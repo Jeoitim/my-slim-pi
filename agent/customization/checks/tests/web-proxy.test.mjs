@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { windowsHttpsProxy } from '../../../extensions/timrt-suite/web-proxy.ts';
+import {resolve} from 'node:path';
+import {pathToFileURL} from 'node:url';
+const {windowsHttpsProxy}=await import(process.env.PI_CODING_AGENT_DIR ? pathToFileURL(resolve(process.env.PI_CODING_AGENT_DIR,'extensions/timrt-suite/web-proxy.ts')).href : new URL('../../../extensions/timrt-suite/web-proxy.ts',import.meta.url).href);
 const target = 'https://api.search.brave.com/res/v1/web/search';
 const config = (server, extra = '', enabled = '0x1') => `
 HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Internet Settings

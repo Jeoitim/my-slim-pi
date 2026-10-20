@@ -20,7 +20,7 @@ export type PermissionMode = "auto" | "act" | "ask" | "plan";
 export const modeInfo = {
   auto: { icon: "◈", label: "AUTO", color: "success", desc: "规则优先，复杂调用由内部审批代理评估" },
   act: { icon: "⚡", label: "ACT", color: "warning", desc: "普通操作直接执行；高风险删除由内部审批评估" },
-  ask: { icon: "?", label: "ASK", color: "accent", desc: "逐次人工确认；无等待超时" },
+  ask: { icon: "?", label: "ASK", color: "accent", desc: "已确认只读免审；其余逐次人工确认，无等待超时" },
   plan: { icon: "◇", label: "PLAN", color: "mdHeading", desc: "只读规划" },
 } as const;
 export function permissionBadge(mode: PermissionMode, appearance: string): string {
@@ -189,7 +189,7 @@ export function installPermissions(pi: ExtensionAPI, review = createApprovalRevi
   pi.registerCommand("subagent", settingsCommand);
   pi.registerTool({
     name:"maintain_pi",label:"Maintain Pi",
-    description:"Apply exact Pi configuration/UI patches only for an explicit current human request to maintain Pi. Read files and obtain SHA256 first; submit full replacement content. Always approves this transaction, backs up, rebuilds and checks offline; rolls back on failure. Never use to bypass another task's permissions. Authorization/reviewer/transaction/build kernels remain protected. No deletes, credentials or arbitrary commands. Reload after success.",
+    description:"Apply exact Pi source/configuration patches only for an explicit current human request. Includes authorization, reviewer, transaction, integrity, builder and loader sources with explicit relevant maintenance intent. Read files and SHA256 first. Every transaction requires approval under pre-change rules, independent backup, rebuild/checks and rollback; core changes freeze the old runner/checks and activate after reload. Never bypass another task's denial. No deletes, credentials, generated seals, dependency edits or arbitrary commands.",
     parameters:Type.Object({changes:Type.Array(Type.Object({path:Type.String(),sha256:Type.Union([Type.String({pattern:"^[a-f0-9]{64}$"}),Type.Null()]),content:Type.String({maxLength:128000})}),{minItems:1,maxItems:8})}),
     prepareLoadout:()=>state.maintenance ? undefined : {hiddenDeclarations:["maintain_pi"]},
     async execute(_id,params,signal,onUpdate,ctx) {
@@ -207,7 +207,7 @@ export function installPermissions(pi: ExtensionAPI, review = createApprovalRevi
           progress:text=>onUpdate?.({content:[{type:"text",text}]}),
           approved:async()=>{
             if(state.mode==="ask")return confirmApprovalWithAlert(pi,ctx,"ASK：批准本次 Pi 自维护？",`用户请求：${request}\n补丁：\n${JSON.stringify(params,null,2)}\n包含备份、应用、重建、离线检查；失败恢复原文件。`,{timeout:0});
-            const decision=await reviewCall(ctx,"maintain_pi",{...params,maintenanceContract:"仅当前用户明确提出的 Pi 自身维护；不能为其他任务解除拒绝、清理暂停、凭据或灾难性保护。此事务自动备份/重建/离线检查，失败恢复本次文件；授权和事务内核不可修改。权限相关配置仅在用户明确提出 Pi 权限维护时可改。"},sessionModelReference(ctx));
+            const decision=await reviewCall(ctx,"maintain_pi",{...params,maintenanceContract:"仅当前用户明确提出的 Pi 自身维护；不能为其他任务解除拒绝、清理暂停、凭据或灾难性保护。此事务使用修改前规则审批，先调用独立脚本备份，失败恢复本次文件；允许用户明确提出的权限、审批、事务、校验、构建及加载源码维护。核心修改使用保存的旧维护脚本、构建器和检查，重载后生效。禁止为其他任务解除拒绝或关闭灾难性保护。"},sessionModelReference(ctx));
             return decision.approved===true;
           },
         });
@@ -242,14 +242,14 @@ export function installPermissions(pi: ExtensionAPI, review = createApprovalRevi
     if (verdict === "deny") return {route:"deny",reason:"路径或命令规则拒绝。"};
     if (name === "powershell" && powerShellLiteralPaths(String(input.command || "")).some(path => rules.evaluate("read",{path}) === "deny")) return {route:"deny",reason:"受保护路径。"};
     if (state.approvalHold && !readOnly) return {route:"deny",reason:holdMessage()};
-    if(name==="maintain_pi")return state.mode==="plan" || !state.maintenance ? {route:"deny",reason:"需要当前用户明确提出 Pi 维护且非 PLAN。"} : {route:state.mode==="ask"?"human":"model",reason:"受控维护事务始终逐次审批，不享受 ACT 普通操作直通；内核修改不在范围内。"};
-    if (readOnly) return {route:state.mode === "ask" && name !== "explain_call" ? "human" : "allow",reason:state.mode === "ask" && name !== "explain_call" ? "ASK 每次实际调用须人工确认，无等待超时。" : "已确认只读，不调用审批模型。"};
+    if(name==="maintain_pi")return state.mode==="plan" || !state.maintenance ? {route:"deny",reason:"需要当前用户明确提出 Pi 维护且非 PLAN。"} : {route:state.mode==="ask"?"human":"model",reason:"受控维护事务始终逐次审批，不享受 ACT 普通操作直通；核心源码也走当前用户明确授权和备份验证。"};
+    if (readOnly) return {route:"allow",reason:"已确认只读，不调用审批模型。"};
     if (name === "set_approval_mode" || (/subagent|delegate|spawn_agent/i.test(name) && !state.taskAgents)) return {route:"deny",reason:"模式或任务代理需要真实用户授权。"};
     const inspected = inspectDeletionCall(name,input,ctx.cwd);
     const catastrophe = catastrophicCall(ctx.cwd,name,input,inspected?.scripts);
     if (catastrophe) return {route:"deny",reason:catastrophe};
     if (state.mode === "plan") return {route:"deny",reason:"PLAN 仅允许只读。"};
-    if (state.mode === "ask") return {route:"human",reason:"ASK 每次实际调用须人工确认，无等待超时；批准仅限当前调用。"};
+    if (state.mode === "ask") return {route:"human",reason:"ASK 未通过只读免审判断的调用须逐次人工确认，无等待超时；批准仅限当前调用。"};
     if (inspected) return {route:"model",reason:"当前风险调用交内部审批；静态解析不支持不是拒绝理由，批准仅限当前调用。"};
     return {route:state.mode === "auto" ? "model" : "allow",reason:state.mode === "auto" ? "完整明文交内部审批模型评估；测试/预览标志不等于免审。" : "ACT 普通操作。"};
   };
@@ -298,7 +298,7 @@ export function installPermissions(pi: ExtensionAPI, review = createApprovalRevi
     if (verdict === "deny") return rules.getDenyMessage(name, input) || "被权限规则拒绝。";
     if (state.approvalHold && !readOnly) return holdMessage();
     // 只读调用先放行：读取或搜索脚本内容不等于执行脚本，不该走删除审批。
-    if (readOnly && state.mode !== "ask") return;
+    if (readOnly) return;
     if (name === "explain_call") return;
     const inspected = inspectDeletionCall(name, input, ctx.cwd);
     const catastrophe = catastrophicCall(ctx.cwd, name, input, inspected?.scripts);

@@ -3,7 +3,7 @@ export function permissionBrief(state: {mode:string;approvalHold:boolean;taskAge
   const operation = state.mode === "auto"
     ? "AUTO：read/grep/find/ls 等读取及已确认只读命令免审；其余原始调用、完整参数/脚本交内部审批，批准即执行。"
     : state.mode === "act" ? "ACT：明确只读和普通写入/执行直接通过；高风险删除及需核对范围的执行交内部审批，批准即执行。"
-    : state.mode === "ask" ? "ASK：每次实际工具调用（含读取）须人工明确批准，无等待超时；不调用内部审批模型，仅批准当前调用。"
+    : state.mode === "ask" ? "ASK：与 AUTO 共用只读免审判断；read/grep/find/ls 等读取及已确认只读命令直接执行，其余调用逐次人工明确批准，无等待超时；不调用内部审批模型，仅批准当前调用。"
     : "PLAN：仅允许只读；不能通过模型或人工审批执行写入、删除。";
   const service = !healthy ? "策略校验失败，仅限只读，须外部维护"
     : status?.unavailable ? (status.choice === "pause" ? "审批服务故障，本轮待审操作已暂停" : "审批服务故障，逐条人工审批") + `（窗口剩余约 ${status.remainingSeconds ?? "?"} 秒）`

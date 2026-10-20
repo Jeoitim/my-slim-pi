@@ -15,23 +15,25 @@
 | 界面 | Claude 风格消息与输入框、紧凑底栏、主题实时预览、`/btw` 旁支对话 |
 | 编辑 | hashline 锚点、过期检查与撤销 |
 | 联网 | Pi 原生 Exa 免费 MCP → Brave / Tavily / Exa API 按查询串行回退 |
-| 权限 | AUTO / ACT / ASK / PLAN；ASK 无超时，自动模式审批不确定时暂停 |
+| 权限 | AUTO / ACT / ASK / PLAN；ASK 只读免审、其余逐次人工确认且无超时，自动模式审批不确定时暂停 |
 | 记忆与技能 | Hermes 懒初始化、Principal 单索引按需读取 |
 | 子代理 | 普通任务不自动委派；用户明确授权后加载 |
-| 自维护 | 具体补丁逐次审批、备份、构建、检查；保护内核保留外部维护 |
+| 自维护 | 配置及核心源码统一入口；逐次审批、独立备份、旧规则验证、失败恢复、重载生效 |
 | 维护入口 | Key 隐藏输入、备份恢复、测速、上下文统计与生成物清理 |
 
-当前基线：**Pi 1.3.0、九个固定版本社区组件**，版本见 [distribution.json](distribution.json)。分享配置、自定义源码与维护工具；不包含密钥、个人供应商配置、会话或记忆数据库。第三方组件安装时通过 npm 获取。
+当前基线：**Pi 1.3.0、八个固定版本社区组件及 Pi 原生 MCP**，版本见 [distribution.json](distribution.json)。分享配置、自定义源码与维护工具；不包含密钥、个人供应商配置、会话或记忆数据库。第三方组件安装时通过 npm 获取。
 
 ## 安装
 
-需要 **Windows、Node.js 24+（含 npm）、PowerShell 7**，以及可访问 GitHub 与 npm 的网络。在 **PowerShell 7（`pwsh`）** 中运行：
+**无需预装 Pi**：安装器会一并安装锁定版本的 **Pi 1.3.0**、社区组件和定制配置，不依赖全局 `pi` 命令。
+
+需要先安装 **Node.js 24+（含 npm）、PowerShell 7**，使用 Windows，并能访问 GitHub 与 npm；缺少前置环境时安装器会提示并停止。在 **PowerShell 7（`pwsh`）** 中运行：
 
 ```powershell
 irm https://raw.githubusercontent.com/Jeoitim/my-slim-pi/main/install.ps1 | iex
 ```
 
-安装到 `~/.pi/agent`，**已有配置时默认停止，不直接覆盖**。入口下载当前 `main` 对应的单个提交，再复用仓库安装器。仅在信任本仓库时直接执行远程脚本；也可以下载源码，检查后本地运行。
+安装到 `~/.pi/agent`，**已有配置时默认停止，不直接覆盖**。已安装其他 Pi 的用户也可选择独立目录，使用该目录的 `bin/pi.cmd` 启动锁定版本。入口下载当前 `main` 对应的单个提交，再复用仓库安装器。仅在信任本仓库时直接执行远程脚本；也可以下载源码，检查后本地运行。
 
 <details>
 <summary>预览、独立安装或更新已有配置</summary>
@@ -77,7 +79,7 @@ irm https://raw.githubusercontent.com/Jeoitim/my-slim-pi/main/install.ps1 -OutFi
 # 自定义安装目录需继续指定同一 -AgentRoot
 ```
 
-更新先将被替换文件备份到目标的 `backups/installer-*`，保留现有默认供应商/模型和凭据；配置模板、源码及九个组件按仓库版本更新。原有额外组件会保留并由 Pi 协调安装。安装失败保留目录和备份，显示失败原因；不会自动清空目录或宣称已回滚。完成后重启 Pi。
+更新先将被替换文件备份到目标的 `backups/installer-*`，保留现有默认供应商/模型和凭据；Pi 宿主、配置模板、源码及八个社区组件按仓库版本更新。原有额外组件会保留并由 Pi 协调安装。安装失败保留目录和备份，显示失败原因；不会自动清空目录或宣称已回滚。完成后重启 Pi。
 
 ## 使用与维护
 

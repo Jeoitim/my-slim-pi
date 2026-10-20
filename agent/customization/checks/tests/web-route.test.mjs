@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { runWeb, fallbackOrder } from '../../../extensions/timrt-suite/web-route.ts';
+import {resolve} from 'node:path';
+import {pathToFileURL} from 'node:url';
+const {runWeb,fallbackOrder}=await import(process.env.PI_CODING_AGENT_DIR ? pathToFileURL(resolve(process.env.PI_CODING_AGENT_DIR,'extensions/timrt-suite/web-route.ts')).href : new URL('../../../extensions/timrt-suite/web-route.ts',import.meta.url).href);
 const hit = { content: [{ type: 'text', text: 'Title: Official docs\nURL: https://pi.dev/docs/latest/extensions\nPi supports extensions.' }] };
 const response = { results: [{ title: 'Official docs', url: 'https://pi.dev', content: 'Documentation' }], usage: { credits: 1 } };
 const search = { action: 'search', query: 'Pi extension docs' };
