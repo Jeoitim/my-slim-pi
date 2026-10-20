@@ -115,7 +115,7 @@ bash "$maint" EditConfig settings.json        # 先备份，再打开编辑器
 
 **ASK 与 AUTO 共用只读免审判断**；其余调用逐次人工确认，**无等待超时**，仅明确批准后执行当前调用；无交互界面时仅允许通过只读免审的操作。memory 与原生 MCP 均在实际内部操作处检查，web 外层放行不替代内部工具检查。只有经过固定配置和来源核对的 Exa 只读工具免审，其他 MCP 单靠 `readOnlyHint` 不免审。
 
-**AUTO/ACT 默认无人值守**：审批拒绝、不确定或故障时暂停待审操作并提醒。`extensions/pi-permission-suite/config.json` 的 `reviewer.humanFallback` 默认为 `pause`；设为 `ask` 可启用人工兜底。AUTO/ACT 的审批与任务代理授权窗口 **90 秒无回应即关闭**，本次不执行，在回答中说明阻塞并等待下一轮指示。主题、模型等主动打开的设置窗口不计时。
+**AUTO/ACT 默认启用人工兜底**：Windows 和 Linux 各自 AgentRoot 下的 `extensions/pi-permission-suite/config.json` 中，`reviewer.humanFallback` 均默认为 `ask`；审批不确定时弹出人工确认，审批服务故障时先询问暂停还是逐条人工审批。需要无人值守、不被弹窗打断时可设为 `pause`：立即暂停待审操作并提醒，不弹框、不等待，也不自动放行。明确拒绝或硬保护不会转人工兜底放行。AUTO/ACT 的人工审批与任务代理授权窗口 **90 秒无回应即关闭**，本次不执行，在回答中说明阻塞并等待下一轮指示；ASK 模式仍无等待超时。主题、模型等主动打开的设置窗口不计时。
 
 ### 命令审批路线
 
@@ -140,8 +140,8 @@ flowchart TD
     F -->|已变化| X
     V -->|拒绝| X
     V -->|不确定或故障| U{人工兜底配置}
-    U -->|默认 pause| X
-    U -->|ask| W[人工确认；90 秒超时]
+    U -->|pause| X
+    U -->|默认 ask| W[人工确认；90 秒超时]
     W -->|批准| F
     W -->|未批准或超时| X
 ```
