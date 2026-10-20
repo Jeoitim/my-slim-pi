@@ -14,8 +14,16 @@ compatibility: Windows / Linux; Node.js 24; isolated managed Pi installation.
 
 ## 定位
 
-1. 配置根目录为 `~/.pi/agent`；设置了 `PI_CODING_AGENT_DIR` 时使用其值。使用当前环境的原生终端与路径。
-2. 在配置根目录运行 `node customization/runtime/config-state.mjs status`，读取脱敏状态；版本取 `install/current-version`。
+1. 先确定当前运行的 AgentRoot：Windows 默认 `C:\Users\<用户名>\.pi\agent`，Linux 默认 `$HOME/.pi/agent`；自定义安装核对实际启动路径和 `PI_CODING_AGENT_DIR`。两端各用原生目录、依赖与备份，WSL 不复用 Windows 安装。
+2. 使用当前系统维护入口读取脱敏状态；版本取 AgentRoot 下的 `install/current-version`。命令均使用绝对入口路径，不依赖当前工作目录：
+
+   | 环境 | 状态入口（替换 AgentRoot） |
+   |---|---|
+   | Windows / PowerShell 7 | `& '<AgentRoot>/customization/Maintain-Pi.ps1' -Action Status` |
+   | Linux / Bash | `bash '<AgentRoot>/customization/maintain-pi.sh' Status` |
+
+   后文动作沿用此入口：Windows 用 `-Action 动作`，Linux 直接传动作。Linux 脚本使用 `install/node-path` 定位本机 Node，无需激活 nvm；不能跨系统复制该定位文件。菜单仅 Windows 提供。
+
 3. 仅阅读相关配置和[维护手册](../../customization/Pi%20Agent%20本机配置维护手册.md)对应章节。SDK 文档位于 `install/releases/<version>/node_modules/@earendil-works/pi-coding-agent/docs/`：包管理看 `packages.md` / `cli.md`，扩展看 `extensions.md`，技能看 `skills.md`。
 
 ## 选择修改方式
@@ -33,13 +41,14 @@ compatibility: Windows / Linux; Node.js 24; isolated managed Pi installation.
 
 - 先 read 目标，获取原件 SHA256 哈希；提交相对 `path`、`sha256`、完整 `content`。新文件哈希为 null。每次 1～8 个文件、合计不超过 128 KB；凭据和删除不在范围内。
 - `maintain_pi` 在 AUTO/ACT 均内部审批，ASK 人工确认且无超时，PLAN/清理暂停不执行。工具自动备份、应用、重建与离线检查，无需重复运行；失败恢复本次文件，外部并发修改保留并报告。
-- 外部维护在修改前运行 `node customization/runtime/maintenance.mjs Backup`；应用后依次运行 `node customization/runtime/maintenance.mjs Rebuild`、`node customization/runtime/maintenance.mjs Check`。
+- 外部维护使用本系统入口，修改前运行 `Backup`，应用后依次运行 `Rebuild`、`Check`。模型、主题、Key 和恢复参数见手册的集中命令表，不把 PowerShell 参数用于 Bash。
+- 修改长期规则须将当前平台源文件（Windows 为 `APPEND_SYSTEM.windows.md`，Linux 为 `APPEND_SYSTEM.linux.md`）与运行用 `APPEND_SYSTEM.md` 在同一补丁中保持一致；另一平台源也受权限保护，不擅自改写。
 - 重大修改不自行先换审批器：当前规则先审批精确补丁，事务再调用独立 Backup；核心源码和加载配置的备份须覆盖全部已有目标。新规则在重载后生效；未知基线异常先恢复，不能自动接纳。
-- 最后 `/reload` 或重启，确认实际行为及 `policyIntegrity.ok: true`。保护基线由构建生成，不手工编辑。启动或维护脚本损坏时，用备份 `node <快照>/transaction-runner/customization/runtime/maintenance.mjs --agent-root <原配置目录> Restore --backup-path <快照> --apply` 恢复，见手册。凭据、记忆库与安装包需单独保管。
+- 最后 `/reload` 或重启，确认实际行为及 `policyIntegrity.ok: true`。保护基线由构建生成，不手工编辑。启动或维护脚本损坏时，用完整快照中的旧系统入口恢复；显式指定原 AgentRoot 和快照路径，先预览再确认，按手册的双平台恢复步骤执行。凭据、记忆库与安装包需单独保管。
 
 ## 包管理与长期维护
 
 - 使用 `pi list` 核对来源，通过 `pi install npm:包名@明确版本` 管理目标组件。保留旧版本和配置快照，验证后再清理。
 - 保留 `settings.json` 的包资源过滤和预编译入口；每个组件只启用一个入口。包升级、重装或扩展源码变化后重建并检查；构建失败先定位原因。
-- 性能问题才运行 `node customization/runtime/maintenance.mjs Benchmark` / `node customization/runtime/maintenance.mjs Context`，联网问题才运行 `node customization/runtime/maintenance.mjs WebTest`。这些入口不调用真实模型；WebTest 使用免费 Exa MCP。常规维护不探测收费 API。
+- 性能问题才通过本系统入口运行 `Benchmark` / `Context`，联网问题才运行 `WebTest`。这些入口不调用真实模型；WebTest 使用免费 Exa MCP。常规维护不探测收费 API。
 - 只把验证过的可复用做法更新到对应章节，替换旧内容；用户偏好存入 memory。密钥、临时日志和未经验证的推测不写入文档或记忆。
