@@ -134,8 +134,8 @@ async function askModel(
 export function configuredHumanFallback(): "pause" | "ask" {
   try {
     const config = JSON.parse(readFileSync(join(getAgentDir(),"extensions/pi-permission-suite/config.json"),"utf8"));
-    return config.reviewer?.humanFallback === "ask" ? "ask" : "pause";
-  } catch {return "pause";}
+    return config.reviewer?.humanFallback === "pause" ? "pause" : "ask";
+  } catch {return "ask";}
 }
 
 export function createApprovalReviewer(pi: ExtensionAPI, options?: {humanFallback?:"pause"|"ask"}) {

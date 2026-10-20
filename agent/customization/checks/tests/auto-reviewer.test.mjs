@@ -126,9 +126,9 @@ test('ACT skips ordinary review and approves each risky deletion internally with
 
 test('both execution modes pause uncertain or unavailable deletion reviews without modal prompts', async () => {
   const {configuredHumanFallback}=await jiti.import(join(suite,'extensions/timrt-suite/approval-reviewer.ts'));
-  assert.equal(configuredHumanFallback(),'pause','本机默认使用无人值守回退');
+  assert.equal(configuredHumanFallback(),'ask','两平台默认使用人工兜底');
   for(const mode of ['auto','act'])for(const response of ['{"approved":true,"confidence":0.3,"reason":"范围不足"}',{error:'HTTP 503'}]) {
-    const h=await harness(()=>response);h.setMode(mode);
+    const h=await harness(()=>response,{humanFallback:'pause'});h.setMode(mode);
     let dialogs=0,notifications=0;
     h.ctx.ui.confirm=h.ctx.ui.select=async()=>{dialogs++;return false;};
     h.ctx.ui.notify=()=>{notifications++;};
@@ -142,7 +142,7 @@ test('both execution modes pause uncertain or unavailable deletion reviews witho
   }
 });
 
-test('cancelled reviews never approve or prompt, and unavailable SDK pauses by default', async () => {
+test('cancelled reviews never prompt; unavailable SDK uses the default human fallback', async () => {
   const h = await harness(() => APPROVE);
   h.setMode('auto');
   const asked = h.ask('❌ 拒绝');
@@ -153,7 +153,25 @@ test('cancelled reviews never approve or prompt, and unavailable SDK pauses by d
   h.ctx.signal = undefined;
   h.ctx.modelRegistry.complete = undefined;
   assert.equal((await h.call('write', {path:'./note.md',content:'ok'})).block, true);
-  assert.equal(asked(), 0, '接口不可用时默认暂停，不弹窗');
+  assert.equal(asked(), 1, '接口不可用时默认询问，未批准不能执行');
+});
+
+test('default human fallback waits for a decision for AUTO and risky ACT calls; headless calls stay blocked',async()=>{
+  for(const mode of ['auto','act']) {
+    const h=await harness(()=>'{"approved":false,"confidence":0.4,"reason":"需人工核对"}');h.setMode(mode);
+    let finish, options, completed=false;
+    const pending=new Promise(resolve=>{finish=resolve;});
+    h.ctx.ui.confirm=async(_title,_body,opts)=>{options=opts;return pending;};
+    h.ctx.ui.select=async(_title,rows,opts)=>{options=opts;return await pending ? rows[0] : rows[1];};
+    const call=h.call('bash',{command:'rm -rf ./cache'}).then(value=>{completed=true;return value;});
+    for(let i=0;i<30&&!options;i++)await new Promise(resolve=>setTimeout(resolve,5));
+    assert.equal(options?.timeout,90000);
+    assert.equal(completed,false,'必须等待人工结果，不能先返回暂停并让模型继续');
+    finish(false);assert.equal((await call).block,true);
+    assert.equal(h.state.approvalHold,true);
+    const headless=await harness(()=>'{"approved":false,"confidence":0.4,"reason":"需人工核对"}');headless.setMode(mode);headless.ctx.hasUI=false;
+    assert.equal((await headless.call('bash',{command:'rm -rf ./cache'})).block,true);
+  }
 });
 
 test('approval cache and unavailable window are scoped to the selected model', async () => {

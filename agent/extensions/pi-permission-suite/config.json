@@ -13,6 +13,6 @@
   },
   "external_directory": "mode",
   "reviewer": {
-    "humanFallback": "pause"
+    "humanFallback": "ask"
   }
 }
