@@ -1,15 +1,19 @@
 # Pi 本机维护手册
 
-更新：2026-10-20 · Pi 1.3.0 · Node 24.20.0 · Windows / PowerShell 7
+更新：2026-10-20 · Pi 1.3.0 · Node 24+ · Windows / PowerShell 7 · Linux / Bash
 配置根目录：`~/.pi/agent`，下文文件路径均相对此目录。
 
-本安装目录自带锁定版本的 Pi，宿主位于 `install/releases/<版本>/`，用 `bin/pi.cmd` 启动；无需全局安装 Pi。运行需要 Node.js 24+（含 npm）和 PowerShell 7。使用独立配置目录时，以 `PI_CODING_AGENT_DIR` 指向的目录为准。
+本安装目录自带锁定版本的 Pi，宿主位于 `install/releases/<版本>/`，Windows 用 `bin/pi.cmd`，Linux 用 `bin/pi` 启动；无需全局安装 Pi。运行需要 Node.js 24+（含 npm）；Windows 还需要 PowerShell 7，Linux 使用 Bash。使用独立配置目录时，以 `PI_CODING_AGENT_DIR` 指向的目录为准。
 
 **查阅顺序：** [日常操作](#日常操作) · [权限与审批](#权限与审批) · [自维护与升级](#自维护与升级) · [联网与记忆](#联网与记忆) · [备份与清理](#备份与清理) · [配置与组件](#配置与组件) · [检查与维护命令](#检查与维护命令)
 
 ## 日常操作
 
-双击 `customization/Pi-Maintenance.bat` 打开菜单，H 查看本手册，0 退出。维护脚本优先 PowerShell 7，兼容系统 Windows PowerShell。
+安装器会询问是否将此安装设为默认 pi 命令，并可选隐藏输入搜索 Key。已有安装先备份再修复；原有模型、认证、长期规则与个人配置保留。Linux 使用原生独立目录；WSL 不应执行 Windows AgentRoot 里的 pi。Bash 启动器使用 install/node-path 记录的本机 Node，无需每次手动激活 nvm；切勿将该文件跨系统复制。
+
+若新终端仍找到旧命令，Windows 用 Get-Command pi -All、Bash 用 type -a pi 检查；Bash 当前终端可 source ~/.bashrc 后 hash -r；登录环境是 zsh 时安装器也配置 .zshrc / .zprofile，当前 zsh 可 source ~/.zshrc 后 rehash。安装器保留其他 Pi，不自动移除个人别名或函数。macOS 尚未验证，属于 Bash 适配尝试，不能视为已支持。
+
+Windows 双击 `customization/Pi-Maintenance.bat` 打开菜单，H 查看本手册，0 退出。共享维护核心使用 Node.js；Windows 菜单与密钥窗口使用 PowerShell 7。Linux 在配置根运行 `node customization/runtime/maintenance.mjs Status`，也可使用 `bash customization/maintain-pi.sh Status`。
 
 | 菜单 | 用途 |
 |---|---|
@@ -22,6 +26,18 @@
 | 7 检查 / 联网 / 测速 | 离线检查、免费 Exa 测试、启动测速、首轮上下文统计 |
 | 8 清理生成物 | 预览日志和指定残留，确认后删除 |
 | 9 启动 Pi | 选择工作目录并启动，退出后返回菜单 |
+
+Linux 常用维护操作：
+
+```bash
+node customization/runtime/maintenance.mjs Catalog
+node customization/runtime/maintenance.mjs Set-Model provider model-id
+node customization/runtime/maintenance.mjs Set-Theme claude-warm
+node customization/runtime/maintenance.mjs SetKey brave
+node customization/runtime/maintenance.mjs EditConfig settings.json
+```
+
+Key 仅在终端隐藏输入，不放入命令参数或聊天。EditConfig 先备份，使用 VISUAL / EDITOR 指定的编辑器可执行文件。Windows 菜单保留同等设置入口。
 
 ### 模型、主题与底栏
 
@@ -145,11 +161,13 @@ flowchart LR
 
 AUTO/ACT 均须内部审批，ASK 人工确认且无超时，PLAN/清理暂停不执行。所有补丁均由修改前的规则审批；重大修改先调用独立维护脚本备份，并核对每个已有目标均有完整原件。核心修改使用备份中的旧维护脚本、构建器、校验器和检查代码完成本次验证，不在事务中途切换审批规则。未批准的核心变化或快照篡改使事务停止。无需手动重复备份与验证；完成后底栏提示 `/reload` 或重启，新代码才进入当前会话。
 
+修改长期规则时，当前平台源文件与 `APPEND_SYSTEM.md` 必须在同一次补丁中保持相同内容。两个平台源文件均受保护并纳入备份；修改尚未使用的平台规则也需要明确权限维护授权。
+
 ### 外部维护与组件升级
 
-1. 在 agent 根目录运行 `pwsh -NoProfile -File customization/Maintain-Pi.ps1 -Action Backup`。
+1. 在 agent 根目录运行 `node customization/runtime/maintenance.mjs Backup`。
 2. 核对具体补丁或组件版本。包管理使用 `pi list`、`pi install npm:包名@明确版本`；保留包资源过滤和单一扩展入口。
-3. 应用后依次运行 `-Action Rebuild`、`-Action Check`。重建会应用兼容补丁、编译并生成 `customization/runtime/policy-seal.json`。
+3. 应用后依次运行 `node customization/runtime/maintenance.mjs Rebuild`、`node customization/runtime/maintenance.mjs Check`。重建会应用兼容补丁、编译并生成 `customization/runtime/policy-seal.json`。
 4. `/reload` 或重启，检查状态和实际行为；验证后再清理旧版与快照。构建失败先定位原因，保留回退资料。
 
 ## 联网与记忆
@@ -182,24 +200,24 @@ Hermes 按需初始化，每 12 轮或 30 次工具调用复盘，使用最近 2
 | 内容 | 默认配置快照 |
 |---|---|
 | 普通配置、主题、代理定义、本地扩展源码、技能、维护文档、STANDING、信任配置 | 包含 |
-| 独立维护脚本、构建/校验源码、检查脚本、启动器 | 包含；不备份生成的 seal、编译产物或依赖 |
+| 独立维护脚本、构建/校验源码、检查脚本、启动器与 Linux Node 定位文件 | 包含；不备份生成的 seal、编译产物或依赖 |
 | models.json、auth.json、搜索 Key | 排除；单文件编辑备份可能包含凭据 |
 | 会话、记忆数据库、安装包和依赖 | 排除，需单独备份 |
 
-快照在 `backups/config-用途-时间-随机值`，访问权限限当前用户，清单含 SHA256。恢复会验证路径与文件完整性，先备份当前配置，再要求输入 `RESTORE`；维护脚本、构建器及启动器也可恢复，恢复后重建并重启。记忆数据库应关闭 Pi 后另行备份。
+快照在 `backups/config-用途-时间-随机值`，Windows 使用用户 DACL，Linux 目录 0700、文件 0600，清单含 SHA256。恢复先展示路径、源文件 SHA256 和当前目标状态，输入 `RESTORE` 后复查这些状态并创建安全快照；维护脚本、构建器及启动器也可恢复，恢复后重建并重启。记忆数据库应关闭 Pi 后另行备份。
 
 如果本次核心修改导致 Pi 或现用维护入口无法启动，退出 Pi，用该次备份保存的旧入口恢复，不需要新增恢复系统：
 
-```powershell
-$agent = "$env:USERPROFILE\.pi\agent" # 独立安装改为实际目录
-$backup = "$agent\backups\config-具体备份目录"
-$runner = "$backup\transaction-runner\customization\Maintain-Pi.ps1"
-pwsh -NoProfile -File $runner -AgentRoot $agent -Action Restore -BackupPath $backup
-# 核对预览后，追加 -Apply 并输入 RESTORE
-# 恢复后用原安装目录的维护菜单重建，再重启 Pi
+在终端运行（占位符替换为实际绝对路径）：
+
+```text
+node <快照>/customization/runtime/maintenance.mjs --agent-root <AgentRoot> Restore --backup-path <快照>
+node <快照>/customization/runtime/maintenance.mjs --agent-root <AgentRoot> Restore --backup-path <快照> --apply
 ```
 
-仅核心事务会保存 `transaction-runner`；一般配置备份从现有维护菜单恢复。快照是同一用户可访问的恢复材料，不是操作系统级防篡改隔离。
+输入 RESTORE 前核对完整清单。核心事务也可使用 `<快照>/transaction-runner/customization/runtime/maintenance.mjs`；两者均不依赖损坏的现用维护器。恢复后运行现用核心 Rebuild、Check 并重启。外部恢复不覆盖未列入快照的文件。
+
+仅核心事务会保存 `transaction-runner`；一般完整配置备份也包含共享维护核心，可在外部独立恢复。快照是同一用户可访问的恢复材料，不是操作系统级防篡改隔离。
 
 菜单 5 的清理选项先展示清单，再确认：
 
@@ -259,13 +277,13 @@ pwsh -NoProfile -File $runner -AgentRoot $agent -Action Restore -BackupPath $bac
 | @anishthite/pi-themes | 0.1.9 | Ayu、Catppuccin、GitHub 等主题 |
 | @narumitw/pi-btw | 0.61.2 | 独立旁聊 |
 
-本地 `timrt-suite` 整合界面、权限、联网与维护。启动器 `bin/pi-launcher.js` 使用 Windows Node 原生运行 Pi，命令工具使用 PowerShell。四个编译入口随启动加载，第五个任务代理入口授权后加载。包的 `extensions: []` 可与预编译入口配套；每个组件只启用一个入口，MCP 使用内置扩展，不单独编译、不安装第三方 Adapter。Exa 默认仅开放 search/fetch 两个 deferred 工具，其余隐藏。连接在后台建立，web 首次调用通过 reachesTools 等待就绪；不是首次调用才连接。
+本地 `timrt-suite` 整合界面、权限、联网与维护。启动器 `bin/pi-launcher.js` 使用本机 Node 原生运行 Pi；Windows 命令工具为 PowerShell 7，Linux 为 Bash。四个编译入口随启动加载，第五个任务代理入口授权后加载。包的 `extensions: []` 可与预编译入口配套；每个组件只启用一个入口，MCP 使用内置扩展，不单独编译、不安装第三方 Adapter。Exa 默认仅开放 search/fetch 两个 deferred 工具，其余隐藏。连接在后台建立，web 首次调用通过 reachesTools 等待就绪；不是首次调用才连接。
 
 `cache/node-compile` 与 `cache/jiti` 日常保留。Hashline 默认数据放在当前 AgentRoot 的 `pi-hashline-edit-pro`；显式设置 PI_HASHLINE_DIR 时遵循该设置。启动器依据 `customization/runtime/compiled-extensions.json` 检测源码、SDK 和输出变化，必要时自动重建。
 
 ## 检查与维护命令
 
-在 `customization` 目录运行；以下检查不调用真实模型：
+正常部署用 `node customization/checks/check-startup.mjs` 检查扩展和工具启动，不使用用户数据制造测试夹具。下列完整离线测试与诊断在 `customization` 目录运行，不调用真实模型；外部安装测试仅使用独立 .local 安装：
 
 ```powershell
 .\Maintain-Pi.ps1 -Action Status     # 脱敏状态

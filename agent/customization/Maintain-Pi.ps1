@@ -53,76 +53,32 @@ function Protect-PiPath([string]$Path, [switch]$File) {
         else { [IO.Directory]::SetAccessControl($Path, $acl) }
     }
 }
-function Test-PiConfigPath([string]$Relative) {
-    $name = $Relative.Replace('/','\')
-    return $name -match '^(settings\.json|trust\.json|models\.json|auth\.json|mcp\.json|keybindings\.json|pi-cc-extensions\.json|pi-btw\.json|hermes-memory-config\.json|APPEND_SYSTEM\.md|pi-hermes-memory\\STANDING\.md|secrets\\web-keys\.json|extensions\\pi-permission-suite\\config\.json|extensions\\subagent\\config\.json|skills\\(?:pi-maintenance|principal)\\SKILL\.md|customization\\(?:README\.md|Pi Agent 本机配置维护手册\.md|Maintain-Pi\.ps1|Pi-Maintenance\.bat)|customization\\runtime\\[^\\]+\.(cjs|mjs)|customization\\checks\\(?:tests\\)?[^\\]+\.(mjs|ps1)|bin\\pi(?:-launcher\.js|\.cmd)|agents\\[^\\]+\.md|themes\\[^\\]+\.json|extensions\\timrt-suite\\[^\\]+\.(ts|ps1))$'
+function Invoke-PiMaintenance([string[]]$Arguments) {
+    $node = (Get-Command node -ErrorAction Stop).Source
+    & $node (Join-Path $PSScriptRoot 'runtime/maintenance.mjs') --agent-root $script:AgentRoot @Arguments
+    if ($LASTEXITCODE -ne 0) { throw '维护操作未完成。' }
 }
-function Get-PiConfigFiles {
-    $files = @('settings.json','trust.json','mcp.json','keybindings.json','pi-cc-extensions.json','pi-btw.json','hermes-memory-config.json','APPEND_SYSTEM.md','pi-hermes-memory\STANDING.md','extensions\pi-permission-suite\config.json','extensions\subagent\config.json','skills\pi-maintenance\SKILL.md','skills\principal\SKILL.md','customization\README.md','customization\Pi Agent 本机配置维护手册.md','customization\Maintain-Pi.ps1','customization\Pi-Maintenance.bat','bin\pi-launcher.js','bin\pi.cmd')
-    foreach ($group in @(@{Path='agents';Filter='*.md'},@{Path='themes';Filter='*.json'},@{Path='extensions\timrt-suite';Filter='*.ts'},@{Path='extensions\timrt-suite';Filter='*.ps1'})) {
-        $directory = Resolve-PiChild $script:AgentRoot $group.Path
-        if (Test-Path -LiteralPath $directory) { $files += Get-ChildItem -LiteralPath $directory -File -Filter $group.Filter | ForEach-Object { $group.Path + '\' + $_.Name } }
-    }
-    foreach ($relative in @('customization\runtime','customization\checks','customization\checks\tests')) {
-        $directory = Resolve-PiChild $script:AgentRoot $relative
-        if (Test-Path -LiteralPath $directory) { $files += Get-ChildItem -LiteralPath $directory -File | Where-Object { Test-PiConfigPath ($relative + '\' + $_.Name) } | ForEach-Object { $relative + '\' + $_.Name } }
-    }
-    return @($files | Select-Object -Unique)
+function Test-PiConfigPath([string]$Relative) {
+    $env:PI_CONFIG_PATH = $Relative
+    $module = Join-Path $PSScriptRoot 'runtime/maintenance.mjs'
+    $env:PI_MAINTENANCE_MODULE = $module
+    $result = & node --input-type=module -e 'import {pathToFileURL} from "node:url"; const m=await import(pathToFileURL(process.env.PI_MAINTENANCE_MODULE));console.log(m.configPath(process.env.PI_CONFIG_PATH));'
+    if ($LASTEXITCODE -ne 0) { throw '配置范围检查失败。' }
+    return $result -eq 'true'
 }
 function New-PiBackup([string]$Label = 'manual', [string[]]$Files) {
-    if ($Label -notmatch '^[A-Za-z0-9-]+$') { throw '备份名称只允许英文、数字和连字符。' }
-    $fullBackup = -not $Files
-    if ($fullBackup) { $Files = Get-PiConfigFiles }
-    $name = 'config-' + $Label + '-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + [Guid]::NewGuid().ToString('N').Substring(0,8)
-    $destination = Resolve-PiChild $script:AgentRoot ('backups\' + $name)
-    New-Item -ItemType Directory -Path $destination -Force | Out-Null
-    Protect-PiPath $destination
-    $copied = @(); $hashes = @{}
-    foreach ($relative in $Files) {
-        if (-not (Test-PiConfigPath $relative)) { throw '该文件不属于配置备份范围。' }
-        $source = Resolve-PiChild $script:AgentRoot $relative
-        if (-not (Test-Path -LiteralPath $source -PathType Leaf)) { continue }
-        $target = Resolve-PiChild $destination $relative
-        New-Item -ItemType Directory -Path (Split-Path -Parent $target) -Force | Out-Null
-        Copy-Item -LiteralPath $source -Destination $target
-        $copied += $relative; $hashes[$relative] = (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash
-    }
-    Write-PiJson (Join-Path $destination 'configuration-snapshot.json') @{kind='pi-configuration';scope=$(if($fullBackup){'full'}else{'files'});createdAt=(Get-Date).ToString('o');files=$copied;hashes=$hashes;excludes=@('node_modules','sessions','memory database','runtime cache');credentialsIncluded=[bool]($copied -match '^(models\.json|auth\.json|secrets\\)')}
-    return $destination
+    $arguments = @('Backup','--label',$Label)
+    if ($null -ne $Files) { $arguments += @('--files', (ConvertTo-Json -InputObject @($Files) -Compress)) }
+    return Invoke-PiMaintenance $arguments
 }
 function Get-PiRestorePlan([string]$Snapshot) {
-    $snapshotPath = [IO.Path]::GetFullPath($Snapshot).TrimEnd('\')
-    $backupRoot = Resolve-PiChild $script:AgentRoot 'backups'
-    if ((Split-Path -Parent $snapshotPath) -ne $backupRoot) { throw '请选择 Pi backups 下的配置快照目录。' }
-    $manifestPath = Resolve-PiChild $snapshotPath 'configuration-snapshot.json'
-    $manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
-    $plan = @(foreach ($relative in $manifest.files) {
-        $source = Resolve-PiChild $snapshotPath $relative
-        $target = Resolve-PiChild $script:AgentRoot $relative
-        # Restore managed source, including the maintainer/builder; never generated seals or dependencies.
-        if (-not (Test-PiConfigPath $relative)) { continue }
-        if (-not (Test-Path -LiteralPath $source -PathType Leaf)) { throw "快照缺少文件：$relative" }
-        if ($manifest.hashes) {
-            $expected = $manifest.hashes.PSObject.Properties[$relative].Value
-            if (-not $expected -or (Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash -ne $expected) { throw "快照校验失败：$relative" }
-        }
-        [pscustomobject]@{Relative=$relative;Source=$source;Target=$target}
-    })
-    if (-not $plan.Count) { throw '没有可恢复的配置。' }
-    return $plan
+    $plan = (Invoke-PiMaintenance @('Restore','--backup-path',$Snapshot)) -join "`n" | ConvertFrom-Json
+    return @($plan.files | ForEach-Object { [pscustomobject]@{ Relative=$_.relative.Replace('/','\'); Source=(Join-Path $Snapshot $_.relative); Target=(Join-Path $script:AgentRoot $_.relative) } })
 }
 function Restore-PiBackup([string]$Snapshot, [switch]$Commit) {
-    $plan = @(Get-PiRestorePlan $Snapshot)
-    Write-Host "将恢复 $($plan.Count) 个配置/本地扩展文件。先退出所有 Pi。"
-    if (-not $Commit) { $plan | ForEach-Object { Write-Host ('  ' + $_.Relative) }; return }
-    if ((Read-Host '输入 RESTORE 确认恢复') -cne 'RESTORE') { return }
-    $safety = New-PiBackup -Label before-restore -Files @($plan.Relative | Where-Object { Test-Path -LiteralPath (Resolve-PiChild $script:AgentRoot $_) -PathType Leaf })
-    foreach ($file in $plan) {
-        New-Item -ItemType Directory -Path (Split-Path -Parent $file.Target) -Force | Out-Null
-        Copy-Item -LiteralPath $file.Source -Destination $file.Target -Force
-        if ($file.Relative -match '^(models\.json|auth\.json|secrets\\)') { Protect-PiPath $file.Target -File }
-    }
-    Write-Host "恢复完成；恢复前备份：$safety。请重建扩展并重启 Pi。" -ForegroundColor Green
+    $arguments = @('Restore','--backup-path',$Snapshot)
+    if ($Commit) { $arguments += '--apply' }
+    Invoke-PiMaintenance $arguments
 }
 function Invoke-PiState([string[]]$Arguments = @('status')) {
     $node = (Get-Command node -ErrorAction Stop).Source
@@ -278,58 +234,10 @@ function Invoke-PiNode([string[]]$Arguments, [string]$Log, [string]$WorkingDirec
         if ($LASTEXITCODE -ne 0) { throw "操作未通过（退出码 $LASTEXITCODE）。" }
     } finally { Pop-Location }
 }
-function Invoke-PiCheck([string]$Kind) {
-    $reports = Resolve-PiChild $script:AgentRoot 'customization\reports'
-    New-Item -ItemType Directory -Path $reports -Force | Out-Null
-    $log = Resolve-PiChild $reports 'last-check.log'
-    [IO.File]::WriteAllText($log, (Get-Date).ToString('o') + [Environment]::NewLine, $script:Utf8)
-    $checks = Join-Path $script:MaintenanceRoot 'checks'
-    if ($Kind -eq 'Check') {
-        $powerShell = (Get-Process -Id $PID).Path
-        & $powerShell -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $checks 'tests\Test-Maintenance.ps1') | Tee-Object -FilePath $log -Append
-        if ($LASTEXITCODE -ne 0) { throw '维护脚本检查未通过。' }
-        $testFiles = @(Get-ChildItem -LiteralPath (Join-Path $checks 'tests') -Filter '*.test.mjs' -File | ForEach-Object FullName)
-        Invoke-PiNode -Arguments (@('--test') + $testFiles) -Log $log
-        Invoke-PiNode -Arguments @((Join-Path $checks 'check-components.mjs')) -Log $log
-    } elseif ($Kind -eq 'WebTest') { Invoke-PiNode -Arguments @((Join-Path $checks 'check-components.mjs'),'--live-web') -Log $log }
-    elseif ($Kind -eq 'Benchmark') { Invoke-PiNode -Arguments @((Join-Path $checks 'benchmark-startup.mjs')) -Log $log }
-    elseif ($Kind -eq 'Context') { Invoke-PiNode -Arguments @((Join-Path $checks 'profile-prompt.mjs')) -Log $log }
-    Write-Host "完成。最新日志：$log（下次检查覆盖）。" -ForegroundColor Green
-}
-function Get-PiCleanupItems {
-    $reports = Resolve-PiChild $script:AgentRoot 'customization\reports'
-    if (Test-Path -LiteralPath $reports) {
-        foreach ($file in Get-ChildItem -LiteralPath $reports -File -Force) {
-            if ($file.Extension -in @('.json','.log')) { [pscustomobject]@{Path=(Resolve-PiChild $reports $file.Name);IsDirectory=$false;Bytes=$file.Length} }
-        }
-    }
-    $backups = Resolve-PiChild $script:AgentRoot 'backups'
-    if (Test-Path -LiteralPath $backups) {
-        foreach ($directory in Get-ChildItem -LiteralPath $backups -Directory) {
-            if ($directory.Name -notmatch '^(maintenance|installation)-artifacts-\d{8}-\d{6}$') { continue }
-            $path = Resolve-PiChild $backups $directory.Name
-            $items = @(Get-ChildItem -LiteralPath $path -Recurse -Force)
-            if (@($items | Where-Object { $_.Attributes -band [IO.FileAttributes]::ReparsePoint }).Count) { throw '清理目录包含链接，请手动检查。' }
-            [pscustomobject]@{Path=$path;IsDirectory=$true;Bytes=($items | Where-Object { -not $_.PSIsContainer } | Measure-Object Length -Sum).Sum}
-        }
-    }
-}
+function Invoke-PiCheck([string]$Kind) { Invoke-PiMaintenance @($Kind) }
 function Clear-PiGenerated([switch]$Commit) {
-    $items = @(Get-PiCleanupItems)
-    if (-not $items.Count) { Write-Host '没有可清理的报告或安装残留。'; return }
-    Write-Host '仅清理生成的报告/日志及明确标记的安装、调试残留归档：' -ForegroundColor Yellow
-    $items | ForEach-Object { Write-Host ('  {0}  ({1:N0} bytes)' -f $_.Path,$_.Bytes) }
-    Write-Host ('合计约 {0:N2} MiB。配置快照、记忆、认证和编译缓存不在清单中。' -f (($items | Measure-Object Bytes -Sum).Sum / 1MB))
-    if (-not $Commit) { Write-Host '当前仅预览；手动从菜单确认，或使用 -Action Clean -Apply。'; return }
-    if ((Read-Host '输入 DELETE 确认永久删除以上生成物') -cne 'DELETE') { return }
-    # Recompute and revalidate paths after confirmation; reject changes to the deletion set.
-    $fresh = @(Get-PiCleanupItems)
-    if (@(Compare-Object @($items.Path) @($fresh.Path)).Count) { throw '清理清单发生变化，请重新预览。' }
-    foreach ($item in $fresh) {
-        if ($item.IsDirectory) { Remove-Item -LiteralPath $item.Path -Recurse -Force }
-        else { Remove-Item -LiteralPath $item.Path -Force }
-    }
-    Write-Host '生成物已清理。' -ForegroundColor Green
+    $arguments = @('Clean'); if ($Commit) { $arguments += '--apply' }
+    Invoke-PiMaintenance $arguments
 }
 function Show-PiRestore {
     $backups = Resolve-PiChild $script:AgentRoot 'backups'
@@ -337,60 +245,9 @@ function Show-PiRestore {
     $item = Select-PiItem '选择配置快照；恢复前会自动备份当前文件' $items {param($entry) $entry.Name}
     if ($item) { Restore-PiBackup $item.FullName -Commit }
 }
-function Get-PiBackupInventory {
-    $root = Resolve-PiChild $script:AgentRoot 'backups'
-    if (-not (Test-Path -LiteralPath $root)) { return }
-    foreach ($item in Get-ChildItem -LiteralPath $root -Force) {
-        $path = Resolve-PiChild $root $item.Name
-        $files = if ($item.PSIsContainer) { @(Get-ChildItem -LiteralPath $path -Recurse -Force) } else { @($item) }
-        if (@($files | Where-Object { $_.Attributes -band [IO.FileAttributes]::ReparsePoint }).Count) { throw '备份目录包含链接，请手动检查。' }
-        $full = $false; $created = [DateTimeOffset]$item.CreationTimeUtc
-        $manifestPath = Join-Path $path 'configuration-snapshot.json'
-        if ($item.PSIsContainer -and (Test-Path -LiteralPath $manifestPath -PathType Leaf)) {
-            try {
-                $manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
-                $parsed = [DateTimeOffset]::MinValue
-                if ($manifest.createdAt -is [DateTimeOffset]) { $created = $manifest.createdAt }
-                elseif ($manifest.createdAt -is [DateTime]) { $created = [DateTimeOffset]$manifest.createdAt }
-                elseif ([DateTimeOffset]::TryParse([string]$manifest.createdAt,[ref]$parsed)) { $created = $parsed }
-                $normalized = @($manifest.files | ForEach-Object { $_.Replace('/','\') })
-                if ($manifest.scope -eq 'full' -or (-not $manifest.scope -and $normalized -contains 'settings.json' -and $normalized -contains 'APPEND_SYSTEM.md')) {
-                    $null = @(Get-PiRestorePlan $path)
-                    $full = $true
-                }
-            } catch { $full = $false }
-        }
-        [pscustomobject]@{Name=$item.Name;Path=$path;IsDirectory=$item.PSIsContainer;Bytes=($files | Where-Object { -not $_.PSIsContainer } | Measure-Object Length -Sum).Sum;Created=$created;FullConfiguration=$full}
-    }
-}
-function Get-PiBackupPrunePlan([ValidateSet('All','KeepLatestTwo')][string]$Mode) {
-    $all = @(Get-PiBackupInventory)
-    $keep = @()
-    if ($Mode -eq 'KeepLatestTwo') { $keep = @($all | Where-Object FullConfiguration | Sort-Object Created,Name -Descending | Select-Object -First 2) }
-    $delete = @($all | Where-Object { $keep.Path -notcontains $_.Path })
-    return [pscustomobject]@{Mode=$Mode;Keep=$keep;Delete=$delete}
-}
 function Clear-PiBackups([ValidateSet('All','KeepLatestTwo')][string]$Mode = 'KeepLatestTwo', [switch]$Commit) {
-    $plan = Get-PiBackupPrunePlan $Mode
-    Write-Host "`n备份目录：$(Join-Path $script:AgentRoot 'backups')" -ForegroundColor Cyan
-    if ($Mode -eq 'KeepLatestTwo') {
-        Write-Host "保留最新 $($plan.Keep.Count) 份有效完整配置备份：" -ForegroundColor Green
-        $plan.Keep | ForEach-Object { Write-Host ('  {0}  {1}' -f $_.Created.ToString('yyyy-MM-dd HH:mm:ss zzz'),$_.Name) }
-        if ($plan.Keep.Count -eq 0) { throw '没有可识别的完整配置备份。请先使用菜单 4 创建备份，或明确选择删除全部。' }
-    }
-    if (-not $plan.Delete.Count) { Write-Host '没有需要删除的备份。'; return }
-    Write-Host ('将删除 {0} 项旧备份/归档，约 {1:N2} MiB：' -f $plan.Delete.Count,(($plan.Delete | Measure-Object Bytes -Sum).Sum/1MB)) -ForegroundColor Yellow
-    $plan.Delete | ForEach-Object { Write-Host ('  ' + $_.Path) }
-    if (-not $Commit) { Write-Host '当前仅预览。手动使用 -Apply 或通过菜单确认。'; return }
-    $confirmation = if ($Mode -eq 'All') { 'DELETE ALL BACKUPS' } else { 'KEEP LATEST 2' }
-    if ((Read-Host "输入 $confirmation 确认永久删除清单中的备份") -cne $confirmation) { return }
-    $fresh = Get-PiBackupPrunePlan $Mode
-    if ((@($plan.Delete.Path | Sort-Object) -join "`n") -cne (@($fresh.Delete.Path | Sort-Object) -join "`n") -or (@($plan.Keep.Path | Sort-Object) -join "`n") -cne (@($fresh.Keep.Path | Sort-Object) -join "`n")) { throw '备份清单发生变化，请重新预览。' }
-    foreach ($item in $fresh.Delete) {
-        if ($item.IsDirectory) { Remove-Item -LiteralPath $item.Path -Recurse -Force }
-        else { Remove-Item -LiteralPath $item.Path -Force }
-    }
-    Write-Host '备份清理完成。' -ForegroundColor Green
+    $arguments = @('PruneBackups','--backup-mode',$Mode); if ($Commit) { $arguments += '--apply' }
+    Invoke-PiMaintenance $arguments
 }
 function Show-PiBackupMenu {
     $choice = Read-Host "`n1 恢复备份  2 删除全部备份  3 只保留最新两份完整配置备份  0 返回"
@@ -417,7 +274,7 @@ function Show-PiMenu {
                 '3' { Set-PiWebKey -Gui }
                 '4' { Write-Host ('备份已创建：' + (New-PiBackup)) -ForegroundColor Green }
                 '5' { Show-PiBackupMenu }
-                '6' { Invoke-PiNode @((Join-Path $script:MaintenanceRoot 'runtime\build-extensions.cjs')); Write-Host '构建完成。请重启 Pi。' -ForegroundColor Green }
+                '6' { Invoke-PiMaintenance @('Rebuild'); Write-Host '构建完成。请重启 Pi。' -ForegroundColor Green }
                 '7' {
                     $check = Select-PiItem '选择检查；均不调用模型，联网测试只用免费 Exa MCP' @('Check','WebTest','Benchmark','Context') {param($item) switch($item){'Check'{'离线测试与组件集成'} 'WebTest'{'免费联网测试'} 'Benchmark'{'三次启动测速'} 'Context'{'离线首轮上下文采集'}}}
                     if ($check) { Invoke-PiCheck $check }
@@ -445,7 +302,7 @@ if ($MyInvocation.InvocationName -ne '.') {
             'SetKey' { Set-PiWebKey -Provider $KeyProvider -Gui:$Gui }
             'Restore' { if (-not $BackupPath) { throw '请提供 -BackupPath。' }; Restore-PiBackup $BackupPath -Commit:$Apply }
             'PruneBackups' { Clear-PiBackups -Mode $BackupMode -Commit:$Apply }
-            'Rebuild' { Invoke-PiNode @((Join-Path $script:MaintenanceRoot 'runtime\build-extensions.cjs')) }
+            'Rebuild' { Invoke-PiMaintenance @('Rebuild') }
             'Clean' { Clear-PiGenerated -Commit:$Apply }
             default { Invoke-PiCheck $Action }
         }

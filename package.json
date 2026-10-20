@@ -2,7 +2,7 @@
   "name": "my-slim-pi",
   "version": "0.1.0",
   "private": true,
-  "description": "A personal, slim Windows customization and reproducible setup for Pi.",
+  "description": "A personal Pi customization and reproducible native Windows/Linux setup.",
   "scripts": {"test": "node --test tests/*.test.mjs", "audit:share": "node scripts/audit-share.mjs"},
   "engines": {"node": ">=24"}
 }

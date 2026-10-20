@@ -8,7 +8,7 @@ const repo=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const source=resolve(process.argv.find(a=>a.startsWith('--source='))?.slice(9)||join(homedir(),'.pi/agent'));
 const apply=process.argv.includes('--apply');
 const payload=join(repo,'agent');
-const selected=['APPEND_SYSTEM.md','settings.json','keybindings.json','pi-cc-extensions.json','pi-btw.json','hermes-memory-config.json','mcp.json','extensions/pi-permission-suite/config.json','extensions/subagent/config.json','skills/pi-maintenance/SKILL.md','skills/principal/SKILL.md','customization/Maintain-Pi.ps1','customization/Pi-Maintenance.bat','customization/README.md','customization/Pi Agent 本机配置维护手册.md','bin/pi-launcher.js','bin/pi.cmd','bin/pi.ps1','customization/runtime/build-runtime/package.json','customization/runtime/build-runtime/package-lock.json','install/current-version','npm/package.json','npm/package-lock.json'];
+const selected=['APPEND_SYSTEM.windows.md','APPEND_SYSTEM.linux.md','bin/pi','customization/maintain-pi.sh','settings.json','keybindings.json','pi-cc-extensions.json','pi-btw.json','hermes-memory-config.json','mcp.json','extensions/pi-permission-suite/config.json','extensions/subagent/config.json','skills/pi-maintenance/SKILL.md','skills/principal/SKILL.md','customization/Maintain-Pi.ps1','customization/Pi-Maintenance.bat','customization/README.md','customization/Pi Agent 本机配置维护手册.md','bin/pi-launcher.js','bin/pi.cmd','bin/pi.ps1','customization/runtime/build-runtime/package.json','customization/runtime/build-runtime/package-lock.json','install/current-version','npm/package.json','npm/package-lock.json'];
 const version=readFileSync(join(source,'install/current-version'),'utf8').trim();
 if(!/^\d+\.\d+\.\d+$/.test(version))throw Error('Unsupported Pi version format');
 selected.push(`install/releases/${version}/package.json`,`install/releases/${version}/package-lock.json`);
@@ -33,11 +33,15 @@ function privacyCheck(value,path){
   }
 }
 const changed=[];
+// Export an explicitly customized runtime prompt back into its platform source.
+const sourcePlatform=process.argv.find(a=>a.startsWith('--platform='))?.slice(11)||process.platform;
+if(!['win32','linux'].includes(sourcePlatform))throw Error('Unsupported source platform');
 for(const path of [...new Set(selected)].sort()){
   if(omitted.includes(path))continue;
   const file=join(source,path);
   if(lstatSync(file).isSymbolicLink())throw Error('Export refuses links: '+path);
   let text=readFileSync(file,'utf8').replace(/^\uFEFF/,'');
+  if(path==='APPEND_SYSTEM.'+(sourcePlatform==='win32'?'windows':'linux')+'.md' && existsSync(join(source,'APPEND_SYSTEM.md')))text=readFileSync(join(source,'APPEND_SYSTEM.md'),'utf8');
   if(path.endsWith('.json'))privacyCheck(JSON.parse(text),path);
   if(path==='settings.json'){
     const clean=JSON.parse(text);delete clean.defaultProvider;delete clean.defaultModel;delete clean.lastChangelogVersion;
@@ -89,5 +93,5 @@ changed.push({path:'customization/runtime/patch-portable-paths.cjs',text:readFil
 if(!apply){console.log(JSON.stringify({source,files:changed.map(x=>x.path),omittedTests:omitted,apply:'Pass --apply to export'},null,2));process.exit(0);}
 for(const {path,text} of changed){const target=join(payload,path);mkdirSync(dirname(target),{recursive:true});writeFileSync(target,text);}
 const files=Object.fromEntries(changed.map(({path,text})=>[path,createHash('sha256').update(text).digest('hex')]));
-writeFileSync(join(repo,'distribution.json'),JSON.stringify({name:'my-slim-pi',schemaVersion:1,piVersion:version,platform:'win32',nodeMajor:24,packages:pins,files},null,2)+'\n');
+writeFileSync(join(repo,'distribution.json'),JSON.stringify({name:'my-slim-pi',schemaVersion:1,piVersion:version,platforms:['win32','linux'],nodeMajor:24,packages:pins,files},null,2)+'\n');
 console.log(`Exported ${changed.length} allowlisted files; no credentials, models, sessions, memory, installed dependencies or generated caches.`);

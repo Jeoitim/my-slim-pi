@@ -4,7 +4,11 @@ param(
     [string]$AgentRoot = (Join-Path $env:USERPROFILE '.pi\agent'),
     [switch]$Update,
     [switch]$Plan,
-    [switch]$AddToPath
+    [switch]$AddToPath,
+    [switch]$NoPath,
+    [switch]$NonInteractive,
+    [switch]$SkipSearchKeys,
+    [switch]$FullCheck
 )
 & {
     $ErrorActionPreference = 'Stop'
@@ -16,7 +20,7 @@ param(
     $version = & $node.Source -p 'process.versions.node'
     if ($LASTEXITCODE -ne 0 -or $version -notmatch '^\d+\.' -or [int]($version.Split('.')[0]) -lt 24) { throw 'A working Node.js 24+ with npm is required. Pi itself will be installed automatically.' }
     $target = [IO.Path]::GetFullPath($AgentRoot)
-    if (-not $Plan -and -not $Update -and (Test-Path -LiteralPath $target) -and @(Get-ChildItem -LiteralPath $target -Force).Count -gt 0) {
+    if (($NonInteractive -or [Console]::IsInputRedirected) -and -not $Plan -and -not $Update -and (Test-Path -LiteralPath $target) -and @(Get-ChildItem -LiteralPath $target -Force).Count -gt 0) {
         throw 'Target already contains files. Use -AgentRoot for a separate install, or explicitly use -Update to back up and update existing files.'
     }
     $headers = @{ 'User-Agent'='my-slim-pi-installer'; 'Accept'='application/vnd.github+json' }
@@ -43,5 +47,10 @@ param(
     Expand-Archive -LiteralPath $archive -DestinationPath $workspace
     $installer = Join-Path $workspace "my-slim-pi-$sha\scripts\Install-MySlimPi.ps1"
     if (-not (Test-Path -LiteralPath $installer -PathType Leaf)) { throw 'Downloaded source is missing the installer.' }
-    & $installer -AgentRoot $target -Update:$Update -Plan:$Plan -AddToPath:$AddToPath
+    $extra = @{}
+    if ($NoPath) { $extra.NoPath=$true }
+    if ($NonInteractive) { $extra.NonInteractive=$true }
+    if ($SkipSearchKeys) { $extra.SkipSearchKeys=$true }
+    if ($FullCheck) { $extra.FullCheck=$true }
+    & $installer -AgentRoot $target -Update:$Update -Plan:$Plan -AddToPath:$AddToPath @extra
 }

@@ -32,8 +32,10 @@ try {
   console.log('Active tools:', JSON.stringify(session.getActiveToolNames()));
   assert.ok(session.extensionRunner.getCommand('btw'), 'native BTW package command is registered');
   assert.ok(session.extensionRunner.getCommand('notify-test'), 'terminal reminder check is registered');
-  assert.ok(session.getActiveToolNames().includes('powershell'), 'native PowerShell is active');
-  assert.ok(!session.getActiveToolNames().includes('bash'), 'WSL Bash is not a default tool');
+  const shell=process.platform==='win32'?'powershell':'bash',other=shell==='bash'?'powershell':'bash';
+  const configured=JSON.parse(readFileSync(join(root,'settings.json'),'utf8')).defaultTools;
+  assert.equal(session.getActiveToolNames().includes(shell),configured.includes(shell),'respect configured native shell');
+  if(!configured.includes(other))assert.ok(!session.getActiveToolNames().includes(other),'one default shell schema');
   assert.ok(!session.getActiveToolNames().some(n => /^(?:subagent|subagents_enable|set_approval_mode|replace_match|move|copy|edit)$/.test(n)));
   assert.ok(session.getActiveToolNames().includes('replace'));
   await session.extensionRunner.emitInput('帮我修复普通开发问题，读取需要的 Principal build 技能。', undefined, 'interactive');
@@ -47,7 +49,7 @@ try {
   const deletionModeCommand = session.extensionRunner.getCommand('approval-mode');
   const deletionModeHandler = deletionModeCommand.handler || deletionModeCommand.command?.handler;
   await deletionModeHandler('plan', session.extensionRunner.createContext());
-  const nativeRead = await session.extensionRunner.emitToolCall({ type: 'tool_call', toolCallId: 'check-powershell-read', toolName: 'powershell', input: { command: 'Get-PSDrive | Select-Object Name,Used,Free' } });
+  const nativeRead = await session.extensionRunner.emitToolCall({ type: 'tool_call', toolCallId: 'check-powershell-read', toolName: shell, input: { command: shell==='bash'?'pwd':'Get-PSDrive | Select-Object Name,Used,Free' } });
   assert.ok(!nativeRead?.block, 'PLAN allows a literal PowerShell read pipeline');
   const nativeDelete = await session.extensionRunner.emitToolCall({ type: 'tool_call', toolCallId: 'check-powershell-delete', toolName: 'powershell', input: { command: "Remove-Item -LiteralPath './cache' -Recurse" } });
   assert.ok(nativeDelete?.block, 'PLAN blocks native PowerShell deletion');

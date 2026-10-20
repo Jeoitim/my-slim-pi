@@ -4,7 +4,7 @@ import { join, resolve } from 'node:path';
 import { homedir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
-const root = resolve(import.meta.dirname, '../..');
+const root = resolve(process.env.PI_MAINTENANCE_TARGET || process.env.PI_CODING_AGENT_DIR || resolve(import.meta.dirname, '../..'));
 const read = file => JSON.parse(readFileSync(join(root, file), 'utf8').replace(/^\uFEFF/, ''));
 const print = value => console.log(JSON.stringify(value));
 const command = process.argv[2] || 'status';

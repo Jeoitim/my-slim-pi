@@ -78,7 +78,7 @@ test('human timeout feedback blocks this call and preserves cleanup hold until a
   assert.equal(h.state.approvalHold,false);
 });
 
-test('auditing policy sources does not confuse echoed text or read operands with write targets', async () => {
+test('auditing policy sources does not confuse echoed text or read operands with write targets', {skip:process.platform!=='win32'}, async () => {
   const h=await harness(()=>APPROVE);const asked=h.ask('❌ 拒绝');
   const policy=join(root,'agents/approver.md'), source=join(root,'extensions/timrt-suite/permissions.ts'), builder=join(root,'customization/runtime/build-extensions.cjs');
   for(const command of [
@@ -102,7 +102,7 @@ test('auditing policy sources does not confuse echoed text or read operands with
   assert.equal(h.requests.length,before,'实际改写受保护目标不能交模型覆盖');
 });
 
-test('optional parser failures recover without caching errors or blocking literal reads', async () => {
+test('optional parser failures recover without caching errors or blocking literal reads', {skip:process.platform!=='win32'}, async () => {
   const {createShellAnalyzer,resolvePowerShellExecutable,nativeRead}=await jiti.import(join(suite,'extensions/timrt-suite/shell-analysis.ts'));
   let now=100, requests=0;
   const parser=createShellAnalyzer({now:()=>now,resolveExecutable:()=> 'C:\\fixture\\pwsh.exe',run:(_exe,_args,options)=>{
@@ -146,7 +146,7 @@ test('read-only calls never reach the deletion gate or the reviewer', async () =
   assert.equal(h.requests.length, before, 'read 工具不调用审批模型');
 });
 
-test('native queries and grammar-proven data pipelines bypass the approval model', async () => {
+test('native queries and grammar-proven data pipelines bypass the approval model', {skip:process.platform!=='win32'}, async () => {
   const h = await harness(() => {throw Error('read-only must not call reviewer');});
   for (const command of ['git status --short','node --version','Get-Location; Get-PSDrive | Select-Object Name,Free','Select-String -LiteralPath ./notes.txt -Pattern hello | ForEach-Object { $_.Line }']) {
     assert.equal(await h.call('powershell',{command}), undefined, command);
@@ -173,7 +173,7 @@ test('catastrophic scopes and policy sources cannot be overridden by AUTO approv
   for(const path of ['agents/approver.md','trust.json','customization/runtime/policy-seal.json','customization/Maintain-Pi.ps1','npm/node_modules/pi-permission-suite/rules.ts']) {
     assert.equal((await h.call('write',{path:join(root,path),content:'changed'})).block,true,path);
   }
-  for(const command of ["Remove-Item -LiteralPath 'C:\\' -Recurse -Force",`Remove-Item -LiteralPath '${homedir()}' -Recurse -Force`,'Remove-Item $HOME -Recurse -Force','Format-Volume -DriveLetter C -Confirm:$false',`Set-Content -LiteralPath '${join(root,'agents/approver.md')}' -Value changed`]) assert.equal((await h.call('powershell',{command}))?.block,true,command);
+  for(const command of [...(process.platform==='win32'?["Remove-Item -LiteralPath 'C:\\' -Recurse -Force"]:[]),`Remove-Item -LiteralPath '${homedir()}' -Recurse -Force`,'Remove-Item $HOME -Recurse -Force','Format-Volume -DriveLetter C -Confirm:$false',`Set-Content -LiteralPath '${join(root,'agents/approver.md')}' -Value changed`]) assert.equal((await h.call('powershell',{command}))?.block,true,command);
   assert.equal(h.requests.length,0,'硬边界不交模型覆盖');
 });
 

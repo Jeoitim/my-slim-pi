@@ -13,6 +13,7 @@
 **/pi-hermes-memory/
 **/policy-seal.json
 **/compiled-extensions.json
+**/install/node-path
 **/timrt-fast.mjs
 **/timrt-chunks/
 *.tgz

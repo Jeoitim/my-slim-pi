@@ -8,10 +8,15 @@ const root = process.env.PI_CODING_AGENT_DIR || join(homedir(), '.pi/agent');
 const version = readFileSync(join(root, 'install/current-version'), 'utf8').trim();
 const sdk = join(root, 'install/releases', version, 'node_modules/@earendil-works/pi-coding-agent/dist');
 
+test('configured native Bash runs Linux commands with POSIX paths and UTF-8', {skip:process.platform!=='linux'},async()=>{
+  const {createBashToolDefinition}=await import(pathToFileURL(join(sdk,'core/tools/bash.js')));
+  const cwd=mkdtempSync(join(tmpdir(),'pi-native-bash-')),tool=createBashToolDefinition(cwd);
+  const result=await tool.execute('native-bash-check',{command:'printf "中文写入\\n" > ./原生验证.txt; pwd; cat ./原生验证.txt',timeout:20});
+  assert.ok(!result.isError);assert.equal(readFileSync(join(cwd,'原生验证.txt'),'utf8').trim(),'中文写入');
+  assert.ok(result.content.some(c=>c.type==='text' && c.text.includes(cwd)));
+});
+
 test('configured native PowerShell tool runs pwsh 7 with Windows paths and UTF-8', { skip: process.platform !== 'win32' }, async () => {
-  const settings = JSON.parse(readFileSync(join(root, 'settings.json'), 'utf8'));
-  assert.ok(settings.defaultTools.includes('powershell'));
-  assert.ok(!settings.defaultTools.includes('bash'));
   const { getPowerShellConfig } = await import(pathToFileURL(join(sdk, 'utils/shell.js')));
   const config = getPowerShellConfig();
   assert.match(config.shell, /pwsh\.exe$/i);

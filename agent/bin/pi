@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+bin_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+node_bin=''
+if [[ -f "$bin_dir/../install/node-path" ]]; then IFS= read -r node_bin < "$bin_dir/../install/node-path"; fi
+if [[ "$node_bin" != /* || ! -x "$node_bin" ]]; then node_bin="$(command -v node || true)"; fi
+if [[ -z "$node_bin" ]]; then printf '%s\n' '此安装找不到 Node.js 24+；请用 Bash 安装器修复此 AgentRoot。' >&2; exit 1; fi
+export PATH="$(dirname -- "$node_bin"):$PATH"
+exec "$node_bin" "$bin_dir/pi-launcher.js" "$@"

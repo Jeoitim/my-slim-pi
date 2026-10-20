@@ -25,7 +25,7 @@ function fullPath(value: string, cwd: string) {
 
 type CommandRow = ShellAnalysis["commands"][number];
 const leaf = (path:string) => path.replace(/^.*[\\/]/,"");
-const criticalProgram = (path:string) => /^(?:Maintain-Pi\.ps1|build-extensions\.cjs|patch-[\w-]+\.cjs|policy-files\.cjs)$/i.test(leaf(path));
+const criticalProgram = (path:string) => /^(?:Maintain-Pi\.ps1|maintain-pi\.sh|maintenance\.mjs|build-extensions\.cjs|patch-[\w-]+\.cjs|policy-files\.cjs)$/i.test(leaf(path));
 const writers = /^(?:Set-Content|Add-Content|Clear-Content|Out-File|New-Item|Remove-Item|Copy-Item|Move-Item|Rename-Item|Set-Item|Clear-Item|Set-ItemProperty|Remove-ItemProperty|New-ItemProperty|Set-Acl|sc|ac|ni|ri|rm|del|erase|rd|rmdir|cp|copy|mv|move|ren|rename|icacls)$/i;
 
 function simpleCommand(command:string): CommandRow[] {
@@ -73,11 +73,27 @@ export function protectedMutation(root: string, cwd: string, name: string, input
   const shell = /^(?:bash|powershell|shell|exec|terminal)/i.test(name);
   if (shell) {
     const command = String(input.command || input.code || "");
+    // Literal destinations remain protected when the optional native parser is
+    // unavailable. Quoted source text containing '>' is an inert token.
+    const redirectTokens=command.match(/"[^"\r\n]*"|'(?:[^']|'')*'|>{1,2}|[^\s;|&<>"']+/g)||[];
+    for(let i=0;i<redirectTokens.length-1;i++)if(/^>{1,2}$/.test(redirectTokens[i])) {
+      const value=redirectTokens[i+1].replace(/^(['"])([\s\S]*)\1$/,'$2');
+      if(!/[$`{}()]/.test(value))candidates.push(value);
+    }
     const parsed=name==="powershell" ? analyzePowerShell(command) : undefined;
     const rows=parsed?.valid ? parsed.commands : simpleCommand(command);
     for(const row of rows) {
+      if(name==='bash') {
+        const program=leaf(row.name),args=row.literal,positionals=args.filter(a=>!a.startsWith('-'));
+        if(/^(?:tee|touch|mkdir|rm|rmdir|unlink|truncate|mv)$/.test(program))candidates.push(...positionals);
+        if(/^(?:chmod|chown)$/.test(program))candidates.push(...positionals.slice(1));
+        if(/^(?:cp|install)$/.test(program) && positionals.length)candidates.push(positionals.at(-1)!);
+        if(program==='sed' && args.some(a=>/^(?:-i|--in-place)(?:$|=|.)/.test(a)))candidates.push(...positionals);
+        if(program==='dd')for(const arg of args)if(arg.startsWith('of='))candidates.push(arg.slice(3).replace(/^(['"])([\s\S]*)\1$/,'$2'));
+        for(let i=0;i<args.length;i++)if(/^(?:-t|--target-directory)$/.test(args[i]) && args[i+1])candidates.push(args[i+1]);
+      }
       if(criticalProgram(row.name || ""))return POLICY_EXIT;
-      if(/^(?:node|pwsh|powershell|python|cmd)(?:\.exe)?$/i.test(leaf(row.name || ""))) {
+      if(/^(?:node|pwsh|powershell|python3?|bash|sh|cmd)(?:\.exe)?$/i.test(leaf(row.name || ""))) {
         for(const arg of row.literal)if(!/[;{}\r\n()'"]/.test(arg) && criticalProgram(arg))return POLICY_EXIT;
       }
       candidates.push(...writtenPaths(row,cwd));
@@ -98,7 +114,7 @@ export function catastrophicCall(cwd: string, name: string, input: Record<string
   // A small floor for unmistakable shell invocations, not a general program parser.
   // JS/Python fixture strings are reviewed by the model, never treated as shell commands.
   const texts = [String(input.command || input.code || ""), ...scripts.filter(s => /\.(?:ps1|sh|cmd|bat)$/i.test(s.path || "")).map(s => s.source)];
-  const roots = [homedir(), process.env.SystemRoot, process.env.ProgramFiles, process.env.APPDATA, process.env.LOCALAPPDATA, process.env.OneDrive,
+  const roots = [...(process.platform === "linux" ? ["/etc","/usr","/var","/bin","/sbin","/boot","/root","/home","/opt","/proc","/sys","/dev","/run"] : []),homedir(), process.env.SystemRoot, process.env.ProgramFiles, process.env.APPDATA, process.env.LOCALAPPDATA, process.env.OneDrive,
     ...["Desktop","Documents","Downloads","Pictures","Videos","Music"].map(folder => join(homedir(),folder))].filter(Boolean).map(p => resolve(p!));
   for (let folder = resolve(cwd); ; folder = dirname(folder)) {
     if (existsSync(join(folder,".git"))) {roots.push(folder); break;}
@@ -107,7 +123,7 @@ export function catastrophicCall(cwd: string, name: string, input: Record<string
   for (const text of texts) {
     if (/^\s*(?:Format-(?:Volume|Disk)|Clear-Disk|Initialize-Disk|diskpart|mkfs(?:\.\w+)?|bcdedit)\b/im.test(text)) return "系统磁盘/启动配置破坏风险：当前工具调用不执行，请由用户在外部单独核对。";
     const literals: string[] = [];
-    for (const match of text.matchAll(/^\s*(?:Remove-Item|ri|rm|rd|rmdir|del|erase)\s+([^\r\n]+)/gmi)) {
+    for (const match of text.matchAll(/(?:^|[;&|\n])\s*(?:(?:sudo|doas)\s+)?(?:Remove-Item|ri|rm|rd|rmdir|del|erase)\s+([^\r\n;&|]+)/gmi)) {
       literals.push(...(match[1].match(/"[^"]*"|'[^']*'|[^\s,'"]+/g) || []).map(p=>p.replace(/^['"]|['"]$/g,"")));
     }
     for (const literal of literals) {
@@ -116,7 +132,7 @@ export function catastrophicCall(cwd: string, name: string, input: Record<string
       const stripped = literal.replace(/([\\/])[*?].*$/, "$1");
       if (/[$%{}]/.test(stripped.replace(/\$env:(?:USERPROFILE|LOCALAPPDATA|APPDATA|TEMP|TMP)\b|\$HOME\b|\$\{HOME\}/gi, ""))) continue;
       const target = fullPath(stripped, cwd);
-      if (target === parse(target).root || roots.some(root => root.toLowerCase() === target.toLowerCase())) return "拒绝清空磁盘根目录、用户主目录或系统/应用数据根目录；AUTO 审批不能覆盖这项保护。";
+      if (target === parse(target).root || roots.some(root => (process.platform === "win32" ? root.toLowerCase() === target.toLowerCase() : root === target))) return "拒绝清空磁盘根目录、用户主目录或系统/应用数据根目录；AUTO 审批不能覆盖这项保护。";
     }
   }
 }

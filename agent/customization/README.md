@@ -1,6 +1,8 @@
 # Pi 本机维护
 
-双击 **Pi-Maintenance.bat** 打开维护菜单。完整说明见[维护手册](Pi%20Agent%20本机配置维护手册.md)。
+安装时可选择将 pi 设为用户默认命令并录入搜索 Key；Linux 使用原生安装，不复用 Windows 目录。
+
+Windows 双击 **Pi-Maintenance.bat** 打开维护菜单。Linux 使用 `node customization/runtime/maintenance.mjs <Action>`，或本目录的 `bash maintain-pi.sh <Action>`。完整说明见[维护手册](Pi%20Agent%20本机配置维护手册.md)。
 
 | 常用操作 | 入口 |
 |---|---|
@@ -21,5 +23,9 @@
 .\Maintain-Pi.ps1 -Action Rebuild
 .\Maintain-Pi.ps1 -Action Check
 ```
+
+CLI 支持 Status、Catalog、Set-Model 供应商 模型ID、Set-Theme 主题、SetKey brave|tavily|exa（隐藏输入）、EditConfig 相对配置路径。编辑前自动备份；编辑器使用 VISUAL / EDITOR 指定的可执行文件。
+
+Backup 默认不含凭据；Restore --backup-path 绝对快照路径 先预览，追加 --apply 并输入 RESTORE 才恢复。Clean 与 PruneBackups 同样先预览、再确认；保留最新两份使用 --backup-mode KeepLatestTwo。
 
 重建后 `/reload` 或重启 Pi。检查日志：`reports/last-check.log`。配置备份：`../backups/`；默认不含凭据、会话和记忆数据库。

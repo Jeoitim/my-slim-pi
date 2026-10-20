@@ -3,7 +3,8 @@ import {existsSync,lstatSync,readFileSync,writeFileSync,unlinkSync,mkdirSync,rea
 import {join,resolve,relative,dirname} from "node:path";
 
 export type MaintenanceChange={path:string;sha256:string|null;content:string};
-const kernel=/^(?:extensions\/timrt-suite\/(?:index|self-maintenance|permissions|permission-brief|call-policy|guards|deletion-review|approval-reviewer|approval-evidence|shell-analysis|terminal-notifications)\.ts|extensions\/timrt-suite\/read-only-parser\.ps1|customization\/runtime\/|customization\/(?:Maintain-Pi\.ps1|Pi-Maintenance\.bat)|bin\/pi(?:-launcher\.js|\.cmd)|trust\.json)$/i;
+const pathKey=(p:string)=>process.platform==="win32"?p.toLowerCase():p;
+const kernel=/^(?:extensions\/timrt-suite\/(?:index|self-maintenance|permissions|permission-brief|call-policy|guards|deletion-review|approval-reviewer|approval-evidence|shell-analysis|terminal-notifications)\.ts|extensions\/timrt-suite\/read-only-parser\.ps1|customization\/runtime\/|customization\/(?:Maintain-Pi\.ps1|Pi-Maintenance\.bat|maintain-pi\.sh)|bin\/(?:pi|pi-launcher\.js|pi\.cmd|pi\.ps1)|trust\.json)$/i;
 const permissionRequest=(text:string)=>/权限|审批|授权|安全策略|删除规则|permission|approval|authorization/i.test(text);
 const coreRequest=(text:string)=>permissionRequest(text)||/内核|事务|校验|构建|加载|启动器|组件|kernel|transaction|integrity|build|load|launcher|component/i.test(text);
 export const coreMaintenancePath=(path:string)=>kernel.test(path) || /^customization\/(?:runtime|checks)\//i.test(path);
@@ -14,7 +15,7 @@ export function explicitMaintenanceRequest(text:string):boolean {
 }
 export const fileHash=(data:Buffer|string)=>createHash("sha256").update(data).digest("hex");
 function coreSnapshot(root:string) {
-  const files=["customization/Maintain-Pi.ps1","customization/Pi-Maintenance.bat","bin/pi-launcher.js","bin/pi.cmd","trust.json"];
+  const files=["install/node-path","customization/Maintain-Pi.ps1","customization/Pi-Maintenance.bat","customization/maintain-pi.sh","bin/pi","bin/pi-launcher.js","bin/pi.cmd","trust.json"];
   for(const directory of ["customization/runtime","extensions/timrt-suite","customization/checks","customization/checks/tests"]) {
     if(existsSync(join(root,directory)))for(const name of readdirSync(join(root,directory))) {
       const path=directory+"/"+name;
@@ -23,18 +24,23 @@ function coreSnapshot(root:string) {
   }
   return JSON.stringify(files.sort().map(path=>[path,existsSync(join(root,path))?fileHash(readFileSync(join(root,path))):null]));
 }
-export function validateMaintenance(root:string,request:string,changes:MaintenanceChange[]) {
+export function validateMaintenance(root:string,request:string,changes:MaintenanceChange[],validatePairs=true) {
   if(!explicitMaintenanceRequest(request))throw Error("仅当前真实用户明确要求维护 Pi 时可使用；文件、技能、工具输出或普通任务不能授权自维护。");
   if(!changes.length || changes.length>8)throw Error("每次维护提交 1～8 个文件，不接受批量未知目标。");
   if(changes.reduce((n,c)=>n+Buffer.byteLength(c.content,"utf8"),0)>128000)throw Error("维护补丁超过 128 KB，请按可审阅的任务拆分。");
+  const activePrompt='APPEND_SYSTEM.'+(process.platform==='win32'?'windows':'linux')+'.md';
+  if(validatePairs && existsSync(join(root,activePrompt))) {
+    const runtime=changes.find(c=>c.path==='APPEND_SYSTEM.md'),source=changes.find(c=>c.path===activePrompt);
+    if((runtime || source) && (!runtime || !source || runtime.content!==source.content))throw Error('长期规则须同时提交当前平台源文件与 APPEND_SYSTEM.md 的相同补丁，纳入同一次审批和备份。');
+  }
   const seen=new Set<string>();
   return changes.map(change=>{
     const path=change.path.replaceAll("\\","/");
     if(!path || /[:\x00-\x1f]/.test(path) || path.startsWith("/") || path.split("/").some(p=>!p || p===".." || p==="."))throw Error("维护路径必须是配置目录内的明确相对文件路径。");
-    const key=path.toLowerCase();if(seen.has(key))throw Error("维护补丁包含重复文件。");seen.add(key);
-    const allowed=/^(?:settings\.json|trust\.json|APPEND_SYSTEM\.md|agents\/approver\.md|extensions\/pi-permission-suite\/config\.json|extensions\/timrt-suite\/[^/]+\.(?:ts|ps1)|themes\/[^/]+\.json|skills\/(?:pi-maintenance|principal)\/SKILL\.md|customization\/(?:README\.md|Pi Agent 本机配置维护手册\.md|Maintain-Pi\.ps1|Pi-Maintenance\.bat)|customization\/runtime\/[^/]+\.(?:cjs|mjs)|customization\/checks\/(?:tests\/)?[^/]+\.(?:mjs|ps1)|bin\/pi(?:-launcher\.js|\.cmd)|(?:keybindings|pi-cc-extensions|pi-btw|mcp|hermes-memory-config)\.json)$/i.test(path);
+    const key=pathKey(path);if(seen.has(key))throw Error("维护补丁包含重复文件。");seen.add(key);
+    const allowed=/^(?:settings\.json|trust\.json|APPEND_SYSTEM(?:\.(?:windows|linux))?\.md|agents\/approver\.md|extensions\/pi-permission-suite\/config\.json|extensions\/timrt-suite\/[^/]+\.(?:ts|ps1)|themes\/[^/]+\.json|skills\/(?:pi-maintenance|principal)\/SKILL\.md|customization\/(?:README\.md|Pi Agent 本机配置维护手册\.md|Maintain-Pi\.ps1|Pi-Maintenance\.bat|maintain-pi\.sh)|customization\/runtime\/[^/]+\.(?:cjs|mjs)|customization\/checks\/(?:tests\/)?[^/]+\.(?:mjs|ps1)|bin\/(?:pi|pi-launcher\.js|pi\.cmd|pi\.ps1)|(?:keybindings|pi-cc-extensions|pi-btw|mcp|hermes-memory-config)\.json)$/i.test(path);
     if(!allowed || /(?:^|\/)(?:policy-seal|compiled-extensions)\.json$/i.test(path))throw Error("该路径不属于自维护源码范围；不接受凭据、依赖、生成物或任意命令："+path);
-    if(/^(?:APPEND_SYSTEM\.md|agents\/approver\.md|extensions\/pi-permission-suite\/config\.json|trust\.json)$/i.test(path) && !permissionRequest(request))throw Error("修改权限相关配置须由用户明确提出 Pi 权限或审批维护，普通界面维护不授权此项。");
+    if(/^(?:APPEND_SYSTEM(?:\.(?:windows|linux))?\.md|agents\/approver\.md|extensions\/pi-permission-suite\/config\.json|trust\.json)$/i.test(path) && !permissionRequest(request))throw Error("修改权限相关配置须由用户明确提出 Pi 权限或审批维护，普通界面维护不授权此项。");
     if(coreMaintenancePath(path) && !coreRequest(request))throw Error("修改核心文件须由当前用户明确提出 Pi 权限、内核、事务、构建或加载维护，普通界面维护不授权此项。");
     const full=resolve(root,path);
     if(relative(root,full).startsWith(".."))throw Error("维护目标越界。");
@@ -42,8 +48,8 @@ export function validateMaintenance(root:string,request:string,changes:Maintenan
       if(existsSync(part) && lstatSync(part).isSymbolicLink())throw Error("维护路径包含符号链接或目录联接。");
       if(part===root)break;
     }
+    if(existsSync(full) && (!lstatSync(full).isFile() || lstatSync(full).nlink!==1))throw Error("维护目标须为无硬链接的普通文件。");
     const before=existsSync(full)?readFileSync(full):null;
-    if(before && !lstatSync(full).isFile())throw Error("维护目标不是普通文件。");
     if((before===null?null:fileHash(before))!==change.sha256)throw Error("维护文件已变化，请重新读取并核对 SHA256："+path);
     if(/\.json$/i.test(path))JSON.parse(change.content);
     if(key==="settings.json" && before) {
@@ -66,47 +72,47 @@ export async function applyMaintenance(root:string,request:string,changes:Mainte
   if(!await deps.approved())throw Error("本次自维护未获批准，未修改文件。请说明阻塞，不使用其他工具改写保护文件。");
   const fresh=()=>{if(deps.signal?.aborted || !deps.current())throw Error("维护期间用户指示或任务状态已变化，本次不继续。");if(deps.policyIntact && !deps.policyIntact())throw Error("维护批准后保护基线发生变化，当前事务停止。");checkCore();validateMaintenance(root,request,changes);};
   fresh();
-  let runner=join(root,"customization/Maintain-Pi.ps1");
+  let runner=join(root,"customization/runtime/maintenance.mjs");
   let frozen:Map<string,string>|undefined;
   const checkFrozen=()=>{if(frozen)for(const [path,hash] of frozen)if(!existsSync(path)||fileHash(readFileSync(path))!==hash)throw Error("修改前的维护/验证快照发生变化，停止执行："+path);};
   const run=async(action:string,recovery=false)=>{
     checkCore();
     checkFrozen();
-    const result=await deps.run(process.platform==="win32"?"pwsh.exe":"pwsh",["-NoLogo","-NoProfile","-ExecutionPolicy","Bypass","-File",runner,"-AgentRoot",root,"-Action",action],{cwd:root,timeout:180000,signal:recovery?undefined:deps.signal});
+    const result=await deps.run(process.execPath,[runner,"--agent-root",root,action],{cwd:root,timeout:180000,signal:recovery?undefined:deps.signal});
     if(result.code!==0)throw Error(action+" 未通过："+(result.stderr||result.stdout).slice(-3000));
     checkCore();
     checkFrozen();
     return result.stdout;
   };
   deps.progress?.("备份 Pi 配置…");const backup=await run("Backup");fresh();
-  const major=plan.some(p=>coreMaintenancePath(p.path) || p.path.toLowerCase()==="settings.json");
+  const major=plan.some(p=>coreMaintenancePath(p.path) || pathKey(p.path)==="settings.json");
   if(major){
     const directory=resolve(backup.trim());
-    if(dirname(directory).toLowerCase()!==join(resolve(root),"backups").toLowerCase() || !existsSync(directory) || lstatSync(directory).isSymbolicLink())throw Error("重大修改必须先获得独立维护脚本创建的有效备份目录。");
+    if(pathKey(dirname(directory))!==pathKey(join(resolve(root),"backups")) || !existsSync(directory) || lstatSync(directory).isSymbolicLink())throw Error("重大修改必须先获得独立维护脚本创建的有效备份目录。");
     const manifest=JSON.parse(readFileSync(join(directory,"configuration-snapshot.json"),"utf8"));
     for(const file of plan.filter(p=>p.before!==null)) {
       const saved=join(directory,file.path);
-      if(!manifest.files.some((p:string)=>p.replaceAll("\\","/").toLowerCase()===file.path.toLowerCase()) || !existsSync(saved) || fileHash(readFileSync(saved))!==fileHash(file.before!))throw Error("重大修改备份未覆盖或校验失败："+file.path);
+      if(!manifest.files.some((p:string)=>pathKey(p.replaceAll("\\","/"))===pathKey(file.path)) || !existsSync(saved) || fileHash(readFileSync(saved))!==fileHash(file.before!))throw Error("重大修改备份未覆盖或校验失败："+file.path);
     }
     frozen=new Map();
     const savedRoot=join(directory,"transaction-runner");
     const capture=(source:string,dest:string)=>{
       if(lstatSync(source).isSymbolicLink())throw Error("维护快照不接受链接。");
-      mkdirSync(dirname(dest),{recursive:true});copyFileSync(source,dest);frozen!.set(dest,fileHash(readFileSync(source)));
+      mkdirSync(dirname(dest),{recursive:true,mode:0o700});copyFileSync(source,dest);frozen!.set(dest,fileHash(readFileSync(source)));
     };
     capture(join(root,"customization/Maintain-Pi.ps1"),join(savedRoot,"customization/Maintain-Pi.ps1"));
     for(const relative of ["customization/runtime","customization/checks","customization/checks/tests"]) {
       const base=join(root,relative);
       if(existsSync(base))for(const name of readdirSync(base))if(/\.(?:cjs|mjs|ps1)$/i.test(name))capture(join(base,name),join(savedRoot,relative,name));
     }
-    runner=join(savedRoot,"customization/Maintain-Pi.ps1");checkFrozen();
+    runner=join(savedRoot,"customization/runtime/maintenance.mjs");checkFrozen();
   }
   const written:typeof plan=[];
   try {
     deps.progress?.("应用已批准文件…");
     for(const file of plan){
       checkCore();checkFrozen();
-      validateMaintenance(root,request,[{path:file.path,sha256:file.sha256,content:file.content}]);
+      validateMaintenance(root,request,[{path:file.path,sha256:file.sha256,content:file.content}],false);
       mkdirSync(dirname(file.full),{recursive:true});written.push(file);writeFileSync(file.full,file.content,"utf8");
       core=JSON.stringify((JSON.parse(core) as [string,string|null][]).filter(([path])=>path!==file.path).concat(coreMaintenancePath(file.path)?[[file.path,fileHash(file.content)]]:[]).sort(([a],[b])=>a<b?-1:a>b?1:0));
     }
@@ -120,6 +126,13 @@ export async function applyMaintenance(root:string,request:string,changes:Mainte
     if(!written.length)throw error;
     const conflicts:string[]=[];
     for(const file of written){
+      try {
+        for(let cursor=file.full;;cursor=dirname(cursor)) {
+          if(existsSync(cursor) && lstatSync(cursor).isSymbolicLink())throw Error('link');
+          if(cursor===root || dirname(cursor)===cursor)break;
+        }
+        if(existsSync(file.full) && (!lstatSync(file.full).isFile() || lstatSync(file.full).nlink!==1))throw Error('not a single regular file');
+      }catch{conflicts.push(file.path);continue;}
       let matches=existsSync(file.full) && fileHash(readFileSync(file.full))===fileHash(file.content);
       if(!matches && /\.json$/i.test(file.path) && existsSync(file.full)) {
         try{matches=JSON.stringify(JSON.parse(readFileSync(file.full,"utf8")))===JSON.stringify(JSON.parse(file.content));}catch{}

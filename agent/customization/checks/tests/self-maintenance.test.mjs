@@ -2,13 +2,34 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {homedir,tmpdir} from 'node:os';
 import {join,dirname} from 'node:path';
-import {mkdtempSync,mkdirSync,readFileSync,writeFileSync,existsSync} from 'node:fs';
+import {mkdtempSync,mkdirSync,readFileSync,writeFileSync,existsSync,linkSync,symlinkSync,unlinkSync} from 'node:fs';
 import {pathToFileURL} from 'node:url';
 const root=process.env.PI_CODING_AGENT_DIR || join(homedir(),'.pi/agent');
 const version=readFileSync(join(root,'install/current-version'),'utf8').trim();
 const {createJiti}=await import(pathToFileURL(join(root,'install/releases',version,'node_modules/jiti/lib/jiti.mjs')));
 const {validateMaintenance,explicitMaintenanceRequest,applyMaintenance,fileHash}=await createJiti(import.meta.url).import(join(root,'extensions/timrt-suite/self-maintenance.ts'));
 const request='请维护 Pi 的主题和界面配置';
+test('self-maintenance rejects hardlinked targets',()=>{
+  const f=fixture(),alias=join(f.dir,'alias');linkSync(f.file,alias);
+  assert.throws(()=>validateMaintenance(f.dir,request,[f.change]),/硬链接/);
+});
+test('rollback refuses a symlink swapped in after the approved write', {skip:process.platform!=='linux'},async()=>{
+  const f=fixture(),external=join(f.dir,'external.json');writeFileSync(external,f.change.content);
+  await assert.rejects(applyMaintenance(f.dir,request,[f.change],{
+    approved:async()=>true,current:()=>true,
+    run:async(_cmd,args)=>{if(args.at(-1)==='Check'){unlinkSync(f.file);symlinkSync(external,f.file);return {code:1,stdout:'',stderr:'candidate failed'};}return {code:0,stdout:'backup-path',stderr:''};},
+  }),/外部并发修改/);
+  assert.equal(readFileSync(external,'utf8'),f.change.content);
+});
+test('active platform prompt and runtime edits require one identical reviewed patch',()=>{
+  const root=mkdtempSync(join(tmpdir(),'pi-prompt-pair-'));
+  const active='APPEND_SYSTEM.'+(process.platform==='win32'?'windows':'linux')+'.md';
+  writeFileSync(join(root,active),'old');writeFileSync(join(root,'APPEND_SYSTEM.md'),'old');
+  const a={path:active,sha256:fileHash('old'),content:'new'},b={...a,path:'APPEND_SYSTEM.md'};
+  assert.throws(()=>validateMaintenance(root,'请维护 Pi 权限规则',[a]),/同时提交/);
+  assert.throws(()=>validateMaintenance(root,'请维护 Pi 权限规则',[b]),/同时提交/);
+  assert.equal(validateMaintenance(root,'请维护 Pi 权限规则',[a,b]).length,2);
+});
 function fixture(){
   const dir=mkdtempSync(join(tmpdir(),'pi-self-maintenance-'));
   const path='pi-cc-extensions.json',file=join(dir,path),before='{"enabled":true}\n';
@@ -41,7 +62,7 @@ test('settings self-maintenance preserves the protected loader and package list'
 
 function coreFixture() {
   const f=fixture(),path='customization/runtime/build-extensions.cjs';
-  for(const [relative,text] of [[path,'// old builder'],['customization/Maintain-Pi.ps1','# old independent maintainer'],['customization/runtime/policy-files.cjs','// old verifier'],['customization/checks/check-components.mjs','// old checks']]) {
+  for(const [relative,text] of [[path,'// old builder'],['customization/Maintain-Pi.ps1','# old independent maintainer'],['customization/runtime/maintenance.mjs','// old node maintainer'],['customization/runtime/policy-files.cjs','// old verifier'],['customization/checks/check-components.mjs','// old checks']]) {
     const full=join(f.dir,relative);mkdirSync(dirname(full),{recursive:true});writeFileSync(full,text);
   }
   const backup=join(f.dir,'backups','core-test');
@@ -53,9 +74,9 @@ function coreFixture() {
       mkdirSync(dirname(join(backup,path)),{recursive:true});writeFileSync(join(backup,path),'// old builder');
       writeFileSync(join(backup,'configuration-snapshot.json'),JSON.stringify({files:[path]}));
     } else {
-      const runner=args[args.indexOf('-File')+1];
-      assert.equal(runner,join(backup,'transaction-runner/customization/Maintain-Pi.ps1'));
-      assert.equal(readFileSync(runner,'utf8'),'# old independent maintainer');
+      const runner=args[0];
+      assert.equal(runner,join(backup,'transaction-runner/customization/runtime/maintenance.mjs'));
+      assert.equal(readFileSync(runner,'utf8'),'// old node maintainer');
       assert.equal(readFileSync(join(backup,'transaction-runner',path),'utf8'),'// old builder');
     }
     return {code:0,stdout:backup,stderr:''};

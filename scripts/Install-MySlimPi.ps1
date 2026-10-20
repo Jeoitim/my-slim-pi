@@ -3,11 +3,16 @@ param(
     [string]$AgentRoot = (Join-Path $env:USERPROFILE '.pi\agent'),
     [switch]$Update,
     [switch]$Plan,
-    [switch]$AddToPath
+    [switch]$AddToPath,
+    [switch]$NoPath,
+    [switch]$NonInteractive,
+    [switch]$SkipSearchKeys,
+    [switch]$FullCheck
 )
 $ErrorActionPreference = 'Stop'
 if ($PSVersionTable.PSVersion.Major -lt 7) { throw '需要 PowerShell 7。请在 pwsh 中运行安装脚本，或双击 Install.bat；无需预装 Pi。' }
 if ($env:OS -ne 'Windows_NT') { throw '此安装器仅支持 Windows。' }
+if ($AddToPath -and $NoPath) { throw '请选择 AddToPath 或 NoPath，不能同时使用。' }
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $payload = Join-Path $repoRoot 'agent'
 $manifest = Get-Content -LiteralPath (Join-Path $repoRoot 'distribution.json') -Raw | ConvertFrom-Json
@@ -46,39 +51,59 @@ Write-Host "My Slim Pi / Pi $($manifest.piVersion) / $($rows.Count) files / $(@(
 Write-Host "目标：$target"
 Write-Host "将安装锁定版本的 Pi $($manifest.piVersion)、社区组件和构建工具；无需预装或全局安装 Pi。"
 if ($Plan) { Write-Host '仅预览：未下载依赖、未修改配置或 PATH。'; return }
+if ($FullCheck -and $target -notmatch '[\\/]\.local[\\/]') { throw '完整测试仅用于仓库 .local 内的一次性安装；实际部署只验证启动。' }
+$offerKeys = $false
+if (-not $NonInteractive -and -not [Console]::IsInputRedirected) {
+    $choiceFile = [IO.Path]::GetTempFileName()
+    try {
+        $choiceArgs = @((Join-Path $PSScriptRoot 'installer-setup.mjs'),'--windows-options','--target',$target,'--version',$manifest.piVersion,'--result',$choiceFile)
+        if ($Update) { $choiceArgs += '--update' }
+        if ($AddToPath) { $choiceArgs += '--add-to-path' }
+        if ($NoPath) { $choiceArgs += '--no-path' }
+        if ($SkipSearchKeys) { $choiceArgs += '--skip-search-keys' }
+        & $node @choiceArgs
+        if ($LASTEXITCODE -ne 0) { throw '安装选项未完成，未修改安装目录。' }
+        $choices = Get-Content -LiteralPath $choiceFile -Raw | ConvertFrom-Json
+    } finally { [IO.File]::Delete($choiceFile) }
+    if ($choices.cancel) { Write-Host '已取消，保留现有安装。'; return }
+    if ($choices.target -ne $target) {
+        & $PSCommandPath -AgentRoot $choices.target -Update:$choices.update -AddToPath:$choices.addToPath -NoPath:(-not $choices.addToPath) -NonInteractive -SkipSearchKeys -FullCheck:$FullCheck
+        if ($LASTEXITCODE -ne 0) { throw '独立安装未完成。' }
+        if ($choices.offerKeys) { & $node (Join-Path $PSScriptRoot 'installer-setup.mjs') --search-keys --target $choices.target }
+        return
+    }
+    $Update = [bool]$choices.update
+    $AddToPath = [bool]$choices.addToPath
+    $offerKeys = [bool]$choices.offerKeys
+}
 $exists = (Test-Path -LiteralPath $target) -and @(Get-ChildItem -LiteralPath $target -Force).Count -gt 0
 if ($exists -and -not $Update) { throw '目标已有配置。默认不覆盖；确认后使用 -Update（会备份被替换文件）。也可用 -AgentRoot 选择新目录。' }
 $backup = $null
 if ($exists) {
-    $backup = Join-Path $target ('backups\installer-'+(Get-Date -Format 'yyyyMMdd-HHmmss')+'-'+[Guid]::NewGuid().ToString('N').Substring(0,8))
-    New-Item -ItemType Directory -Path $backup | Out-Null
-    $identity = [Security.Principal.WindowsIdentity]::GetCurrent().User
-    $acl = New-Object Security.AccessControl.DirectorySecurity
-    $acl.SetAccessRuleProtection($true,$false)
-    $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule($identity,'FullControl','ContainerInherit,ObjectInherit','None','Allow')))
-    Set-Acl -LiteralPath $backup -AclObject $acl
-    foreach ($row in $rows) {
-        $old = Join-Path $target $row.Name
-        if (Test-Path -LiteralPath $old -PathType Leaf) {
-            $copy = Join-Path $backup $row.Name
-            New-Item -ItemType Directory -Path (Split-Path -Parent $copy) -Force | Out-Null
-            Copy-Item -LiteralPath $old -Destination $copy
-        }
-    }
-    Write-Host "原文件备份：$backup"
+    $backup = & $node (Join-Path $payload 'customization/runtime/maintenance.mjs') --agent-root $target Backup
+    if ($LASTEXITCODE -ne 0) { throw '更新前备份失败，停止安装。' }
+    Write-Host "原配置与核心源码备份：$backup"
 }
 $oldAgent = $env:PI_CODING_AGENT_DIR
 $oldOffline = $env:PI_OFFLINE
+$oldMaintenanceTarget = $env:PI_MAINTENANCE_TARGET
 try {
     $oldSettings = if (Test-Path -LiteralPath (Join-Path $target 'settings.json')) { Get-Content -LiteralPath (Join-Path $target 'settings.json') -Raw | ConvertFrom-Json -AsHashtable } else { @{} }
+    $runtimePrompt = Join-Path $target 'APPEND_SYSTEM.md'
+    $platformPrompt = Join-Path $target 'APPEND_SYSTEM.windows.md'
+    if ((Test-Path -LiteralPath $runtimePrompt) -and -not (Test-Path -LiteralPath $platformPrompt)) {
+        Copy-Item -LiteralPath $runtimePrompt -Destination $platformPrompt
+    }
     foreach ($row in $rows) {
         $destination = Join-Path $target $row.Name
         New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null
+        if (($row.Name -match '^APPEND_SYSTEM(?:\.(?:windows|linux))?\.md$|^(?:agents/|themes/|[^/]+\.json$|extensions/(?:subagent|pi-permission-suite)/config\.json$)' -and $row.Name -ne 'settings.json') -and (Test-Path -LiteralPath $destination)) { continue }
         Copy-Item -LiteralPath (Join-Path $payload $row.Name) -Destination $destination -Force
     }
     $settingsFile = Join-Path $target 'settings.json'
     $newSettings = Get-Content -LiteralPath $settingsFile -Raw | ConvertFrom-Json -AsHashtable
-    foreach ($key in @('defaultProvider','defaultModel')) { if ($oldSettings.ContainsKey($key)) { $newSettings[$key]=$oldSettings[$key] } }
+    foreach ($key in @($oldSettings.Keys | Where-Object { $_ -notin @('packages','extensions') })) { $newSettings[$key]=$oldSettings[$key] }
+    if ($oldSettings.extensions) { $newSettings.extensions = @(@($newSettings.extensions) + @($oldSettings.extensions) | Select-Object -Unique) }
     if ($oldSettings.packages) {
         $known = @($newSettings.packages | ForEach-Object { if ($_ -is [string]) { $_ -replace '@[^@]+$','' } else { $_.source -replace '@[^@]+$','' } })
         foreach ($package in $oldSettings.packages) {
@@ -88,6 +113,8 @@ try {
         }
     }
     $newSettings | ConvertTo-Json -Depth 40 | Set-Content -LiteralPath $settingsFile -Encoding utf8NoBOM
+    & $node (Join-Path $target 'customization/runtime/platform-config.mjs') $target
+    if ($LASTEXITCODE -ne 0) { throw '平台配置失败。' }
     # Protect the selected target, including an isolated non-default install.
     $permissionFile = Join-Path $target 'extensions\pi-permission-suite\config.json'
     $permission = Get-Content -LiteralPath $permissionFile -Raw | ConvertFrom-Json -AsHashtable
@@ -95,7 +122,25 @@ try {
     $permission.path.deny[(Join-Path $target 'auth.json')]='Private model credentials'
     $permission | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $permissionFile -Encoding utf8NoBOM
     $env:PI_CODING_AGENT_DIR=$target
+    $env:PI_MAINTENANCE_TARGET=$target
     $env:PI_OFFLINE='1'
+    # WSL may previously have downloaded ELF helpers into a shared Windows AgentRoot.
+    # Quarantine only these known Pi-generated files; keep all bytes for rollback.
+    foreach ($helper in @('rg','fd')) {
+        $helperPath = Join-Path $target "bin/$helper"
+        if (Test-Path -LiteralPath $helperPath -PathType Leaf) {
+            $header = [IO.File]::OpenRead($helperPath)
+            try { $magic = New-Object byte[] 4; $count = $header.Read($magic,0,4) } finally { $header.Dispose() }
+            if ($count -eq 4 -and [Convert]::ToHexString($magic) -eq '7F454C46') {
+                if (-not $backup) { throw '检测到 Linux 工具残留，请先备份此安装再修复。' }
+                $quarantine = [IO.Path]::GetFullPath((Join-Path $backup "foreign-platform-tools/$helper"))
+                if (-not $quarantine.StartsWith($backup+'\',[StringComparison]::OrdinalIgnoreCase)) { throw '工具备份路径越界。' }
+                New-Item -ItemType Directory -Path (Split-Path -Parent $quarantine) -Force | Out-Null
+                Move-Item -LiteralPath $helperPath -Destination $quarantine
+                Write-Host "已备份错误平台的 $helper 工具：$quarantine"
+            }
+        }
+    }
     foreach ($directory in @("install\releases\$($manifest.piVersion)",'npm','customization\runtime\build-runtime')) {
         Write-Host "安装锁定依赖：$directory"
         $npmArgs = @('ci','--prefix',(Join-Path $target $directory),'--no-audit','--no-fund','--ignore-scripts')
@@ -110,13 +155,24 @@ try {
     }
     & $node (Join-Path $target 'customization\runtime\build-extensions.cjs')
     if ($LASTEXITCODE -ne 0) { throw '构建失败。' }
-    & $pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $target 'customization\Maintain-Pi.ps1') -Action Check
-    if ($LASTEXITCODE -ne 0) { throw '离线验证未通过。' }
+    & $node (Join-Path $target 'customization/checks/check-startup.mjs')
+    if ($LASTEXITCODE -ne 0) { throw '启动验证未通过。' }
+    if ($FullCheck) {
+        & $pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $target 'customization\Maintain-Pi.ps1') -Action Check
+        if ($LASTEXITCODE -ne 0) { throw '离线验证未通过。' }
+    }
     if ($AddToPath) {
         $bin=Join-Path $target 'bin'
         $userPath=[Environment]::GetEnvironmentVariable('Path','User')
-        if ($bin -notin @($userPath -split ';')) { [Environment]::SetEnvironmentVariable('Path',($userPath.TrimEnd(';')+';'+$bin).TrimStart(';'),'User') }
+        $pathBackup = & $node (Join-Path $target 'customization/runtime/maintenance.mjs') --agent-root $target Backup --label before-path --files '[]'
+        if ($LASTEXITCODE -ne 0) { throw 'PATH 备份失败，未调整用户 PATH。' }
+        @{userPath=$userPath;createdAt=(Get-Date).ToString('o')} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $pathBackup 'user-path.json') -Encoding utf8NoBOM
+        [Environment]::SetEnvironmentVariable('Path',(@($bin)+@($userPath -split ';' | Where-Object { $_ -and $_ -ne $bin }) -join ';'),'User')
+        $env:Path = @($bin)+@($env:Path -split ';' | Where-Object { $_ -and $_ -ne $bin }) -join ';'
+        Write-Host "已将此安装设为用户 pi 命令：$bin。其他已安装 Pi 未卸载。"
+        Write-Host "原用户 PATH 备份：$(Join-Path $pathBackup 'user-path.json')"
     }
+    if ($offerKeys) { & $node (Join-Path $PSScriptRoot 'installer-setup.mjs') --search-keys --target $target }
     Write-Host "安装完成。启动：$(Join-Path $target 'bin\pi.cmd')" -ForegroundColor Green
     Write-Host '在 Pi 中配置模型认证；搜索 Key 使用维护菜单 3。Windows Terminal bellStyle 可自行设为 all。'
 } catch {
@@ -126,4 +182,5 @@ try {
 } finally {
     $env:PI_CODING_AGENT_DIR=$oldAgent
     $env:PI_OFFLINE=$oldOffline
+    $env:PI_MAINTENANCE_TARGET=$oldMaintenanceTarget
 }

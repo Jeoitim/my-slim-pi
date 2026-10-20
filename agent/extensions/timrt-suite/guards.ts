@@ -106,6 +106,11 @@ export function inspectDeletionScripts(command: string, cwd: string, shell = "ba
   opaque ||= /\bgit\s+(?:reset\b[^\n]*--hard|(?:checkout|restore)\b[^\n]*(?:--\s+\.|(?:^|\s)\.)(?:\s|$))/i.test(command);
   opaque ||= opaqueExecution(command);
   let reviewRequired = /\b(?:execFile(?:Sync)?|execSync|spawn(?:Sync)?|child_process|Start-Process)\b/i.test(command);
+  if(shell==='bash' && !safeShellRead(command,shell)) {
+    // ACT still executes ordinary literal development commands. Privileged operations,
+    // interpreters and unresolved compound syntax use the existing execution review gate.
+    reviewRequired ||= /[;&|<>`$(){}\r\n]|\b(?:sudo|su|doas|systemctl|service|pacman|apt|apt-get|dnf|yum|usermod|useradd|chmod|chown|node|python3?|bash|sh|eval|exec)\b/.test(command);
+  }
   if (stdinInterpreter(command) && !(command.match(MENTIONED) || []).length) opaque = true;
   let remaining = SCRIPT_EVIDENCE_LIMIT.total;
   const inline: string[] = [];
@@ -177,7 +182,7 @@ export function powerShellLiteralPaths(command: string): string[] {
 }
 
 export function safeShellRead(command: string, shell = "bash"): boolean {
-  if (nativeRead(command)) return true;
+  if (shell === "powershell" && nativeRead(command)) return true;
   if (shell === "powershell") {
     // Only literal read commands and data-only pipelines skip Auto review.
     // Expressions, script blocks, redirection, nested shells and wildcards do not.
@@ -190,6 +195,14 @@ export function safeShellRead(command: string, shell = "bash"): boolean {
     if (!/^(?:Get-(?:Location|ChildItem|Content|Item|ItemProperty|PSDrive|PSProvider|Command|FileHash|Date|Process|Service|Acl|WinEvent)|Test-Path|Resolve-Path|Split-Path|Join-Path|Select-String)\b/i.test(parts[0])) return false;
     return parts.slice(1).every(part => /^(?:Select-Object|Measure-Object|Sort-Object|Group-Object|Format-(?:Table|List|Wide)|Out-String|ConvertTo-Json)\b/i.test(part));
   }
-  if (/[;&|<>\n`]|\$\(|\beval\b|\b(?:-c|-Command)\b/i.test(command)) return false;
-  return /^(?:pwd|ls|dir|cat|head|tail|wc|stat|file|rg|grep|find|Get-Location|Get-ChildItem|Get-Content|Test-Path|git\s+(?:status|diff|log|show|blame|describe|rev-parse))\b/i.test(command.trim()) && !deletionRisk(command);
+  // Literal, data-only Bash queries. Expansions and composite syntax go to the existing reviewer.
+  if (/[;&|<>\r\n\x00-\x1f`$(){}\\*?!#]/.test(command) || deletionRisk(command)) return false;
+  const tokens=command.trim().match(/"[^"$`]*"|'[^']*'|[^\s"']+/g)||[];
+  if(tokens.join(" ")!==command.trim().replace(/\s+/g," "))return false;
+  if(nativeRead(command))return true;
+  const [program,...args]=tokens.map(token=>token.replace(/^(['"])([\s\S]*)\1$/,'$2'));
+  if(!/^(?:pwd|ls|cat|head|tail|wc|stat|file|find)$/.test(program||""))return false;
+  if(program==="find" && args.some(a=>a.startsWith('-') && !['-name','-iname','-type','-maxdepth','-mindepth','-print','-print0','-size','-mtime','-path'].includes(a)))return false;
+  if(program==="file" && args.some(a=>/^(?:-z|--uncompress|-S|--no-sandbox|-f|--files-from)/.test(a)))return false;
+  return true;
 }

@@ -2,9 +2,9 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
-const direct = ['settings.json', 'APPEND_SYSTEM.md', 'agents/approver.md', 'trust.json', 'extensions/pi-permission-suite/config.json', 'customization/Maintain-Pi.ps1', 'customization/Pi-Maintenance.bat', 'bin/pi-launcher.js', 'bin/pi.cmd'];
+const direct = ['settings.json', 'APPEND_SYSTEM.md', 'APPEND_SYSTEM.windows.md', 'APPEND_SYSTEM.linux.md', 'agents/approver.md', 'trust.json', 'extensions/pi-permission-suite/config.json', 'customization/Maintain-Pi.ps1', 'customization/Pi-Maintenance.bat', 'bin/pi-launcher.js', 'bin/pi.cmd', 'bin/pi', 'customization/maintain-pi.sh', 'install/node-path'];
 const trees = ['extensions/timrt-suite', 'customization/runtime', 'customization/checks', 'customization/checks/tests', 'npm/node_modules/pi-permission-suite'];
-const normalize = p => p.replaceAll('\\', '/').toLowerCase();
+const normalize = p => process.platform === 'win32' ? p.replaceAll('\\', '/').toLowerCase() : p.replaceAll('\\', '/');
 function protectedPath(root, target) {
   const relative = normalize(path.relative(root, path.resolve(target)));
   return direct.some(p => normalize(p) === relative) || trees.some(p => relative === normalize(p) || relative.startsWith(normalize(p) + '/'));
