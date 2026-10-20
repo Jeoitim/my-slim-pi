@@ -113,6 +113,8 @@ try {
         }
     }
     $newSettings | ConvertTo-Json -Depth 40 | Set-Content -LiteralPath $settingsFile -Encoding utf8NoBOM
+    & $node (Join-Path $target 'customization/runtime/maintenance.mjs') --agent-root $target MigrateWeb (Join-Path $payload 'web-search.json')
+    if ($LASTEXITCODE -ne 0) { throw 'Web 配置迁移失败；备份保留。' }
     & $node (Join-Path $target 'customization/runtime/platform-config.mjs') $target
     if ($LASTEXITCODE -ne 0) { throw '平台配置失败。' }
     # Protect the selected target, including an isolated non-default install.
@@ -120,6 +122,7 @@ try {
     $permission = Get-Content -LiteralPath $permissionFile -Raw | ConvertFrom-Json -AsHashtable
     $permission.path.deny[(Join-Path $target 'secrets\*')]='Private search credentials'
     $permission.path.deny[(Join-Path $target 'auth.json')]='Private model credentials'
+    $permission.path.deny[(Join-Path $target 'web-search.json')]='Private web configuration and credentials'
     $permission | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $permissionFile -Encoding utf8NoBOM
     $env:PI_CODING_AGENT_DIR=$target
     $env:PI_MAINTENANCE_TARGET=$target

@@ -1,0 +1,445 @@
+{
+  "date": "2026-10-20",
+  "baseCommit": "82374337ec7a6a8f3815735805b4fadeb89b960b",
+  "piVersion": "1.3.0",
+  "webAccessVersion": "0.43.0",
+  "method": {
+    "context": "Fresh hello through a local fake provider; actual outgoing schemas and structured system sections; UTF-16 string lengths, not tokens. Native MCP connections disabled. No context files captured.",
+    "dynamicModel": "openai-completions with supportsMidConvoSystemMessages=true and supportsMidConvoToolAdditions=true; auto chooses web_enable.",
+    "startup": "Five fresh managed-launcher processes per version/platform, RPC get_state readiness, --no-session --no-mcp PI_OFFLINE=1; no model request or terminal rendering. Filesystem/V8 caches not flushed, system load not controlled. Preserve every sample including first-run outliers."
+  },
+  "windows": {
+    "node": "24.20.0",
+    "before": {
+      "context": {
+        "measuredAt": "2026-10-20T14:38:53.591Z",
+        "tools": [
+          {
+            "name": "read",
+            "chars": 1078
+          },
+          {
+            "name": "powershell",
+            "chars": 587
+          },
+          {
+            "name": "write",
+            "chars": 462
+          },
+          {
+            "name": "replace",
+            "chars": 1125
+          },
+          {
+            "name": "insert",
+            "chars": 859
+          },
+          {
+            "name": "grep",
+            "chars": 1646
+          },
+          {
+            "name": "undo_last_change",
+            "chars": 433
+          },
+          {
+            "name": "explain_call",
+            "chars": 374
+          },
+          {
+            "name": "memory",
+            "chars": 1128
+          },
+          {
+            "name": "web",
+            "chars": 1055
+          }
+        ],
+        "systemChars": 5745,
+        "toolSchemaChars": 8747,
+        "totalChars": 14524
+      },
+      "startup": {
+        "measuredAt": "2026-10-20T14:38:22.351Z",
+        "medianMs": 1314,
+        "firstRunMs": 12345,
+        "minMs": 1160,
+        "maxMs": 12345,
+        "runs": [
+          {
+            "processToRpcReadyMs": 12345,
+            "runtimePhaseMs": 8551
+          },
+          {
+            "processToRpcReadyMs": 1310,
+            "runtimePhaseMs": 844
+          },
+          {
+            "processToRpcReadyMs": 1314,
+            "runtimePhaseMs": 827
+          },
+          {
+            "processToRpcReadyMs": 1420,
+            "runtimePhaseMs": 945
+          },
+          {
+            "processToRpcReadyMs": 1160,
+            "runtimePhaseMs": 738
+          }
+        ]
+      }
+    },
+    "after": {
+      "context": {
+        "measuredAt": "2026-10-20T14:59:36.208Z",
+        "tools": [
+          {
+            "name": "read",
+            "chars": 1078
+          },
+          {
+            "name": "powershell",
+            "chars": 587
+          },
+          {
+            "name": "write",
+            "chars": 462
+          },
+          {
+            "name": "replace",
+            "chars": 1125
+          },
+          {
+            "name": "insert",
+            "chars": 859
+          },
+          {
+            "name": "grep",
+            "chars": 1646
+          },
+          {
+            "name": "undo_last_change",
+            "chars": 433
+          },
+          {
+            "name": "explain_call",
+            "chars": 374
+          },
+          {
+            "name": "memory",
+            "chars": 1128
+          },
+          {
+            "name": "web_search",
+            "chars": 3712
+          },
+          {
+            "name": "fetch_content",
+            "chars": 2788
+          },
+          {
+            "name": "get_search_content",
+            "chars": 1586
+          }
+        ],
+        "systemChars": 5904,
+        "toolSchemaChars": 15778,
+        "totalChars": 21714
+      },
+      "startup": {
+        "measuredAt": "2026-10-20T14:59:33.280Z",
+        "medianMs": 1138,
+        "firstRunMs": 5660,
+        "minMs": 1100,
+        "maxMs": 5660,
+        "runs": [
+          {
+            "processToRpcReadyMs": 5660,
+            "runtimePhaseMs": 5055
+          },
+          {
+            "processToRpcReadyMs": 1138,
+            "runtimePhaseMs": 711
+          },
+          {
+            "processToRpcReadyMs": 1100,
+            "runtimePhaseMs": 727
+          },
+          {
+            "processToRpcReadyMs": 1138,
+            "runtimePhaseMs": 773
+          },
+          {
+            "processToRpcReadyMs": 1222,
+            "runtimePhaseMs": 814
+          }
+        ]
+      }
+    },
+    "dynamicContext": {
+      "measuredAt": "2026-10-20T14:59:39.222Z",
+      "tools": [
+        {
+          "name": "read",
+          "chars": 1078
+        },
+        {
+          "name": "powershell",
+          "chars": 587
+        },
+        {
+          "name": "write",
+          "chars": 462
+        },
+        {
+          "name": "replace",
+          "chars": 1125
+        },
+        {
+          "name": "insert",
+          "chars": 859
+        },
+        {
+          "name": "grep",
+          "chars": 1646
+        },
+        {
+          "name": "undo_last_change",
+          "chars": 433
+        },
+        {
+          "name": "explain_call",
+          "chars": 374
+        },
+        {
+          "name": "memory",
+          "chars": 1128
+        },
+        {
+          "name": "web_enable",
+          "chars": 314
+        }
+      ],
+      "systemChars": 5679,
+      "toolSchemaChars": 8006,
+      "totalChars": 13717
+    }
+  },
+  "linux": {
+    "node": "24.22.0",
+    "before": {
+      "context": {
+        "measuredAt": "2026-10-20T14:39:16.794Z",
+        "tools": [
+          {
+            "name": "read",
+            "chars": 1078
+          },
+          {
+            "name": "bash",
+            "chars": 575
+          },
+          {
+            "name": "write",
+            "chars": 462
+          },
+          {
+            "name": "replace",
+            "chars": 1125
+          },
+          {
+            "name": "insert",
+            "chars": 859
+          },
+          {
+            "name": "grep",
+            "chars": 1646
+          },
+          {
+            "name": "undo_last_change",
+            "chars": 433
+          },
+          {
+            "name": "explain_call",
+            "chars": 374
+          },
+          {
+            "name": "memory",
+            "chars": 1128
+          },
+          {
+            "name": "web",
+            "chars": 1055
+          }
+        ],
+        "systemChars": 5760,
+        "toolSchemaChars": 8735,
+        "totalChars": 14527
+      },
+      "startup": {
+        "measuredAt": "2026-10-20T14:39:15.130Z",
+        "medianMs": 670,
+        "firstRunMs": 4063,
+        "minMs": 594,
+        "maxMs": 4063,
+        "runs": [
+          {
+            "processToRpcReadyMs": 4063,
+            "runtimePhaseMs": 3697
+          },
+          {
+            "processToRpcReadyMs": 670,
+            "runtimePhaseMs": 362
+          },
+          {
+            "processToRpcReadyMs": 594,
+            "runtimePhaseMs": 335
+          },
+          {
+            "processToRpcReadyMs": 766,
+            "runtimePhaseMs": 403
+          },
+          {
+            "processToRpcReadyMs": 669,
+            "runtimePhaseMs": 352
+          }
+        ]
+      }
+    },
+    "after": {
+      "context": {
+        "measuredAt": "2026-10-20T15:00:59.440Z",
+        "tools": [
+          {
+            "name": "read",
+            "chars": 1078
+          },
+          {
+            "name": "bash",
+            "chars": 575
+          },
+          {
+            "name": "write",
+            "chars": 462
+          },
+          {
+            "name": "replace",
+            "chars": 1125
+          },
+          {
+            "name": "insert",
+            "chars": 859
+          },
+          {
+            "name": "grep",
+            "chars": 1646
+          },
+          {
+            "name": "undo_last_change",
+            "chars": 433
+          },
+          {
+            "name": "explain_call",
+            "chars": 374
+          },
+          {
+            "name": "memory",
+            "chars": 1128
+          },
+          {
+            "name": "web_search",
+            "chars": 3712
+          },
+          {
+            "name": "fetch_content",
+            "chars": 2788
+          },
+          {
+            "name": "get_search_content",
+            "chars": 1586
+          }
+        ],
+        "systemChars": 5920,
+        "toolSchemaChars": 15766,
+        "totalChars": 21718
+      },
+      "startup": {
+        "measuredAt": "2026-10-20T15:00:57.821Z",
+        "medianMs": 680,
+        "firstRunMs": 4598,
+        "minMs": 558,
+        "maxMs": 4598,
+        "runs": [
+          {
+            "processToRpcReadyMs": 4598,
+            "runtimePhaseMs": 4269
+          },
+          {
+            "processToRpcReadyMs": 576,
+            "runtimePhaseMs": 334
+          },
+          {
+            "processToRpcReadyMs": 558,
+            "runtimePhaseMs": 309
+          },
+          {
+            "processToRpcReadyMs": 680,
+            "runtimePhaseMs": 403
+          },
+          {
+            "processToRpcReadyMs": 736,
+            "runtimePhaseMs": 426
+          }
+        ]
+      }
+    },
+    "dynamicContext": {
+      "measuredAt": "2026-10-20T15:01:00.572Z",
+      "tools": [
+        {
+          "name": "read",
+          "chars": 1078
+        },
+        {
+          "name": "bash",
+          "chars": 575
+        },
+        {
+          "name": "write",
+          "chars": 462
+        },
+        {
+          "name": "replace",
+          "chars": 1125
+        },
+        {
+          "name": "insert",
+          "chars": 859
+        },
+        {
+          "name": "grep",
+          "chars": 1646
+        },
+        {
+          "name": "undo_last_change",
+          "chars": 433
+        },
+        {
+          "name": "explain_call",
+          "chars": 374
+        },
+        {
+          "name": "memory",
+          "chars": 1128
+        },
+        {
+          "name": "web_enable",
+          "chars": 314
+        }
+      ],
+      "systemChars": 5695,
+      "toolSchemaChars": 7994,
+      "totalChars": 13721
+    }
+  }
+}

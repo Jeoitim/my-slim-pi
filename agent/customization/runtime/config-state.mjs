@@ -40,17 +40,17 @@ try {
   } else {
     const defaults = { provider: settings.getDefaultProvider(), id: settings.getDefaultModel() };
     const model = models.find(m => m.provider === defaults.provider && m.id === defaults.id);
-    let keys = {}; try { keys = read('secrets/web-keys.json'); } catch { /* Presence only. */ }
+    let keys = {}; try { keys = read('web-search.json'); } catch { /* Presence only. */ }
     let valid = false; try { valid = createRequire(import.meta.url)('./build-extensions.cjs').valid(); } catch { /* Rebuild from menu. */ }
     const jsonErrors = [];
-    for (const file of ['settings.json', 'models.json', 'auth.json', 'mcp.json',  'hermes-memory-config.json', 'pi-cc-extensions.json', 'pi-btw.json', 'keybindings.json', 'extensions/subagent/config.json', 'extensions/pi-permission-suite/config.json']) {
+    for (const file of ['settings.json', 'models.json', 'auth.json', 'web-search.json', 'mcp.json',  'hermes-memory-config.json', 'pi-cc-extensions.json', 'pi-btw.json', 'keybindings.json', 'extensions/subagent/config.json', 'extensions/pi-permission-suite/config.json']) {
       if (existsSync(join(root, file))) try { read(file); } catch { jsonErrors.push(file); }
     }
     let policyIntegrity;
     try { policyIntegrity = createRequire(import.meta.url)('./policy-files.cjs').verify(root); }
     catch { policyIntegrity = {ok:false,changed:['策略校验清单不可用']}; }
     print({ piVersion: version, nodeVersion: process.versions.node, model: model || defaults, theme: settings.getThemeSetting(), buildReady: valid, policyIntegrity, jsonErrors,
-      searchKeys: { brave: Boolean(process.env.BRAVE_API_KEY || process.env.BRAVE_SEARCH_API_KEY || keys.brave), exa: Boolean(process.env.EXA_API_KEY || keys.exa), tavily: Boolean(process.env.TAVILY_API_KEY || keys.tavily) },
+      searchKeys: { brave: Boolean(process.env.BRAVE_API_KEY || process.env.BRAVE_SEARCH_API_KEY || keys.braveApiKey), exa: Boolean(process.env.EXA_API_KEY || keys.exaApiKey), tavily: Boolean(process.env.TAVILY_API_KEY || keys.tavilyApiKey) },
       packages: (settings.getGlobalSettings().packages || []).map(p => { const source = typeof p === 'string' ? p : p.source; return source?.startsWith('npm:') ? source : '[custom source]'; }) });
   }
 } catch {

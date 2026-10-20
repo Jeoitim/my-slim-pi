@@ -11,7 +11,7 @@ const sdk = await import(pathToFileURL(join(root, 'install/releases', version, '
 const { initTheme } = await import(pathToFileURL(join(root, 'install/releases', version, 'node_modules/@earendil-works/pi-coding-agent/dist/modes/interactive/theme/theme.js')));
 initTheme('claude-warm');
 const started = performance.now();
-const loader = new sdk.DefaultResourceLoader({ cwd: homedir(), agentDir: root, noContextFiles: true, extensionFactories: [sdk.createMcpExtension(process.argv.includes('--live-web') ? {} : { loadConfig: () => ({ servers: [], errors: [] }) })] });
+const loader = new sdk.DefaultResourceLoader({ cwd: homedir(), agentDir: root, noContextFiles: true, extensionFactories: [sdk.createMcpExtension({ loadConfig: () => ({ servers: [], errors: [] }) })] });
 await loader.reload();
 console.log('Loader ms:', Math.round(performance.now() - started));
 console.log('Extension errors:', JSON.stringify(loader.getExtensions().errors));
@@ -112,23 +112,30 @@ try {
   await handler('auto', session.extensionRunner.createContext());
   console.log('PLAN blocks writes; user command restores AUTO: OK');
   assert.ok(session.extensionRunner.getCommand('mcp'), 'native MCP manager is registered');
-  console.log('Native MCP manager: OK; ' + (process.argv.includes('--live-web') ? 'live free Exa verification enabled.' : 'offline checks disable network connections.'));
+  console.log('Native MCP manager: OK; no bundled search server.');
   if (process.argv.includes('--auto-review')) {
     const blocked = await session.extensionRunner.emitToolCall({ type: 'tool_call', toolCallId: 'check-auto-review', toolName: 'write', input: { path: target, content: 'scoped local test file' } });
     console.log('Auto approval outcome:', blocked || 'approved');
     assert.ok(!blocked?.block, 'tool-free internal Auto reviewer approves a scoped local edit');
   }
   if (process.argv.includes('--live-web') || process.argv.includes('--live-brave')) {
-    const liveProvider = process.argv.includes('--live-brave') ? 'brave' : 'exa-mcp';
-    const assistant = { role: 'assistant', content: [{ type: 'toolCall', id: 'verification', name: 'web', arguments: {} }], api: 'openai-completions', provider: 'verification', model: 'verification', usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } }, stopReason: 'toolUse', timestamp: Date.now() };
+    const liveProvider = process.argv.includes('--live-brave') ? 'brave' : 'exa';
+    const assistant = { role: 'assistant', content: [{ type: 'toolCall', id: 'verification', name: 'web_search', arguments: {} }], api: 'openai-completions', provider: 'verification', model: 'verification', usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } }, stopReason: 'toolUse', timestamp: Date.now() };
     session.agent.state.messages.push(assistant); session.sessionManager.appendMessage(assistant);
-    const outcome = await session.extensionRunner.createToolContext('verification').executeTool('web', { action: 'search', query: 'site:pi.dev coding agent themes', provider: liveProvider });
+    const outcome = await session.extensionRunner.createToolContext('verification').executeTool('web_search', { includeContent: false, query: 'site:pi.dev coding agent themes', provider: liveProvider });
     const result = { ...outcome.result, isError: outcome.isError };
-    console.log('Web route:', result.details?.provider, 'isError:', result.isError || false);
+    console.log('Native web result:', 'isError:', result.isError || false);
     const text = result.content.filter(c => c.type === 'text').map(c => c.text).join('\n');
     console.log('Web preview:', text.slice(0, 220));
     assert.ok(!result.isError && /https?:/.test(text));
-    assert.equal(result.details.provider, liveProvider);
+    assert.ok(session.getAllTools().some(t => t.name === 'fetch_content'));
+    const page = await session.extensionRunner.createToolContext('verification').executeTool('fetch_content', { url: 'https://example.com', mode: 'raw' });
+    assert.ok(!page.isError, JSON.stringify(page.result.content));
+    const responseId = page.result.details?.responseId;
+    assert.ok(responseId);
+    const cached = await session.extensionRunner.createToolContext('verification').executeTool('get_search_content', { responseId });
+    assert.ok(!cached.isError && /Example Domain/i.test(JSON.stringify(cached.result.content)));
+    console.log('Native public fetch and cached content retrieval: OK');
   }
   if (process.argv.includes('--load-subagents')) {
     // Load/register only. Do not call subagent or start any child/model run.

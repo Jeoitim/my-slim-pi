@@ -134,10 +134,10 @@ test('both execution modes pause uncertain or unavailable deletion reviews witho
     h.ctx.ui.notify=()=>{notifications++;};
     assert.equal((await h.call('powershell',{command:'Remove-Item -LiteralPath ./cache -Recurse'})).block,true);
     assert.equal(dialogs,0,`${mode}: 不得打开阻塞弹窗`);
-    assert.equal(notifications,1);
+    assert.equal(notifications,0,'关闭人工兜底时不通知、不等待');
     assert.equal(h.state.approvalHold,true,'风险审批未通过仍暂停后续修改');
     assert.equal((await h.call('write',{path:'./retry.txt',content:'x'})).block,true);
-    assert.equal(notifications,1,'暂停后不反复提醒');
+    assert.equal(notifications,0,'拒绝后也不发提醒');
     assert.equal(await h.call('read',{path:join(h.ctx.cwd,'cleanup.ps1')}),undefined);
   }
 });

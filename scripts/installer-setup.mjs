@@ -87,7 +87,7 @@ export function configureBashPath(bin,home=homedir(),loginShell=process.env.SHEL
 }
 export async function offerSearchKeys(target) {
   for(;;) {
-    const n=await choose('可选：现在配置搜索 Key？免费 Exa MCP 无需 Key / Optional API keys:', ['跳过或完成 / Skip or done','Brave','Tavily','Exa API']);
+    const n=await choose('可选：现在配置搜索 Key？插件原生 Exa 免费搜索无需 Key / Optional API keys:', ['跳过或完成 / Skip or done','Brave','Tavily','Exa API']);
     if(n===0)return;
     const result=spawnSync(process.execPath,[join(target,'customization/runtime/maintenance.mjs'),'--agent-root',target,'SetKey',['','brave','tavily','exa'][n]],{stdio:'inherit'});
     if(result.status!==0)console.log('Key 未保存；可以重试或跳过。No key saved.');

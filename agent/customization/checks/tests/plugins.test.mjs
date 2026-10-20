@@ -94,14 +94,14 @@ test('Hermes can create, revise and reload a reusable skill in isolated storage'
   const root = mkdtempSync(join(tmpdir(), 'pi-skill-verification-'));
   const options = { globalSkillsDir: join(root, 'skills'), piGlobalSkillsDir: join(root, 'pi-skills'), legacySkillsDir: join(root, 'legacy'), migrationSentinelPath: join(root, 'migration-marker'), projectSkillsDir: null };
   const store = new SkillStore(options);
-  const created = await store.create('verify-web-routing', 'Use when checking free Exa first and Tavily fallback routing.', '## Procedure\n1. Verify free search.\n\n## Verification\n1. Confirm source URLs.', 'global');
+  const created = await store.create('verify-web-cache', 'Use when checking native search content storage.', '## Procedure\n1. Verify free search.\n\n## Verification\n1. Confirm source URLs.', 'global');
   assert.equal(created.success, true, created.error);
-  const patched = await store.patch('global:verify-web-routing', 'Verification', '1. Confirm source URLs.\n2. Check fallback only runs when needed.');
+  const patched = await store.patch('global:verify-web-cache', 'Verification', '1. Confirm source URLs.\n2. Check fallback only runs when needed.');
   assert.equal(patched.success, true, patched.error);
   const reopened = new SkillStore(options);
-  const saved = await reopened.loadSkill('global:verify-web-routing');
+  const saved = await reopened.loadSkill('global:verify-web-cache');
   assert.ok(saved);
-  assert.match(readFileSync(join(root, 'skills', 'verify-web-routing', 'SKILL.md'), 'utf8'), /Check fallback only runs/);
+  assert.match(readFileSync(join(root, 'skills', 'verify-web-cache', 'SKILL.md'), 'utf8'), /Check fallback only runs/);
 });
 
 test('Chinese correction rules recognize explicit steering without flagging ordinary questions', async () => {

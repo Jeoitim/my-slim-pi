@@ -1,8 +1,9 @@
-import test from 'node:test';
+import nodeTest from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdirSync, mkdtempSync, readFileSync, writeFileSync, existsSync} from 'node:fs';
 import {join, resolve} from 'node:path';
 import {spawnSync} from 'node:child_process';
+const test=process.platform==='win32'?nodeTest:nodeTest.skip;
 
 const root = process.cwd();
 const quote = value => "'" + value.replaceAll("'", "''") + "'";

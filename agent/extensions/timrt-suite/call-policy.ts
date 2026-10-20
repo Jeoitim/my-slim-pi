@@ -5,11 +5,54 @@ import { createHash } from "node:crypto";
 import { protectedPath, verify } from "../../customization/runtime/policy-files.cjs";
 import { safeShellRead } from "./guards.ts";
 import { analyzePowerShell, type ShellAnalysis } from "./shell-analysis.ts";
+import { fileURLToPath } from "node:url";
 
 export { verify as verifyPolicy };
 export const POLICY_EXIT = "该操作会直接改写受保护的审批策略。只读审计允许；用户明确要求维护 Pi 对应机制时，配置及授权/审批/事务/校验/构建/加载源码均通过 maintain_pi 逐次审批、备份及验证；不得换 shell、内联或代理绕过。";
-export function readOnlyCall(name: string, input: Record<string, any>): boolean {
-  return ["read", "grep", "find", "ls", "web", "memory_search", "memory_get", "question", "questionnaire", "explain_call"].includes(name)
+// Only the pinned native tools receive these exemptions. Annotations alone do
+// not establish safety. Background page fetches obey the same feature limits.
+export function webReadOnly(name: string, input: Record<string, any>, root: string): boolean {
+  if (name === "web_enable" || name === "get_search_content") return true;
+  if (!["web_search", "fetch_content"].includes(name)) return false;
+  let config: any;
+  try { config = JSON.parse(readFileSync(join(root, "web-search.json"), "utf8")); } catch { return false; }
+  if (Object.entries(config).some(([key,value]) => /ApiKey$/.test(key) && typeof value === "string" && value.startsWith("!"))) return false;
+  if (config.allowBrowserCookies !== false) return false;
+  if (input.proxy !== undefined && input.proxy !== "") return false;
+  if (config.workflow !== "none" || (input.workflow !== undefined && input.workflow !== "none")) return false;
+  if (name === "web_search" && input.includeContent !== true) return true;
+  // tool_call cannot observe Content-Type. With PDF output disabled an
+  // extensionless URL or redirect cannot silently write extracted Markdown.
+  if (config.pdf?.enabled !== false || config.githubClone?.enabled !== false
+      || config.githubPrIssue?.enabled !== false || config.youtube?.enabled !== false
+      || config.allowBrowserCookies !== false) return false;
+  if (name === "web_search") return true;
+  if (input.auth || input.forceClone || input.timestamp || input.frames || input.prompt || input.model || input.answerModel || input.mode === "answer") return false;
+  const urls = Array.isArray(input.urls) && input.urls.length ? input.urls : [input.url];
+  return urls.length > 0 && urls.every(value => {
+    if (typeof value !== "string") return false;
+    try {
+      const url = new URL(value.trim());
+      if (!/^https?:$/.test(url.protocol) || url.username || url.password) return false;
+      return !/^(?:localhost|.*\.localhost|.*\.local|.*\.internal|0|127\..*|10\..*|192\.168\..*|169\.254\..*|172\.(?:1[6-9]|2\d|3[01])\..*|\[.*\])$/i.test(url.hostname);
+    } catch { return false; }
+  });
+}
+
+export function webLocalPaths(name: string, input: Record<string, any>): string[] {
+  if (name !== "fetch_content") return [];
+  const urls = Array.isArray(input.urls) && input.urls.length ? input.urls : [input.url];
+  return urls.flatMap(value => {
+    if (typeof value !== "string") return [];
+    const text = value.trim();
+    try { if (/^file:/i.test(text)) return [fileURLToPath(text)]; } catch { return [text]; }
+    return /^https?:\/\//i.test(text) ? [] : [text];
+  });
+}
+
+export function readOnlyCall(name: string, input: Record<string, any>, root = ""): boolean {
+  return ["read", "grep", "find", "ls", "memory_search", "memory_get", "question", "questionnaire", "explain_call"].includes(name)
+    || webReadOnly(name, input, root)
     || (["bash", "powershell"].includes(name) && safeShellRead(String(input.command || ""), name));
 }
 

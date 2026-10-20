@@ -15,6 +15,8 @@
 2. 在仓库运行 `node scripts/export-config.mjs` 预览，再加 `--apply` 导出。
 3. 运行 `npm test` 和 `npm run audit:share`，检查 `git diff` 后提交。
 
+`web-search.json` 在运行目录可能含凭据、命令来源和认证代理，导出器只使用仓库内经审查的无密钥模板；个人网络配置须用私密快照备份。
+
 导出器包含跨机器适配：隔离目录环境变量、移除个人模型选择、便携路径、任务代理使用当前权限规则。手工调整 agent/ 后，重新导出会替换同名白名单文件，先提交需要保留的更改。
 
 `distribution.json` 必须与 agent/ 内容一致。直接维护仓库源码时，运行下方命令刷新已有白名单文件的哈希，不改变白名单或版本：
@@ -41,7 +43,7 @@ Windows 先用 `Install.bat -Plan`、Linux 使用 `bash install.sh --agent-root 
 | npm run audit:share | 分享路径、凭据特征、源码 SHA256 |
 | node customization/checks/check-startup.mjs | 实际部署的 SDK 扩展启动；不调用模型或制造测试会话 |
 | 安装目录 node customization/runtime/maintenance.mjs Check | 权限、编辑、主题、记忆、搜索模拟、维护脚本和 SDK 集成 |
-| -Action Benchmark / Context / WebTest | 可选性能、上下文、免费 Exa 联网 |
+| -Action Benchmark / Context / WebTest | 可选性能、上下文、插件原生免费 Exa 联网 |
 
 分享版不包含依赖个人 CC Switch 数据库与固定供应商列表的 effort/provider-compat 两项测试文件。终端响铃偏好由使用者管理；通用审批通知测试仍保留。不用本机认证或付费 API 来判定安装成功。
 

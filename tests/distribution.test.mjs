@@ -29,7 +29,7 @@ test('installer defaults to no overwrite and no persistent PATH change',()=>{
  assert.doesNotMatch(script,/Remove-Item|Invoke-Expression/);
 });
 
-test('installer refuses an existing target before writing and its plan is read-only',()=>{
+test('installer refuses an existing target before writing and its plan is read-only',{skip:process.platform!=='win32'},()=>{
  mkdirSync('.local',{recursive:true});
  const dir=mkdtempSync(join(root,'.local','install-guard-'));
  writeFileSync(join(dir,'keep.txt'),'must survive');
@@ -41,14 +41,14 @@ test('installer refuses an existing target before writing and its plan is read-o
  assert.deepEqual(readdirSync(dir),['keep.txt']);
  assert.equal(readFileSync(join(dir,'keep.txt'),'utf8'),'must survive');
 });
-test('installer refuses a drive root as a destination',()=>{
+test('installer refuses a drive root as a destination',{skip:process.platform!=='win32'},()=>{
  const run=spawnSync('pwsh',['-NoLogo','-NoProfile','-File',join(root,'scripts/Install-MySlimPi.ps1'),'-AgentRoot','C:\\','-Plan'],{encoding:'utf8'});
  assert.notEqual(run.status,0);
 });
 
 const psLiteral=value=>"'"+value.replaceAll("'","''")+"'";
 for(const missing of ['pi','node','npm.cmd','pwsh.exe']) {
- test(`installer prerequisite handling: ${missing === 'pi' ? 'Pi need not be preinstalled' : 'missing '+missing}`,()=>{
+ test(`installer prerequisite handling: ${missing === 'pi' ? 'Pi need not be preinstalled' : 'missing '+missing}`,{skip:process.platform!=='win32'},()=>{
   mkdirSync('.local',{recursive:true});
   const fixture=mkdtempSync(join(root,'.local','prerequisite-'));
   const target=join(fixture,'target'),harness=join(fixture,'check.ps1');

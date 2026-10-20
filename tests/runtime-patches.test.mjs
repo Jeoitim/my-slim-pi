@@ -41,7 +41,7 @@ test('failed build restores patched dependency files and previous output',()=>{
  const {root,host}=fixture();
  const paths=['npm/node_modules/pi-permission-suite/config-loader.ts','npm/node_modules/pi-hermes-memory/src/index.ts','npm/node_modules/pi-cc-extensions/extensions/feature/shell/startup-header.ts',host+'modes/interactive/interactive-mode.js',host+'bundle/chunks/interactive.js','extensions/timrt-suite/timrt-fast.mjs','settings.json'];
  const before=paths.map(p=>readFileSync(join(root,p),'utf8'));
- const result=spawnSync(process.execPath,[join(root,'customization/runtime/build-extensions.cjs')],{encoding:'utf8'});
+ const result=spawnSync(process.execPath,[join(root,'customization/runtime/build-extensions.cjs')],{encoding:'utf8',env:{...process.env,PI_MAINTENANCE_TARGET:root}});
  assert.notEqual(result.status,0);assert.match(result.stderr,/fixture build failure/);
  assert.deepEqual(paths.map(p=>readFileSync(join(root,p),'utf8')),before);
  assert.equal(existsSync(join(root,'customization/runtime/policy-seal.json')),false);
@@ -50,7 +50,7 @@ test('successful rebuild preserves a user-disabled native MCP extension',()=>{
  const {root,put}=fixture();
  put('settings.json',JSON.stringify({packages:[],extensions:['-builtin:mcp']}));
  put('customization/runtime/build-runtime/node_modules/esbuild/index.js',"exports.build=async options=>{require('node:fs').writeFileSync(options.outfile,'compiled');};");
- const result=spawnSync(process.execPath,[join(root,'customization/runtime/build-extensions.cjs')],{encoding:'utf8'});
+ const result=spawnSync(process.execPath,[join(root,'customization/runtime/build-extensions.cjs')],{encoding:'utf8',env:{...process.env,PI_MAINTENANCE_TARGET:root}});
  assert.equal(result.status,0,result.stderr);
  assert.ok(JSON.parse(readFileSync(join(root,'settings.json'),'utf8')).extensions.includes('-builtin:mcp'));
 });

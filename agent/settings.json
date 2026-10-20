@@ -48,7 +48,8 @@
         "themes/github-*.json"
       ]
     },
-    "npm:@narumitw/pi-btw@0.61.2"
+    "npm:@narumitw/pi-btw@0.61.2",
+    "npm:pi-web-access@0.43.0"
   ],
   "markdown": {
     "mermaid": "final"

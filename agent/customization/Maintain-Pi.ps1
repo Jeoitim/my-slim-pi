@@ -128,6 +128,7 @@ function Open-PiConfig {
             @{Name='主设置';Path='settings.json'},@{Name='模型与供应商（含认证信息）';Path='models.json'},
             @{Name='系统附加提示词';Path='APPEND_SYSTEM.md'},@{Name='固定偏好';Path='pi-hermes-memory\STANDING.md'},
             @{Name='Hermes 记忆设置';Path='hermes-memory-config.json'},@{Name='审批模型定义';Path='agents\approver.md'},
+            @{Name='Web 搜索与代理（私密）';Path='web-search.json'},
             @{Name='MCP 服务器';Path='mcp.json'},
             @{Name='权限规则';Path='extensions\pi-permission-suite\config.json'},@{Name='快捷键';Path='keybindings.json'},
             @{Name='Claude 风格 UI';Path='pi-cc-extensions.json'},@{Name='任务子代理';Path='extensions\subagent\config.json'}
@@ -209,19 +210,17 @@ function Set-PiWebKey([ValidateSet('brave','tavily','exa')][string]$Provider, [s
     try {
         $plain = [Net.NetworkCredential]::new('', $secure).Password.Trim()
         if ($plain.Length -lt 12 -or $plain.Length -gt 4096 -or $plain -match '\s') { throw 'Key 应为 12 至 4096 字符且不含空白；未保存。' }
-        $directory = Resolve-PiChild $script:AgentRoot 'secrets'
-        New-Item -ItemType Directory -Path $directory -Force | Out-Null
-        Protect-PiPath $directory
-        $file = Resolve-PiChild $script:AgentRoot 'secrets\web-keys.json'
+        $file = Resolve-PiChild $script:AgentRoot 'web-search.json'
         $keys = @{}
         if (Test-Path -LiteralPath $file) {
             $existing = Get-Content -LiteralPath $file -Raw -Encoding UTF8 | ConvertFrom-Json
             foreach ($property in $existing.PSObject.Properties) { $keys[$property.Name] = $property.Value }
-            $null = New-PiBackup -Label before-key -Files @('secrets\web-keys.json')
+            $null = New-PiBackup -Label before-key -Files @('web-search.json')
         }
-        $keys[$provider] = $plain
-        Write-PiJson $file $keys
+        $keys[$provider+'ApiKey'] = if ($plain -match '^[!$]') { '$'+$plain } else { $plain }
+        if (-not (Test-Path -LiteralPath $file)) { [IO.File]::WriteAllText($file,'{}') }
         Protect-PiPath $file -File
+        Write-PiJson $file $keys
         Write-Host "$provider Key 已保存，下一次联网调用生效。" -ForegroundColor Green
     } finally { $plain=$null; $keys=$null; $existing=$null; $secure.Dispose() }
 }
@@ -276,7 +275,7 @@ function Show-PiMenu {
                 '5' { Show-PiBackupMenu }
                 '6' { Invoke-PiMaintenance @('Rebuild'); Write-Host '构建完成。请重启 Pi。' -ForegroundColor Green }
                 '7' {
-                    $check = Select-PiItem '选择检查；均不调用模型，联网测试只用免费 Exa MCP' @('Check','WebTest','Benchmark','Context') {param($item) switch($item){'Check'{'离线测试与组件集成'} 'WebTest'{'免费联网测试'} 'Benchmark'{'三次启动测速'} 'Context'{'离线首轮上下文采集'}}}
+                    $check = Select-PiItem '选择检查；均不调用模型，联网测试只用插件原生免费 Exa' @('Check','WebTest','Benchmark','Context') {param($item) switch($item){'Check'{'离线测试与组件集成'} 'WebTest'{'免费联网测试'} 'Benchmark'{'三次启动测速'} 'Context'{'离线首轮上下文采集'}}}
                     if ($check) { Invoke-PiCheck $check }
                 }
                 '8' { Clear-PiGenerated -Commit }

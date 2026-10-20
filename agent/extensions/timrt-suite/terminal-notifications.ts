@@ -1,4 +1,33 @@
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { readFileSync, writeFileSync, renameSync, unlinkSync } from "node:fs";
+import { join } from "node:path";
+import { randomUUID } from "node:crypto";
+import { getAgentDir, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
+
+/** Agent-owned interactive preference, shared by the CLI and Web UI. */
+export function configuredHumanFallback(): "pause" | "ask" {
+  try {
+    const config = JSON.parse(readFileSync(join(getAgentDir(), "extensions/pi-permission-suite/config.json"), "utf8"));
+    const value = config.reviewer?.humanFallback;
+    return value === undefined || value === "ask" ? "ask" : "pause";
+  } catch { return "pause"; }
+}
+
+export function saveApprovalFallback(enabled: boolean) {
+  const file = join(getAgentDir(), "extensions/pi-permission-suite/config.json");
+  const config = JSON.parse(readFileSync(file, "utf8"));
+  if (!config || typeof config !== "object" || Array.isArray(config)
+    || (config.reviewer !== undefined && (!config.reviewer || typeof config.reviewer !== "object" || Array.isArray(config.reviewer)))) {
+    throw new Error("Invalid permission configuration; nothing was changed");
+  }
+  config.reviewer = { ...config.reviewer, humanFallback: enabled ? "ask" : "pause" };
+  const temporary = file + "." + randomUUID() + ".tmp";
+  try {
+    writeFileSync(temporary, JSON.stringify(config, null, 2) + "\n", { flag: "wx", mode: 0o600, flush: true });
+    renameSync(temporary, file);
+  } finally {
+    try { unlinkSync(temporary); } catch (error: any) { if (error.code !== "ENOENT") throw error; }
+  }
+}
 
 export function isApprovalPrompt(title = ""): boolean {
   if (/权限模式|审批模型|后台模型设置|主题|theme|model|settings|设置/i.test(title)) return false;
@@ -10,6 +39,9 @@ export type ApprovalDialogOptions = {signal?:AbortSignal;timeout?:number};
 
 async function approvalDialog<T>(pi:ExtensionAPI,ctx:ExtensionContext,title:string,options:ApprovalDialogOptions|undefined,show:(opts:ApprovalDialogOptions)=>Promise<T>):Promise<T|undefined> {
   if(!ctx.hasUI || ctx.signal?.aborted || options?.signal?.aborted)return;
+  // ASK's explicit timeout:0 always keeps per-call human approval. AUTO/ACT
+  // may decline human fallback, including delegation and reviewer outages.
+  if(options?.timeout!==0 && configuredHumanFallback()==="pause")return;
   // timeout:0 is reserved for ASK: deliberate, per-call human approval without expiry.
   const timeout=options?.timeout===0 ? undefined : options?.timeout && options.timeout>0 ? Math.min(options.timeout,APPROVAL_TIMEOUT_MS) : APPROVAL_TIMEOUT_MS;
   const controller=new AbortController();let expired=false;

@@ -113,7 +113,7 @@ bash "$maint" EditConfig settings.json        # 先备份，再打开编辑器
 | ASK（蓝） | 直接执行 | 逐次人工确认 | 逐次人工确认 |
 | PLAN（紫） | 直接执行 | 不执行 | 不执行 |
 
-**ASK 与 AUTO 共用只读免审判断**；其余调用逐次人工确认，**无等待超时**，仅明确批准后执行当前调用；无交互界面时仅允许通过只读免审的操作。memory 与原生 MCP 均在实际内部操作处检查，web 外层放行不替代内部工具检查。只有经过固定配置和来源核对的 Exa 只读工具免审，其他 MCP 单靠 `readOnlyHint` 不免审。
+**ASK 与 AUTO 共用只读免审判断**；其余调用逐次人工确认，**无等待超时**，仅明确批准后执行当前调用；无交互界面时仅允许通过只读免审的操作。memory 在实际内部操作处检查；原生 Web 按参数判断。其他 MCP 单靠 `readOnlyHint` 不免审。
 
 **AUTO/ACT 默认启用人工兜底**：Windows 和 Linux 各自 AgentRoot 下的 `extensions/pi-permission-suite/config.json` 中，`reviewer.humanFallback` 均默认为 `ask`；审批不确定时弹出人工确认，审批服务故障时先询问暂停还是逐条人工审批。需要无人值守、不被弹窗打断时可设为 `pause`：立即暂停待审操作并提醒，不弹框、不等待，也不自动放行。明确拒绝或硬保护不会转人工兜底放行。AUTO/ACT 的人工审批与任务代理授权窗口 **90 秒无回应即关闭**，本次不执行，在回答中说明阻塞并等待下一轮指示；ASK 模式仍无等待超时。主题、模型等主动打开的设置窗口不计时。
 
@@ -211,20 +211,17 @@ AUTO/ACT 均须内部审批，ASK 人工确认且无超时，PLAN/清理暂停�
 
 ### 搜索
 
-模型使用一个 `web` 入口，优先调用 Pi 原生 MCP 连接的免费 Exa，再按查询逐个尝试 API；成功即停，主动取消则停止全部回退。嵌套 MCP 调用若被权限管线阻止，不改用付费 API 绕过。只读免自动审批只适用于配置未变化且指向固定公开 Exa 端点的两个已知工具；项目替换、其他工具和 readOnlyHint 声明不构成免审批凭据。
+联网由固定版本 pi-web-access 0.43.0 提供，保留三个原生工具：`web_search` 搜索，`fetch_content` 读取正文，`get_search_content` 分页检索已缓存内容。搜索使用插件原生 auto 策略及串行回退，成功即停，不设置 searchRouting 或 allowedProviders 限制。仅有现行 Exa、Brave、Tavily 凭据时按原生顺序使用；原生 SearXNG、订阅账号等可改变实际优先级，不另写强制路由。未配 Exa Key 时使用插件内部的免费 Exa 服务。指定单一 provider 时遵循上游的严格选择语义。保留全部上游免 Key 入口：Exa、Parallel MCP、degoog、DuckDuckGo、Keenable，以及自建 SearXNG；OpenAI/Kimi 的订阅认证也遵循上游规则。Parallel MCP、degoog、DuckDuckGo、Keenable 在上游属于显式选择项，不擅自塞入 auto 或 all。抓取保留原生 HTTP、正文提取及原生 Fetch 回退和内容缓存；第三方托管抓取服务保持默认关闭。
 
-| 查询 | API 回退顺序 |
-|---|---|
-| 普通、时效、站点、官方文档 | Brave → Tavily basic → Exa API |
-| 比较、调研、综述 | Tavily basic → Brave → Exa API |
-| 论文、语义、相似页面 | Exa API → Tavily basic → Brave |
-| 读取 1～3 个网页正文 | Exa MCP → Tavily basic extract → Exa contents |
+`toolActivation: "auto"` 由插件按模型能力决定：支持会话中追加工具且保留提示缓存的模型先提供原生 `web_enable`，启用后追加三个工具；其他模型首轮直接声明三个工具。恢复会话沿用已有工具声明。没有统一 Web 包装工具。`/search` 查看原生缓存。
 
-缺 Key 或能力不适用时跳过。结果是否切题由模型判断；`provider: "fallback"` 可跳过不切题的 MCP 结果，或指定 `brave`、`tavily`、`exa-api`。API 使用各自账户额度，路由不自动充值或升级；额度以账户控制台为准。
+普通公开搜索和网页读取在四种模式均免审；本地路径、URL 内认证、显式 auth、代理覆盖、forceClone、视频帧及模型分析参数走实际权限流程。PLAN 拒绝，ASK 逐次人工确认，AUTO 调用内部审批，ACT 普通操作直通；凭据路径规则先于模式执行。启用 PDF 后无法在调用前判断 Content-Type，因此相关抓取整体撤销只读豁免，包括搜索的 includeContent 后台抓取。工具动态激活不改变这些规则。
 
-通过上方 SetKey 命令（Windows 也可用菜单 3）隐藏输入并保存到 `secrets/web-keys.json`，仅当前用户可访问。环境变量 `BRAVE_API_KEY`（兼容 `BRAVE_SEARCH_API_KEY`）、`TAVILY_API_KEY`、`EXA_API_KEY` 优先于文件。`/web-status` 查看脱敏状态。
+默认关闭 source_check、Curator 与摘要、浏览器 Cookie、Git 克隆、GitHub 凭据读取、PDF 写入、视频和图片附加处理。PDF 默认关闭可阻止无扩展名 URL 或重定向意外落盘；需要这些能力时由用户在外部原生配置中明确启用、重建并重启，再按当前模式审批。上游参数仍可见，关闭的能力不会因参数存在而自动启用。
 
-API 优先使用 HTTP(S)_PROXY 环境变量，否则按需读取 Windows 已启用的静态代理；遵守 NO_PROXY 和代理排除列表，不执行 PAC。更改代理后重启 Pi。
+搜索 Key 用 SetKey（Windows 菜单 3）隐藏输入，保存到 AgentRoot/`web-search.json` 的 exaApiKey、braveApiKey、tavilyApiKey，Windows 用户 DACL，Linux 0600。配置中的显式凭据来源优先于插件的环境变量；不设置字段时使用 EXA_API_KEY、BRAVE_API_KEY、TAVILY_API_KEY。托管启动器和维护入口兼容旧 BRAVE_SEARCH_API_KEY。Key 以 ! 或 $ 开头时维护入口自动转义，避免误作命令或环境变量来源。不要在聊天、参数或共享文件中填写 Key。
+
+代理使用同一文件的原生 `proxy`。安装时从 HTTP(S)_PROXY（兼容小写）导入；Windows 无环境配置时导入已启用的静态 HTTPS 代理，不执行 PAC。后续使用 Windows 配置菜单或 Linux `bash "$maint" EditConfig web-search.json` 调整，空字符串为直连；需要 curl，插件遵守 NO_PROXY。Key/代理修改有私密备份；能力修改还需 Rebuild 和重启。状态入口只显示 Key 是否存在。
 
 ### 长期记忆
 
@@ -237,8 +234,9 @@ Hermes 按需初始化，每 12 轮或 30 次工具调用复盘，使用最近 2
 | 内容 | 默认配置快照 |
 |---|---|
 | 普通配置、主题、代理定义、本地扩展源码、技能、维护文档、STANDING、信任配置 | 包含 |
-| 独立维护脚本、构建/校验源码、检查脚本、启动器与 Linux Node 定位文件 | 包含；不备份生成的 seal、编译产物或依赖 |
-| models.json、auth.json、搜索 Key | 排除；单文件编辑备份可能包含凭据 |
+| npm 包清单与锁文件、独立维护脚本、构建/校验源码、检查脚本、启动器与 Linux Node 定位文件 | 包含；不备份生成的 seal、编译产物或依赖 |
+| web-search.json（可能含搜索 Key 和认证代理） | 包含，快照须私密保管，清单标记 credentialsIncluded |
+| models.json、auth.json | 排除；单文件编辑备份可能包含凭据 |
 | 会话、记忆数据库、安装包和依赖 | 排除，需单独备份 |
 
 快照在 `backups/config-用途-时间-随机值`，Windows 使用用户 DACL，Linux 目录 0700、文件 0600，清单含 SHA256。恢复先展示路径、源文件 SHA256 和当前目标状态，输入 `RESTORE` 后复查这些状态并创建安全快照；维护脚本、构建器及启动器也可恢复，恢复后重建并重启。记忆数据库应关闭 Pi 后另行备份。
@@ -287,7 +285,8 @@ PruneBackups（Windows 菜单 5）先展示清单，再确认：
 | APPEND_SYSTEM.md / pi-hermes-memory/STANDING.md | 行为规则 / 长期固定偏好 |
 | agents/approver.md / extensions/pi-permission-suite/config.json | 审批提示词与可选模型 / 路径规则与人工兜底配置 |
 | hermes-memory-config.json / extensions/subagent/config.json | 记忆策略 / 任务代理设置 |
-| mcp.json | Pi 原生 MCP 来源、超时与延迟工具暴露 |
+| web-search.json | 原生 Web 配置、私密 Key 和代理 |
+| mcp.json | 用户额外 MCP 配置；默认无服务器 |
 | pi-cc-extensions.json / pi-btw.json / keybindings.json | 消息渲染 / 旁聊 / 快捷键 |
 | themes/ / skills/ / extensions/timrt-suite/ | 本地主题 / 技能 / 整合源码 |
 | customization/runtime/ | 构建、兼容补丁、配置接口、编译清单与构建依赖 |
@@ -297,17 +296,17 @@ PruneBackups（Windows 菜单 5）先展示清单，再确认：
 
 ### 自定义工具与按需暴露
 
-本地整合层提供五个工具，组件内部工具按需加载：
+本地整合层提供四个工具，组件内部工具按需加载：
 
 | 工具 | 用途 | 何时提供给模型 |
 |---|---|---|
-| `web` | 搜索、读取网页，免费 MCP 优先及 API 回退 | 默认提供；仅配置 Exa 时隐藏重复 MCP 入口 |
+| 原生 Web 工具 | 搜索、读取及缓存检索 | pi-web-access 自动选择启用时机 |
 | `memory` | 统一检索、保存记忆，高级 schema 按需读取 | 默认提供；隐藏底层六个记忆工具的完整声明 |
 | `explain_call` | 查询某次调用的权限路线及当前运行构建状态 | 默认提供；仅诊断，不执行或授予权限 |
 | `request_subagent` | 已读技能建议委派后申请当前任务授权 | 非问候且尚未授权时提供；申请本身不启动任务 |
 | `maintain_pi` | 受控 Pi 配置补丁事务 | 当前用户明确提出 Pi 自身维护时提供 |
 
-默认以 `web` 提供统一搜索入口；Exa 的两个原始工具采用原生 deferred 暴露，不常驻完整 schema。仅配置默认 Exa 时，web 隐藏重复的 tool_search 声明；不影响工具可调用性。新增其他 MCP 后保留通用发现入口。工具声明数量以上方 `Context` 命令实测为准。
+Web 工具由固定版社区扩展注册，不在本地整合层增加包装或路由。MCP 管理保留宿主默认实现；默认没有搜索 MCP 服务器。工具声明数量以上方 Context 实测为准。
 
 每轮系统提示包含**本机日期和时区**。需要实时钟点或精确日志时间范围时，Windows 在 PowerShell 执行 `Get-Date -Format o`，Linux 在 Bash 执行 `date --iso-8601=seconds`，无需额外时间工具；日常提示不持续写入变化的时分秒。
 
@@ -315,6 +314,7 @@ PruneBackups（Windows 菜单 5）先展示清单，再确认：
 
 | 组件 | 固定版本 | 职责 |
 |---|---|---|
+| pi-web-access | 0.43.0 | 原生搜索、抓取与缓存 |
 | pi-cc-extensions | 1.0.5 | Claude 风格消息、diff、启动页 |
 | pi-hermes-memory | 0.9.10 | 长期记忆、复盘与经验技能 |
 | pi-hashline-edit-pro | 6.4.6 | 锚点读取、编辑、过期检测与撤销 |
@@ -325,6 +325,6 @@ PruneBackups（Windows 菜单 5）先展示清单，再确认：
 | @anishthite/pi-themes | 0.1.9 | Ayu、Catppuccin、GitHub 等主题 |
 | @narumitw/pi-btw | 0.61.2 | 独立旁聊 |
 
-本地 `timrt-suite` 整合界面、权限、联网与维护。启动器 `bin/pi-launcher.js` 使用本机 Node 原生运行 Pi；Windows 命令工具为 PowerShell 7，Linux 为 Bash。四个编译入口随启动加载，第五个任务代理入口授权后加载。包的 `extensions: []` 可与预编译入口配套；每个组件只启用一个入口，MCP 使用内置扩展，不单独编译、不安装第三方 Adapter。Exa 默认仅开放 search/fetch 两个 deferred 工具，其余隐藏。连接在后台建立，web 首次调用通过 reachesTools 等待就绪；不是首次调用才连接。
+本地 `timrt-suite` 整合界面、权限与维护。启动器使用本机 Node；Windows 使用 PowerShell 7，Linux 使用 Bash。四个本地预编译启动入口，第五个任务代理入口授权后加载。pi-web-access 直接使用上游预构建包的单一原生入口，共享宿主 SDK；不修改插件、宿主或其编译产物来实现 Web。
 
 `cache/node-compile` 与 `cache/jiti` 日常保留。Hashline 默认数据放在当前 AgentRoot 的 `pi-hashline-edit-pro`；显式设置 PI_HASHLINE_DIR 时遵循该设置。启动器依据 `customization/runtime/compiled-extensions.json` 检测源码、SDK 和输出变化，必要时自动重建。

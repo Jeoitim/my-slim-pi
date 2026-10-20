@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import {resolve,join,dirname} from 'node:path';
 import {homedir} from 'node:os';
 import {spawnSync} from 'node:child_process';
-import {backup,child,hash,runNode,protect} from '../agent/customization/runtime/maintenance.mjs';
+import {backup,child,hash,runNode,protect,migrateWebAccess} from '../agent/customization/runtime/maintenance.mjs';
 import {configurePlatform} from '../agent/customization/runtime/platform-config.mjs';
 import {setupChoices,configureBashPath,offerSearchKeys} from './installer-setup.mjs';
 const repo=resolve(import.meta.dirname,'..'), payload=join(repo,'agent');
@@ -62,13 +62,15 @@ try {
     const known=new Set(defaults.map(name));
     const extras=(oldSettings.packages||[]).filter(p=>!known.has(name(p)) && !name(p).includes('pi-mcp-adapter'));
     settings.packages=[...defaults.map(p=>{
+      if(name(p)==='npm:pi-web-access')return p;
       const old=(oldSettings.packages||[]).find(o=>name(o)===name(p));
       return old && typeof old==='object'?{...old,source:typeof p==='string'?p:p.source}:p;
     }),...extras];
     fs.writeFileSync(settingsFile,JSON.stringify(settings,null,2)+'\n',{mode:0o600});
+    migrateWebAccess(target,JSON.parse(fs.readFileSync(child(payload,'web-search.json'),'utf8')));
     configurePlatform(target);
     const permissionFile=child(target,'extensions/pi-permission-suite/config.json'),permission=JSON.parse(fs.readFileSync(permissionFile,'utf8'));
-    permission.path.deny[join(target,'secrets/*')]='Private search credentials';permission.path.deny[join(target,'auth.json')]='Private model credentials';
+    permission.path.deny[join(target,'secrets/*')]='Private search credentials';permission.path.deny[join(target,'auth.json')]='Private model credentials';permission.path.deny[join(target,'web-search.json')]='Private web configuration and credentials';
     fs.writeFileSync(permissionFile,JSON.stringify(permission,null,2)+'\n',{mode:0o600});
     for(const dir of ['install/releases/'+manifest.piVersion,'npm','customization/runtime/build-runtime']) {
       const r=spawnSync('npm',['ci','--prefix',child(target,dir),'--no-audit','--no-fund','--ignore-scripts',...(dir==='npm'?['--legacy-peer-deps']:[])],{cwd:target,stdio:'inherit'});

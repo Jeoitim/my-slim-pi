@@ -7,7 +7,8 @@
     "deny": {
       "~/.ssh/*": "SSH private files are protected",
       "~/.pi/agent/secrets/*": "Network credentials must stay private",
-      "~/.pi/agent/auth.json": "Model credentials must stay private"
+      "~/.pi/agent/auth.json": "Model credentials must stay private",
+      "~/.pi/agent/web-search.json": "Private web configuration and credentials"
     },
     "allow": {}
   },

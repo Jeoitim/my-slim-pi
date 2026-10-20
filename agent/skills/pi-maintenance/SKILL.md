@@ -30,7 +30,7 @@ compatibility: Windows / Linux; Node.js 24; isolated managed Pi installation.
 
 | 修改目标 | 方式 |
 |---|---|
-| 默认模型、主题、后台模型、搜索 Key | 优先原生命令或维护菜单；Key 使用维护入口 SetKey 隐藏输入 |
+| 默认模型、主题、后台模型、搜索 Key | 优先原生命令或维护菜单；Key 使用维护入口 SetKey 隐藏输入，保存到私密 web-search.json；代理用外部 EditConfig web-search.json 配置。其能力配置受策略校验，改动后重建并重启 |
 | 普通配置、主题、UI/搜索/记忆源码、技能、手册 | 当前用户明确要求维护 Pi 后，使用 `maintain_pi` |
 | 权限配置、APPEND_SYSTEM、approver 提示词 | 还须用户明确要求维护 Pi 权限或审批 |
 | 授权/审批/事务/校验内核、构建器、组件加载清单、启动器、信任文件 | 同一 `maintain_pi` 入口；须明确对应核心机制的维护意图，先独立备份，使用修改前的维护/构建/检查快照验证 |
@@ -50,5 +50,5 @@ compatibility: Windows / Linux; Node.js 24; isolated managed Pi installation.
 
 - 使用 `pi list` 核对来源，通过 `pi install npm:包名@明确版本` 管理目标组件。保留旧版本和配置快照，验证后再清理。
 - 保留 `settings.json` 的包资源过滤和预编译入口；每个组件只启用一个入口。包升级、重装或扩展源码变化后重建并检查；构建失败先定位原因。
-- 性能问题才通过本系统入口运行 `Benchmark` / `Context`，联网问题才运行 `WebTest`。这些入口不调用真实模型；WebTest 使用免费 Exa MCP。常规维护不探测收费 API。
+- 性能问题才通过本系统入口运行 `Benchmark` / `Context`，联网问题才运行 `WebTest`。这些入口不调用真实模型；WebTest 使用 pi-web-access 原生免费 Exa 搜索。常规维护不探测收费 API。
 - 只把验证过的可复用做法更新到对应章节，替换旧内容；用户偏好存入 memory。密钥、临时日志和未经验证的推测不写入文档或记忆。

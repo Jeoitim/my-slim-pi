@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -99,6 +99,50 @@ test('ASK approval waits for an explicit choice and does not install a timeout',
   assert.match(message,/无等待超时/);assert.doesNotMatch(message,/90 秒/);
   resolveDialog(true);assert.equal(await pending,true);
   assert.equal(events.includes('timrt:approval-timeout'),false);
+});
+
+test('human fallback is shared, takes effect without reload and never weakens ASK or the policy seal',async()=>{
+  const {configuredHumanFallback,saveApprovalFallback,confirmApprovalWithAlert,selectApprovalWithAlert}=await jiti.import(join(root,'extensions/timrt-suite/terminal-notifications.ts'));
+  const {createApprovalReviewer}=await jiti.import(join(root,'extensions/timrt-suite/approval-reviewer.ts'));
+  const {default:policy}=await import(pathToFileURL(join(root,'customization/runtime/policy-files.cjs')));
+  const fixture=mkdtempSync(join(root,'approval-setting-test-'));
+  const before=process.env.PI_CODING_AGENT_DIR;
+  try {
+    mkdirSync(join(fixture,'extensions/pi-permission-suite'),{recursive:true});
+    mkdirSync(join(fixture,'extensions/timrt-suite'),{recursive:true});
+    mkdirSync(join(fixture,'customization/runtime'),{recursive:true});
+    mkdirSync(join(fixture,'agents'),{recursive:true});
+    writeFileSync(join(fixture,'agents/approver.md'),'---\nname: approver\n---\nReview.');
+    writeFileSync(join(fixture,'extensions/timrt-suite/index.ts'),'');
+    const file=join(fixture,'extensions/pi-permission-suite/config.json');
+    writeFileSync(file,JSON.stringify({path:{deny:{secret:'protected'}},reviewer:{humanFallback:'ask',other:'keep'}}));
+    writeFileSync(join(fixture,'customization/runtime/policy-seal.json'),JSON.stringify(policy.seal(fixture)));
+    process.env.PI_CODING_AGENT_DIR=fixture;
+    let dialogs=0,alerts=0;
+    const pi={events:{emit(){alerts++;}},appendEntry(){}};
+    const ctx={hasUI:true,cwd:fixture,modelRegistry:{find(){}},ui:{notify(){alerts++;},select:async()=>{dialogs++;return '✅ 批准';},confirm:async()=>{dialogs++;return true;}}};
+    const review=createApprovalReviewer(pi);
+    assert.equal(configuredHumanFallback(),'ask');
+    saveApprovalFallback(false);
+    assert.equal((await review(ctx,'operation:write',{})).source,'paused');
+    assert.equal(await confirmApprovalWithAlert(pi,ctx,'批准操作','fixture'),false);
+    assert.equal(await selectApprovalWithAlert(pi,ctx,'审批操作',['approve','deny']),undefined);
+    assert.equal(dialogs,0);assert.equal(alerts,0,'off emits no prompt or approval notification');
+    assert.equal(policy.verify(fixture).ok,true,'only the interactive field is exempt from the seal');
+    assert.equal(policy.protectedPath(fixture,file),true,'tools still cannot edit the preference');
+    assert.equal(await confirmApprovalWithAlert(pi,ctx,'ASK：批准操作','fixture',{timeout:0}),true);
+    assert.equal(dialogs,1,'ASK still asks even when AUTO/ACT fallback is off');
+    saveApprovalFallback(true);
+    assert.equal((await review(ctx,'operation:write',{})).approved,true,'an existing reviewer reads the current preference');
+    assert.equal(dialogs,2);
+    const config=JSON.parse(readFileSync(file,'utf8'));
+    assert.equal(config.reviewer.other,'keep');
+    config.path.deny={};writeFileSync(file,JSON.stringify(config));
+    assert.equal(policy.verify(fixture).ok,false,'other permission changes remain sealed');
+  }finally{
+    if(before===undefined)delete process.env.PI_CODING_AGENT_DIR;else process.env.PI_CODING_AGENT_DIR=before;
+    rmSync(fixture,{recursive:true,force:true});
+  }
 });
 
 test('/btw runs independently while the main task is busy, declares no tools and never auto-injects', async () => {

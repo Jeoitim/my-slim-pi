@@ -8,6 +8,7 @@ const packageName = "@earendil-works/pi-coding-agent";
 const commandName = "pi";
 const agentDir = path.dirname(__dirname);
 process.env.PI_CODING_AGENT_DIR = agentDir;
+process.env.BRAVE_API_KEY ||= process.env.BRAVE_SEARCH_API_KEY;
 process.env.PI_HASHLINE_DIR ??= path.join(agentDir, 'pi-hashline-edit-pro');
 const installRoot = path.join(agentDir, "install");
 const currentFile = path.join(installRoot, "current-version");

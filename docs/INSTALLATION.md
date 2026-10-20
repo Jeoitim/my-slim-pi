@@ -44,10 +44,12 @@ bash install.sh --agent-root <目录> --update --non-interactive --add-to-path -
 
 `-Plan` / `--plan` 不写目标配置或 PATH；远程 PowerShell 入口仍需下载锁定提交的源码。`-Update` / `--update` 允许备份后替换受管理源码，个人认证、模型、代理定义、主题和长期规则保留。共享维护技能和文档随源码更新。
 
-正常部署执行扩展构建与 SDK 启动检查，不把真实配置当测试夹具。完整离线回归使用 `-FullCheck` / `--full-check`，仅允许仓库 `.local/` 内的一次性安装；不调用真实模型或收费搜索。外部 MCP 的公网可用性取决于网络。
+正常部署执行扩展构建与 SDK 启动检查，不把真实配置当测试夹具。完整离线回归使用 `-FullCheck` / `--full-check`，仅允许仓库 `.local/` 内的一次性安装；不调用真实模型或收费搜索。搜索与抓取的公网可用性取决于网络；默认不配置外部 MCP 服务器。
 
 ## 搜索 Key
 
-可在安装结束时选择 Brave、Tavily 或 Exa API，使用隐藏终端输入；不放入命令参数、Shell 历史或聊天。可以跳过或逐个录入；跳过不会清除已有值。后续使用维护入口 SetKey 更新。配置文件与私密备份仅当前用户可访问，分享仓库不包含这些文件。
+可在安装结束时选择 Brave、Tavily 或 Exa API，使用隐藏终端输入；不放入命令参数、Shell 历史或聊天。可以跳过或逐个录入；跳过不会清除已有值。后续使用维护入口 SetKey 更新。全部免 Key 供应商按上游原生 auto/显式选择规则保留，不配置供应商白名单或自研路由。原生配置为 AgentRoot/web-search.json，Key 字段为 exaApiKey、braveApiKey、tavilyApiKey；凭据解析交给插件。更新将旧搜索凭据备份后迁入该文件，并移除旧实现和专用 MCP 配置。配置文件与私密备份仅当前用户可访问；仓库仅含无密钥模板。
+
+安装时优先导入 HTTPS_PROXY / HTTP_PROXY（兼容小写），Windows 未设置时导入已启用的静态 HTTPS 代理；不执行 PAC。之后用 EditConfig web-search.json 调整原生 proxy，空字符串为直连。代理使用插件原生 curl 传输，需要 curl 可执行文件；NO_PROXY 由插件处理。运行期间更改环境变量不会自动改写已保存的 proxy。
 
 macOS 请参考 README 的未验证适配说明；当前脚本不会把 Darwin 当作已验证的 Linux。

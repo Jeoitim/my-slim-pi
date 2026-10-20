@@ -10,7 +10,7 @@ import { join } from "node:path";
 import { getAgentDir, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { configuredBackgroundModel } from "./background-models.ts";
 import { deletionRisk } from "./guards.ts";
-import { selectApprovalWithAlert } from "./terminal-notifications.ts";
+import { selectApprovalWithAlert, configuredHumanFallback } from "./terminal-notifications.ts";
 
 export interface ReviewDecision {
   approved: boolean;
@@ -131,34 +131,21 @@ async function askModel(
   }
 }
 
-export function configuredHumanFallback(): "pause" | "ask" {
-  try {
-    const config = JSON.parse(readFileSync(join(getAgentDir(),"extensions/pi-permission-suite/config.json"),"utf8"));
-    return config.reviewer?.humanFallback === "pause" ? "pause" : "ask";
-  } catch {return "ask";}
-}
+export { configuredHumanFallback };
 
 export function createApprovalReviewer(pi: ExtensionAPI, options?: {humanFallback?:"pause"|"ask"}) {
-  const humanFallback=options?.humanFallback ?? configuredHumanFallback();
+  const humanFallback=()=>options?.humanFallback ?? configuredHumanFallback();
   const cache = new Map<string, { at: number; decision: ReviewDecision }>();
   let unavailableUntil = 0;
   let unavailableKey = "";
   let rememberedProblem = "";
   let outageScope = "";
   let outageChoice: "pause" | "manual" | undefined;
-  let noticeScope="";
   const pause = (ctx: ExtensionContext,name:string,input:Record<string,unknown>,reason:string): ReviewDecision => {
-    const scope=JSON.stringify([ctx.cwd,input.currentUserRequest,ctx.model?.provider,ctx.model?.id]);
-    if(noticeScope!==scope) {
-      noticeScope=scope;
-      ctx.ui.notify(`审批未完成，待审操作已暂停：${reason}`,"warning");
-      pi.events.emit("timrt:approval-wait",{phase:"start",title:"审批暂停，待处理",hasUI:ctx.hasUI});
-      pi.events.emit("timrt:approval-wait",{phase:"end"});
-    }
     pi.appendEntry("timrt-approval-pause",{tool:name,reason});
     return {approved:false,source:"paused",reason:`${reason}；当前待审操作未执行。可做允许的只读核对，等待新用户指示或修复后重新评估。`};
   };
-  const uncertain = (ctx:ExtensionContext,name:string,input:Record<string,unknown>,reason:string) => humanFallback === "ask"
+  const uncertain = (ctx:ExtensionContext,name:string,input:Record<string,unknown>,reason:string) => humanFallback() === "ask"
     ? escalate(pi,ctx,name,input,reason) : Promise.resolve(pause(ctx,name,input,reason));
 
   const review = async function review(
@@ -217,8 +204,7 @@ export function createApprovalReviewer(pi: ExtensionAPI, options?: {humanFallbac
     // One outage-policy question per user request and reviewer configuration. Never a write grant.
     const scope = `${policyKey}\n${String(input.currentUserRequest ?? "")}`;
     if (outageScope !== scope) { outageScope = scope; outageChoice = undefined; }
-    if(humanFallback === "pause") {
-      outageChoice="pause";
+    if(humanFallback() === "pause") {
       return pause(ctx,name,input,`审批服务未完成评估：${problem}`);
     }
     if (!outageChoice) {
@@ -239,6 +225,6 @@ export function createApprovalReviewer(pi: ExtensionAPI, options?: {humanFallbac
       const model = reviewerModel(ctx), prompt = approverSystemPrompt();
       current = !!model && createHash("sha256").update(JSON.stringify([ctx.cwd,model.provider,model.id,prompt])).digest("hex") === unavailableKey;
     }
-    return {unavailable:current && Date.now() < unavailableUntil,choice:outageChoice || "none",remainingSeconds:Math.ceil(Math.max(0,unavailableUntil-Date.now())/1000),humanFallback};
+    return {unavailable:current && Date.now() < unavailableUntil,choice:outageChoice || "none",remainingSeconds:Math.ceil(Math.max(0,unavailableUntil-Date.now())/1000),humanFallback:humanFallback()};
   } });
 }

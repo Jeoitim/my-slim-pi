@@ -22,8 +22,8 @@ export function child(base, relative) {
   }
   return full;
 }
-export const configPath = p => /^(?:install\/node-path|settings\.json|trust\.json|models\.json|auth\.json|mcp\.json|keybindings\.json|pi-cc-extensions\.json|pi-btw\.json|hermes-memory-config\.json|APPEND_SYSTEM(?:\.(?:windows|linux))?\.md|pi-hermes-memory\/STANDING\.md|secrets\/web-keys\.json|extensions\/(?:pi-permission-suite|subagent)\/config\.json|skills\/(?:pi-maintenance|principal)\/SKILL\.md|customization\/(?:README\.md|Pi Agent 本机配置维护手册\.md|Maintain-Pi\.ps1|Pi-Maintenance\.bat|maintain-pi\.sh)|customization\/runtime\/[^/]+\.(?:cjs|mjs)|customization\/checks\/(?:tests\/)?[^/]+\.(?:mjs|ps1)|bin\/(?:pi|pi-launcher\.js|pi\.cmd|pi\.ps1)|agents\/[^/]+\.md|themes\/[^/]+\.json|extensions\/timrt-suite\/[^/]+\.(?:ts|ps1))$/.test(p.replaceAll('\\','/'));
-const credential = p => /^(?:models\.json|auth\.json|secrets\/)/.test(p);
+export const configPath = p => /^(?:npm\/(?:package|package-lock)\.json|install\/node-path|settings\.json|trust\.json|models\.json|auth\.json|web-search\.json|mcp\.json|keybindings\.json|pi-cc-extensions\.json|pi-btw\.json|hermes-memory-config\.json|APPEND_SYSTEM(?:\.(?:windows|linux))?\.md|pi-hermes-memory\/STANDING\.md|secrets\/web-keys\.json|extensions\/(?:pi-permission-suite|subagent)\/config\.json|skills\/(?:pi-maintenance|principal)\/SKILL\.md|customization\/(?:README\.md|Pi Agent 本机配置维护手册\.md|Maintain-Pi\.ps1|Pi-Maintenance\.bat|maintain-pi\.sh)|customization\/runtime\/[^/]+\.(?:cjs|mjs)|customization\/checks\/(?:tests\/)?[^/]+\.(?:mjs|ps1)|bin\/(?:pi|pi-launcher\.js|pi\.cmd|pi\.ps1)|agents\/[^/]+\.md|themes\/[^/]+\.json|extensions\/timrt-suite\/[^/]+\.(?:ts|ps1))$/.test(p.replaceAll('\\','/'));
+const credential = p => /^(?:models\.json|auth\.json|web-search\.json|secrets\/)/.test(p);
 export function protect(file, directory = false) {
   if (process.platform === 'linux') fs.chmodSync(file, directory ? 0o700 : 0o600);
   else {
@@ -34,13 +34,14 @@ export function protect(file, directory = false) {
   }
 }
 function privateDir(dir) { fs.mkdirSync(dir,{recursive:true,mode:0o700}); protect(dir,true); }
-const json = file => JSON.parse(fs.readFileSync(file,'utf8').replace(/^\uFEFF/,''));
+const json = file => {try{return JSON.parse(fs.readFileSync(file,'utf8').replace(/^\uFEFF/,''));}catch{throw Error('Cannot read local JSON configuration: '+path.basename(file));}};
 export function configFiles(root) {
-  const files = ['install/node-path','settings.json','trust.json','mcp.json','keybindings.json','pi-cc-extensions.json','pi-btw.json','hermes-memory-config.json','APPEND_SYSTEM.md','APPEND_SYSTEM.windows.md','APPEND_SYSTEM.linux.md','pi-hermes-memory/STANDING.md','extensions/pi-permission-suite/config.json','extensions/subagent/config.json','skills/pi-maintenance/SKILL.md','skills/principal/SKILL.md','customization/README.md','customization/Pi Agent 本机配置维护手册.md','customization/Maintain-Pi.ps1','customization/Pi-Maintenance.bat','customization/maintain-pi.sh','bin/pi-launcher.js','bin/pi.cmd','bin/pi.ps1','bin/pi'];
+  const files = ['install/node-path','settings.json','trust.json','web-search.json','mcp.json','keybindings.json','pi-cc-extensions.json','pi-btw.json','hermes-memory-config.json','APPEND_SYSTEM.md','APPEND_SYSTEM.windows.md','APPEND_SYSTEM.linux.md','pi-hermes-memory/STANDING.md','extensions/pi-permission-suite/config.json','extensions/subagent/config.json','skills/pi-maintenance/SKILL.md','skills/principal/SKILL.md','customization/README.md','customization/Pi Agent 本机配置维护手册.md','customization/Maintain-Pi.ps1','customization/Pi-Maintenance.bat','customization/maintain-pi.sh','bin/pi-launcher.js','bin/pi.cmd','bin/pi.ps1','bin/pi'];
   for (const dir of ['agents','themes','extensions/timrt-suite','customization/runtime','customization/checks','customization/checks/tests']) {
     const base = child(root,dir);
     if (fs.existsSync(base)) for (const name of fs.readdirSync(base)) if (configPath(dir+'/'+name)) files.push(dir+'/'+name);
   }
+  files.push('npm/package.json','npm/package-lock.json');
   return [...new Set(files)];
 }
 export function backup(root, {label='manual', files} = {}) {
@@ -63,6 +64,54 @@ export function backup(root, {label='manual', files} = {}) {
   fs.writeFileSync(child(destination,'configuration-snapshot.json'),JSON.stringify({kind:'pi-configuration',version:1,scope:full?'full':'files',createdAt:new Date().toISOString(),files:copied,hashes,excludes:['node_modules','sessions','memory database','runtime cache'],credentialsIncluded:copied.some(credential)},null,2)+'\n',{mode:0o600});
   return destination;
 }
+
+// One-time installer migration to the package's native config. No Web routing
+// or provider adapter lives here. Private originals remain recoverable.
+export function migrateWebAccess(root, defaults) {
+  const file=child(root,'web-search.json');
+  fileState(file);
+  const oldKey='secrets/web-keys.json';
+  const obsolete=['extensions/timrt-suite/web-route.ts','extensions/timrt-suite/web-proxy.ts','extensions/timrt-suite/native-exa.ts','customization/checks/tests/web-route.test.mjs','customization/checks/tests/web-proxy.test.mjs','customization/checks/tests/native-mcp.test.mjs'];
+  const present=[oldKey,...obsolete].filter(p=>fs.existsSync(child(root,p)));
+  for(const p of present)fileState(child(root,p));
+  let config=fs.existsSync(file)?json(file):{};
+  // Remove only the three-provider restriction from this migration's previous
+  // template. Native routing and provider availability otherwise belong to Pi Web Access.
+  const formerProviders=value=>JSON.stringify(value)==='["exa","brave","tavily"]';
+  if(formerProviders(config.searchRouting?.providers))delete config.searchRouting;
+  if(formerProviders(config.webSearch?.allowedProviders)) {
+    delete config.webSearch.allowedProviders;
+    if(!Object.keys(config.webSearch).length)delete config.webSearch;
+  }
+  const mcpFile=child(root,'mcp.json');
+  fileState(mcpFile);
+  const mcp=fs.existsSync(mcpFile)?json(mcpFile):{};
+  const oldExa=mcp.mcpServers?.exa?.url==='https://mcp.exa.ai/mcp?tools=web_search_exa,web_fetch_exa';
+  if(present.length || oldExa)backup(root,{label:'before-web-access',files:[...present,...(fs.existsSync(file)?['web-search.json']:[]),...(oldExa?['mcp.json']:[])]});
+  if(present.includes(oldKey)) {
+    const keys=json(child(root,oldKey));
+    for(const p of ['exa','brave','tavily'])if(keys[p] && !config[p+'ApiKey'])config[p+'ApiKey']=literalCredential(keys[p]);
+  }
+  // Preserve native credentials/proxy, enforce the reviewed capability defaults.
+  config={...config,...defaults};
+  if(config.proxy===undefined) {
+    let proxy=process.env.HTTPS_PROXY||process.env.https_proxy||process.env.HTTP_PROXY||process.env.http_proxy;
+    if(!proxy && process.platform==='win32') {
+      const result=spawnSync('pwsh.exe',['-NoLogo','-NoProfile','-NonInteractive','-Command',"$p=Get-ItemProperty 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings';if($p.ProxyEnable -eq 1){$p.ProxyServer}"],{encoding:'utf8',windowsHide:true});
+      const value=result.status===0?result.stdout.trim():'';
+      const match=value.match(/(?:^|;)https=([^;]+)/i);
+      if(match)proxy=match[1];else if(value && !value.includes('='))proxy=value;
+      if(proxy && !proxy.includes('://'))proxy='http://'+proxy;
+    }
+    if(proxy) {const url=new URL(proxy);if(!['http:','https:','socks:','socks5:','socks5h:'].includes(url.protocol))throw Error('Unsupported proxy protocol');config.proxy=proxy;}
+  }
+  if(!fs.existsSync(file))fs.writeFileSync(file,'{}\n',{mode:0o600});
+  protect(file);
+  fs.writeFileSync(file,JSON.stringify(config,null,2)+'\n',{mode:0o600});
+  if(oldExa){delete mcp.mcpServers.exa;fs.writeFileSync(mcpFile,JSON.stringify(mcp,null,2)+'\n');}
+  for(const p of present)fs.unlinkSync(child(root,p));
+}
+export function literalCredential(value) {return /^[!$]/.test(value)?'$'+value:value;}
 const fileState = file => {
   if (!fs.existsSync(file)) return null;
   const s=fs.lstatSync(file);if(!s.isFile() || s.nlink !== 1) throw Error('Expected a regular file without hard links');
@@ -140,7 +189,7 @@ export function cleanup(root, plan, kind, mode) {
   for(const row of plan){if(JSON.stringify(treeState(root,row.path))!==JSON.stringify(row.state))throw Error('Cleanup file changed');fs.rmSync(child(root,row.path),{recursive:true});}
 }
 export function runNode(root, args, log) {
-  const result=spawnSync(process.execPath,args,{cwd:root,stdio:log?'pipe':'inherit',encoding:'utf8',maxBuffer:16_000_000,timeout:180_000,windowsHide:true,env:{...process.env,PI_CODING_AGENT_DIR:root,PI_MAINTENANCE_TARGET:root,PI_OFFLINE:'1',PI_HASHLINE_DIR:path.join(root,'pi-hashline-edit-pro')}});
+  const result=spawnSync(process.execPath,args,{cwd:root,stdio:log?'pipe':'inherit',encoding:'utf8',maxBuffer:16_000_000,timeout:180_000,windowsHide:true,env:{...process.env,BRAVE_API_KEY:process.env.BRAVE_API_KEY||process.env.BRAVE_SEARCH_API_KEY,PI_CODING_AGENT_DIR:root,PI_MAINTENANCE_TARGET:root,PI_OFFLINE:'1',PI_HASHLINE_DIR:path.join(root,'pi-hashline-edit-pro')}});
   if(log){process.stdout.write(result.stdout||'');process.stderr.write(result.stderr||'');fs.appendFileSync(log,(result.stdout||'')+(result.stderr||''));}
   if(result.status!==0)throw Error('Maintenance child failed ('+(result.status ?? result.error?.code)+')');
 }
@@ -159,6 +208,7 @@ export async function main(args=process.argv.slice(2)) {
   }
   const execute=args=>runNode(root,args,log);
   switch(action.toLowerCase()) {
+    case 'migrateweb': migrateWebAccess(root,json(values[0]));break;
     case 'backup': console.log(backup(root,{label,files:filesArg?JSON.parse(filesArg):undefined}));break;
     case 'restore': {const plan=restorePlan(root,snapshot);console.log(JSON.stringify(plan,null,2));if(apply && await ask('RESTORE'))console.log(JSON.stringify(restore(root,plan)));break;}
     case 'clean':case 'prunebackups': {const kind=action.toLowerCase()==='clean'?'Clean':'PruneBackups';const p=cleanupPlan(root,kind,mode);console.log(JSON.stringify(p,null,2));if(apply && await ask(kind==='Clean'?'DELETE':mode==='All'?'DELETE ALL BACKUPS':'KEEP LATEST 2'))cleanup(root,p,kind,mode);break;}
@@ -179,7 +229,7 @@ export async function main(args=process.argv.slice(2)) {
       runNode(root,[path.join(import.meta.dirname,'config-state.mjs'),action.toLowerCase(),...values]);break;
     case 'editconfig': {
       const file=values[0];
-      if(values.length!==1 || !/^(?:settings\.json|models\.json|mcp\.json|keybindings\.json|hermes-memory-config\.json|pi-cc-extensions\.json|pi-btw\.json|APPEND_SYSTEM(?:\.(?:windows|linux))?\.md|pi-hermes-memory\/STANDING\.md|extensions\/(?:subagent|pi-permission-suite)\/config\.json|agents\/approver\.md)$/.test(file))throw Error('Choose an explicit editable configuration file');
+      if(values.length!==1 || !/^(?:settings\.json|models\.json|web-search\.json|mcp\.json|keybindings\.json|hermes-memory-config\.json|pi-cc-extensions\.json|pi-btw\.json|APPEND_SYSTEM(?:\.(?:windows|linux))?\.md|pi-hermes-memory\/STANDING\.md|extensions\/(?:subagent|pi-permission-suite)\/config\.json|agents\/approver\.md)$/.test(file))throw Error('Choose an explicit editable configuration file');
       const target=child(root,file);fileState(target);backup(root,{label:'before-edit',files:[file]});
       const editor=process.env.VISUAL||process.env.EDITOR||(process.platform==='win32'?'notepad.exe':'vi');
       const result=spawnSync(editor,[target],{cwd:root,stdio:'inherit',windowsHide:true});
@@ -195,8 +245,10 @@ export async function main(args=process.argv.slice(2)) {
       process.stdout.write('API Key (hidden): ');
       try {secret=await new Promise((resolve,reject)=>{const handler=s=>{for(const c of s){if(c==='\u0003'){done();reject(Error('Cancelled'));return;}if(c==='\r'||c==='\n'){done();resolve(secret);return;}if(c==='\u007f'||c==='\b')secret=secret.slice(0,-1);else secret+=c;if(secret.length>4096){done();reject(Error('Key too long'));return;}}};const done=()=>process.stdin.off('data',handler);process.stdin.on('data',handler);});} finally {process.stdin.setRawMode(false);process.stdin.pause();process.stdout.write('\n');}
       if(secret.length<12 || /\s/.test(secret))throw Error('Invalid key');
-      const dir=child(root,'secrets');privateDir(dir);const file=child(root,'secrets/web-keys.json');let keys={};if(fs.existsSync(file)){keys=json(file);backup(root,{label:'before-key',files:['secrets/web-keys.json']});}
-      keys[provider]=secret;fs.writeFileSync(file,JSON.stringify(keys)+'\n',{mode:0o600});protect(file);console.log('Key saved');break;
+      const file=child(root,'web-search.json');let keys={};if(fs.existsSync(file)){keys=json(file);backup(root,{label:'before-key',files:['web-search.json']});}
+      keys[provider+'ApiKey']=literalCredential(secret);
+      if(!fs.existsSync(file))fs.writeFileSync(file,'{}\n',{mode:0o600});protect(file);
+      fs.writeFileSync(file,JSON.stringify(keys)+'\n',{mode:0o600});console.log('Key saved');break;
     }
     default: throw Error('Unknown maintenance action');
   }

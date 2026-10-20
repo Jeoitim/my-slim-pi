@@ -11,10 +11,9 @@ import { maintenanceIntent, isGreeting, PRINCIPAL_SUMMARIES } from "./prompt-pol
 import { inspectDeletionScripts, powerShellLiteralPaths, explicitDelegation } from "./guards.ts";
 import { inspectDeletionCall, approveDeletion } from "./deletion-review.ts";
 import { approvalEvidence, approvalReason, deletionPreparation } from "./approval-evidence.ts";
-import { confirmApprovalWithAlert, type ApprovalDialogOptions } from "./terminal-notifications.ts";
-import { readOnlyCall, protectedMutation, catastrophicCall, policyHealth } from "./call-policy.ts";
+import { confirmApprovalWithAlert, configuredHumanFallback, saveApprovalFallback, type ApprovalDialogOptions } from "./terminal-notifications.ts";
+import { readOnlyCall, webLocalPaths, protectedMutation, catastrophicCall, policyHealth } from "./call-policy.ts";
 import { createRuntimeStatus } from "./runtime-status.ts";
-import { exaReadPolicy } from "./native-exa.ts";
 
 export type PermissionMode = "auto" | "act" | "ask" | "plan";
 export const modeInfo = {
@@ -30,8 +29,7 @@ export function permissionBadge(mode: PermissionMode, appearance: string): strin
 
 export function installPermissions(pi: ExtensionAPI, review = createApprovalReviewer(pi)) {
   const rules = new RuleEngine();
-  let exaPolicy = { readOnly: (_name: string, _cwd: string) => false };
-  const isReadOnly = (name: string, input: Record<string, any>, cwd: string) => readOnlyCall(name, input) || exaPolicy.readOnly(name, cwd);
+  const isReadOnly = (name: string, input: Record<string, any>, _cwd: string) => readOnlyCall(name, input, getAgentDir());
   const state = { mode: "auto" as PermissionMode, taskAgents: false, loaded: false, denied: false, development: false, maintenance:false, approvalHold: false, policyOk: true,reloadRequired:false };
   const runtime=createRuntimeStatus(getAgentDir());
   let maintenanceReload=false;
@@ -105,6 +103,8 @@ export function installPermissions(pi: ExtensionAPI, review = createApprovalRevi
     const info=runtimeInfo();state.reloadRequired=info.reloadRequired;
     ctx.ui.setStatus("timrt-runtime",info.reloadRequired ? "⚠ "+info.warning : undefined);
     ctx.ui.setStatus("pi-permission-suite", health.ok ? permissionBadge(state.mode, ctx.ui.theme.appearance) : "\x1b[31m⚠ 策略变化·只读\x1b[39m");
+    // Read-only projection for clients; commands and session entries remain authoritative.
+    ctx.ui.setStatus("timrt-permission-mode", health.ok ? state.mode : undefined);
     pi.events.emit("timrt:permissions", { mode: state.mode, taskAgents: state.taskAgents });
   };
   const filterTools = () => {
@@ -159,6 +159,17 @@ export function installPermissions(pi: ExtensionAPI, review = createApprovalRevi
   };
   pi.registerCommand("approval-mode", command);
   pi.registerCommand("permissions", command);
+  pi.registerCommand("approval-fallback", {
+    description: "AUTO/ACT 人工审批等待：on 等待 90 秒；off 直接拒绝。ASK 始终逐次审批。",
+    handler: async (args, ctx) => {
+      const choice = args.trim().toLowerCase();
+      if (choice && choice !== "on" && choice !== "off") { ctx.ui.notify("用法：/approval-fallback on|off", "warning"); return; }
+      if (choice) saveApprovalFallback(choice === "on");
+      ctx.ui.notify(configuredHumanFallback() === "ask"
+        ? "AUTO/ACT：需要人工审批时提醒并等待 90 秒；ASK 仍无限等待。"
+        : "AUTO/ACT：需要人工审批时直接拒绝，不弹窗、不等待；ASK 仍无限等待。", "info");
+    },
+  });
   pi.registerShortcut("ctrl+q", { description: "切换权限模式", handler: async ctx => {
     const modes: PermissionMode[] = ["auto", "act", "ask", "plan"];
     setMode(modes[(modes.indexOf(state.mode) + 1) % modes.length], ctx);
@@ -237,6 +248,7 @@ export function installPermissions(pi: ExtensionAPI, review = createApprovalRevi
     const readOnly = status.ok ? isReadOnly(name, input, ctx.cwd) : ["read","ls","grep","find","explain_call"].includes(name);
     const policy = protectedMutation(getAgentDir(), ctx.cwd, name, input, readOnly);
     if (policy) return {route:"deny",reason:policy};
+    if (webLocalPaths(name,input).some(path => rules.evaluate("read",{path}) === "deny")) return {route:"deny",reason:"受保护的本地路径。"};
     if (!status.ok && !readOnly) return {route:"deny",reason:"策略文件校验失败，请通过外部维护入口核对并重建。"};
     const verdict = name === "bash" ? await rules.evaluateAsync(name,input) : rules.evaluate(name,input);
     if (verdict === "deny") return {route:"deny",reason:"路径或命令规则拒绝。"};
@@ -283,6 +295,7 @@ export function installPermissions(pi: ExtensionAPI, review = createApprovalRevi
     const readOnly = health.ok ? isReadOnly(name, input, ctx.cwd) : ["read","ls","grep","find","explain_call"].includes(name);
     const policy = protectedMutation(getAgentDir(), ctx.cwd, name, input, readOnly);
     if (policy) return policy;
+    if (webLocalPaths(name,input).some(path => rules.evaluate("read",{path}) === "deny")) return "受保护的本地路径。";
     if (!health.ok) {
       publish(ctx);
       if (!readOnly) return "策略文件校验失败，当前仅允许只读核对。请在外部维护入口检查 " + health.changed.slice(0,4).join(", ") + "，核对后重建；不得自动刷新校验清单。";
@@ -311,9 +324,10 @@ export function installPermissions(pi: ExtensionAPI, review = createApprovalRevi
       const parameters=JSON.stringify(input,null,2);
       if(parameters.length>12000)return "ASK 调用参数过长，无法完整展示；请先准备可审阅的文件并明确范围，本次未执行。";
       const scripts=program?.scripts.map(s=>`${s.path}\nSHA256 ${s.sha256}`).join("\n") || "";
+      const webEffects=approvalEvidence(ctx,name,input,currentUserRequest).webAccessEffects;
       let approved=false;
       try {
-        approved=await confirmApprovalWithAlert(pi,ctx,"ASK：批准本次工具调用？",`工作目录：${ctx.cwd}\n用户请求：${currentUserRequest.slice(0,1600)}\n工具：${name}\n参数：\n${parameters}${scripts ? "\n脚本：\n"+scripts : ""}`,{timeout:0});
+        approved=await confirmApprovalWithAlert(pi,ctx,"ASK：批准本次工具调用？",`工作目录：${ctx.cwd}\n用户请求：${currentUserRequest.slice(0,1600)}\n工具：${name}\n${webEffects ? webEffects+"\n" : ""}参数：\n${parameters}${scripts ? "\n脚本：\n"+scripts : ""}`,{timeout:0});
       } catch {approved=false;}
       let reason = approved ? undefined : "ASK 未获本次人工授权，当前调用未执行。";
       if(generation!==requestGeneration)reason="人工确认期间出现新的用户指示，旧调用未执行，请重新核对。";
@@ -335,7 +349,6 @@ export function installPermissions(pi: ExtensionAPI, review = createApprovalRevi
     }
   };
   pi.on("session_start", (_event, ctx) => {
-    exaPolicy = exaReadPolicy(getAgentDir(), ctx.cwd);
     latestCtx = ctx;
     health = policyHealth(getAgentDir());
     if (!health.ok) ctx.ui.notify("审批策略校验失败：仅允许只读核对，请通过外部维护入口检查并重建。", "warning");

@@ -8,7 +8,7 @@ const repo=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const source=resolve(process.argv.find(a=>a.startsWith('--source='))?.slice(9)||join(homedir(),'.pi/agent'));
 const apply=process.argv.includes('--apply');
 const payload=join(repo,'agent');
-const selected=['APPEND_SYSTEM.windows.md','APPEND_SYSTEM.linux.md','bin/pi','customization/maintain-pi.sh','settings.json','keybindings.json','pi-cc-extensions.json','pi-btw.json','hermes-memory-config.json','mcp.json','extensions/pi-permission-suite/config.json','extensions/subagent/config.json','skills/pi-maintenance/SKILL.md','skills/principal/SKILL.md','customization/Maintain-Pi.ps1','customization/Pi-Maintenance.bat','customization/README.md','customization/Pi Agent 本机配置维护手册.md','bin/pi-launcher.js','bin/pi.cmd','bin/pi.ps1','customization/runtime/build-runtime/package.json','customization/runtime/build-runtime/package-lock.json','install/current-version','npm/package.json','npm/package-lock.json'];
+const selected=['APPEND_SYSTEM.windows.md','APPEND_SYSTEM.linux.md','bin/pi','customization/maintain-pi.sh','settings.json','web-search.json','keybindings.json','pi-cc-extensions.json','pi-btw.json','hermes-memory-config.json','mcp.json','extensions/pi-permission-suite/config.json','extensions/subagent/config.json','skills/pi-maintenance/SKILL.md','skills/principal/SKILL.md','customization/Maintain-Pi.ps1','customization/Pi-Maintenance.bat','customization/README.md','customization/Pi Agent 本机配置维护手册.md','bin/pi-launcher.js','bin/pi.cmd','bin/pi.ps1','customization/runtime/build-runtime/package.json','customization/runtime/build-runtime/package-lock.json','install/current-version','npm/package.json','npm/package-lock.json'];
 const version=readFileSync(join(source,'install/current-version'),'utf8').trim();
 if(!/^\d+\.\d+\.\d+$/.test(version))throw Error('Unsupported Pi version format');
 selected.push(`install/releases/${version}/package.json`,`install/releases/${version}/package-lock.json`);
@@ -25,7 +25,7 @@ const pins=Object.fromEntries(settings.packages.map(p=>{
 function privacyCheck(value,path){
   if(!value || typeof value!=='object')return;
   for(const [key,item] of Object.entries(value)){
-    if(/^(api[-_]?key|access[-_]?token|refresh[-_]?token|password|authorization|clientSecret|privateKey)$/i.test(key) && item)throw Error('Credential-bearing field in allowlisted file: '+path);
+    if(/(?:api[-_]?key|access[-_]?token|refresh[-_]?token|password|authorization|clientSecret|privateKey)$/i.test(key) && item)throw Error('Credential-bearing field in allowlisted file: '+path);
     if(typeof item==='string' && /^https?:\/\//.test(item)){
       const url=new URL(item);if(url.username||url.password||[...url.searchParams.keys()].some(k=>/key|token|secret|auth/i.test(k)))throw Error('Credential-bearing URL: '+path);
     }
@@ -42,6 +42,11 @@ for(const path of [...new Set(selected)].sort()){
   if(lstatSync(file).isSymbolicLink())throw Error('Export refuses links: '+path);
   let text=readFileSync(file,'utf8').replace(/^\uFEFF/,'');
   if(path==='APPEND_SYSTEM.'+(sourcePlatform==='win32'?'windows':'linux')+'.md' && existsSync(join(source,'APPEND_SYSTEM.md')))text=readFileSync(join(source,'APPEND_SYSTEM.md'),'utf8');
+  if(path==='web-search.json') {
+    // Native config may contain keys, credential resolver commands, cookies or
+    // authenticated proxies. Export the reviewed public template only.
+    text=readFileSync(join(payload,'web-search.json'),'utf8');
+  }
   if(path.endsWith('.json'))privacyCheck(JSON.parse(text),path);
   if(path==='settings.json'){
     const clean=JSON.parse(text);delete clean.defaultProvider;delete clean.defaultModel;delete clean.lastChangelogVersion;

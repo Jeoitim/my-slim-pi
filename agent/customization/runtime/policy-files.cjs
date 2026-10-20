@@ -2,7 +2,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
-const direct = ['settings.json', 'APPEND_SYSTEM.md', 'APPEND_SYSTEM.windows.md', 'APPEND_SYSTEM.linux.md', 'agents/approver.md', 'trust.json', 'extensions/pi-permission-suite/config.json', 'customization/Maintain-Pi.ps1', 'customization/Pi-Maintenance.bat', 'bin/pi-launcher.js', 'bin/pi.cmd', 'bin/pi', 'customization/maintain-pi.sh', 'install/node-path'];
+const direct = ['settings.json', 'web-search.json', 'APPEND_SYSTEM.md', 'APPEND_SYSTEM.windows.md', 'APPEND_SYSTEM.linux.md', 'agents/approver.md', 'trust.json', 'extensions/pi-permission-suite/config.json', 'customization/Maintain-Pi.ps1', 'customization/Pi-Maintenance.bat', 'bin/pi-launcher.js', 'bin/pi.cmd', 'bin/pi', 'customization/maintain-pi.sh', 'install/node-path'];
 const trees = ['extensions/timrt-suite', 'customization/runtime', 'customization/checks', 'customization/checks/tests', 'npm/node_modules/pi-permission-suite'];
 const normalize = p => process.platform === 'win32' ? p.replaceAll('\\', '/').toLowerCase() : p.replaceAll('\\', '/');
 function protectedPath(root, target) {
@@ -30,7 +30,22 @@ function digest(root, file) {
     const s = JSON.parse(data.toString('utf8'));
     data = Buffer.from(JSON.stringify({extensions:s.extensions,packages:s.packages,defaultTools:s.defaultTools}));
   }
+  if (file === 'web-search.json') {
+    const config = JSON.parse(data.toString('utf8'));
+    // Key rotation and proxy selection use external private maintenance; feature
+    // changes remain sealed and require rebuilding before a fresh session.
+    for (const key of Object.keys(config)) if (/ApiKey$/.test(key) || key === 'proxy') delete config[key];
+    data = Buffer.from(JSON.stringify(config));
+  }
   if (file === 'agents/approver.md') data = Buffer.from(data.toString('utf8').replace(/^(---\r?\n)([\s\S]*?)(\r?\n---)/, (_all,a,b,c) => a + b.replace(/^model:.*(?:\r?\n|$)/gm,'') + c));
+  // The human alone may choose whether AUTO/ACT asks or declines. The entire
+  // path stays protected from tools; all other permission rules stay sealed.
+  if (file === 'extensions/pi-permission-suite/config.json') {
+    const config = JSON.parse(data.toString('utf8'));
+    const value = config.reviewer?.humanFallback;
+    if (config.reviewer && (value === undefined || value === 'ask' || value === 'pause')) delete config.reviewer.humanFallback;
+    data = Buffer.from(JSON.stringify(config));
+  }
   return crypto.createHash('sha256').update(data).digest('hex');
 }
 function seal(root) {
