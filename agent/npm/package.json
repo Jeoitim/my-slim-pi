@@ -2,14 +2,13 @@
   "name": "pi-extensions",
   "private": true,
   "dependencies": {
+    "@anishthite/pi-themes": "0.1.9",
+    "@narumitw/pi-btw": "0.61.2",
     "pi-cc-extensions": "1.0.5",
-    "pi-hermes-memory": "0.9.10",
     "pi-hashline-edit-pro": "6.4.6",
-    "pi-mcp-adapter": "5.3.1",
+    "pi-hermes-memory": "0.9.10",
     "pi-permission-suite": "0.2.3",
     "pi-subagents": "0.78.0",
-    "principal-pi-skills": "4.14.0",
-    "@anishthite/pi-themes": "0.1.9",
-    "@narumitw/pi-btw": "0.61.2"
+    "principal-pi-skills": "4.14.0"
   }
 }

@@ -10,9 +10,7 @@ export { verify as verifyPolicy };
 export const POLICY_EXIT = "该操作会直接改写受保护的审批策略。只读审计允许；用户明确要求维护 Pi 时，非内核配置/界面改动应通过 maintain_pi 逐次审批、备份及验证。授权/审批/事务/校验内核仍须交付补丁并走外部维护；不得换 shell、内联或代理绕过。";
 export function readOnlyCall(name: string, input: Record<string, any>): boolean {
   return ["read", "grep", "find", "ls", "web", "memory_search", "memory_get", "question", "questionnaire", "explain_call"].includes(name)
-    || (["bash", "powershell"].includes(name) && safeShellRead(String(input.command || ""), name))
-    || /^exa_(?:web_search_exa|web_fetch_exa)$/.test(name)
-    || (name === "mcp" && !input.tool && !["install", "auth-start", "auth-complete"].includes(input.action));
+    || (["bash", "powershell"].includes(name) && safeShellRead(String(input.command || ""), name));
 }
 
 function fullPath(value: string, cwd: string) {

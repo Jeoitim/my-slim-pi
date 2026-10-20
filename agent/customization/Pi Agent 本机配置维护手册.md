@@ -58,7 +58,7 @@
 | ASK（蓝） | 逐次人工确认 | 逐次人工确认 | 逐次人工确认 |
 | PLAN（紫） | 直接执行 | 不执行 | 不执行 |
 
-**ASK 无等待超时**，仅明确批准后执行当前调用；无交互界面则不执行。纯权限诊断 `explain_call` 不额外询问，memory/MCP 封装在实际内部操作处确认。
+**ASK 无等待超时**，仅明确批准后执行当前调用；无交互界面则不执行。纯权限诊断 `explain_call` 不额外询问，memory 封装在实际内部操作处确认；原生 MCP 每次实际调用均进入工具权限管线，web 的外层确认不替代内部工具确认。
 
 **AUTO/ACT 默认无人值守**：审批拒绝、不确定或故障时暂停待审操作并提醒。`extensions/pi-permission-suite/config.json` 的 `reviewer.humanFallback` 默认为 `pause`；设为 `ask` 可启用人工兜底。AUTO/ACT 的审批与任务代理授权窗口 **90 秒无回应即关闭**，本次不执行，在回答中说明阻塞并等待下一轮指示。主题、模型等主动打开的设置窗口不计时。
 
@@ -150,7 +150,7 @@ AUTO/ACT 均须内部审批，ASK 人工确认且无超时，PLAN/清理暂停�
 
 ### 搜索
 
-模型使用一个 `web` 入口，先懒连接免费 Exa MCP，再按查询逐个尝试 API；成功即停，主动取消则停止全部回退。
+模型使用一个 `web` 入口，优先调用 Pi 原生 MCP 连接的免费 Exa，再按查询逐个尝试 API；成功即停，主动取消则停止全部回退。嵌套 MCP 调用若被权限管线阻止，不改用付费 API 绕过。只读免自动审批只适用于配置未变化且指向固定公开 Exa 端点的两个已知工具；项目替换、其他工具和 readOnlyHint 声明不构成免审批凭据。
 
 | 查询 | API 回退顺序 |
 |---|---|
@@ -201,7 +201,7 @@ Hermes 按需初始化，每 12 轮或 30 次工具调用复盘，使用最近 2
 | APPEND_SYSTEM.md / pi-hermes-memory/STANDING.md | 行为规则 / 长期固定偏好 |
 | agents/approver.md / extensions/pi-permission-suite/config.json | 审批提示词与可选模型 / 路径规则与人工兜底配置 |
 | hermes-memory-config.json / extensions/subagent/config.json | 记忆策略 / 任务代理设置 |
-| mcp.json / mcp-adapter.json | MCP 来源、懒加载与工具暴露 |
+| mcp.json | Pi 原生 MCP 来源、超时与延迟工具暴露 |
 | pi-cc-extensions.json / pi-btw.json / keybindings.json | 消息渲染 / 旁聊 / 快捷键 |
 | themes/ / skills/ / extensions/timrt-suite/ | 本地主题 / 技能 / 整合源码 |
 | customization/runtime/ | 构建、兼容补丁、配置接口、编译清单与构建依赖 |
@@ -221,7 +221,7 @@ Hermes 按需初始化，每 12 轮或 30 次工具调用复盘，使用最近 2
 | `request_subagent` | 已读技能建议委派后申请当前任务授权 | 非问候且尚未授权时提供；申请本身不启动任务 |
 | `maintain_pi` | 受控 Pi 配置补丁事务 | 当前用户明确提出 Pi 自身维护时提供 |
 
-当前默认配置离线采样：问候 **10**、普通任务 **11**、Pi 自维护 **12** 个工具声明；授权任务子代理或新增 MCP 后数量可增加。基础工具为 `read`、`powershell`、`write`、`replace`、`insert`、`grep`、`undo_last_change`。注册但隐藏的底层工具不等于每轮都发送完整 schema。
+默认以 `web` 提供统一搜索入口；Exa 的两个原始工具采用原生 deferred 暴露，不常驻完整 schema。仅配置默认 Exa 时，web 隐藏重复的 tool_search 声明；不影响工具可调用性。新增其他 MCP 后保留通用发现入口。工具声明数量以 `-Action Context` 实测为准。
 
 每轮系统提示包含**本机日期和时区**。需要实时钟点或精确日志时间范围时，通过 `powershell` 执行 `Get-Date -Format o`，无需额外时间工具；日常提示不持续写入变化的时分秒。
 
@@ -232,16 +232,16 @@ Hermes 按需初始化，每 12 轮或 30 次工具调用复盘，使用最近 2
 | pi-cc-extensions | 1.0.5 | Claude 风格消息、diff、启动页 |
 | pi-hermes-memory | 0.9.10 | 长期记忆、复盘与经验技能 |
 | pi-hashline-edit-pro | 6.4.6 | 锚点读取、编辑、过期检测与撤销 |
-| pi-mcp-adapter | 5.3.1 | MCP 懒连接与工具声明按需加载 |
+| Pi 原生 MCP | 随 Pi 1.3.0 | 原生连接、延迟发现及统一权限执行管线 |
 | pi-permission-suite | 0.2.3 | 权限规则与内部审批 |
 | pi-subagents | 0.78.0 | 授权后的任务子代理 |
 | principal-pi-skills | 4.14.0 | 单个索引下的 9 项工程技能 |
 | @anishthite/pi-themes | 0.1.9 | Ayu、Catppuccin、GitHub 等主题 |
 | @narumitw/pi-btw | 0.61.2 | 独立旁聊 |
 
-本地 `timrt-suite` 整合界面、权限、联网与维护。启动器 `bin/pi-launcher.js` 使用 Windows Node 原生运行 Pi，命令工具使用 PowerShell。五个编译入口随启动加载，第六个任务代理入口授权后加载。包的 `extensions: []` 可与预编译入口配套；每个组件只启用一个入口，MCP 由 adapter 提供。
+本地 `timrt-suite` 整合界面、权限、联网与维护。启动器 `bin/pi-launcher.js` 使用 Windows Node 原生运行 Pi，命令工具使用 PowerShell。四个编译入口随启动加载，第五个任务代理入口授权后加载。包的 `extensions: []` 可与预编译入口配套；每个组件只启用一个入口，MCP 使用内置扩展，不单独编译、不安装第三方 Adapter。Exa 默认仅开放 search/fetch 两个 deferred 工具，其余隐藏。连接在后台建立，web 首次调用通过 reachesTools 等待就绪；不是首次调用才连接。
 
-`cache/node-compile`、`cache/jiti` 和 MCP 编译分块日常保留。启动器依据 `customization/runtime/compiled-extensions.json` 检测源码、SDK 和输出变化，必要时自动重建。
+`cache/node-compile` 与 `cache/jiti` 日常保留。Hashline 默认数据放在当前 AgentRoot 的 `pi-hashline-edit-pro`；显式设置 PI_HASHLINE_DIR 时遵循该设置。启动器依据 `customization/runtime/compiled-extensions.json` 检测源码、SDK 和输出变化，必要时自动重建。
 
 ## 检查与维护命令
 
@@ -258,7 +258,7 @@ Hermes 按需初始化，每 12 轮或 30 次工具调用复盘，使用最近 2
 .\Maintain-Pi.ps1 -Action Clean      # 仅预览生成物清理
 ```
 
-启动测速不清空系统缓存、不计终端绘制或模型首字时间；上下文字符数不等于 token，实际用量以模型返回值为准。Check 使用模拟审批和搜索响应，并验证真实 SDK 组件加载；日志每次覆盖 `reports/last-check.log`。单独的真实 API 探测会消耗账户额度，常规维护无需运行。
+启动测速使用 --no-mcp 禁用网络连接，不清空系统缓存、不计终端绘制或模型首字时间；离线上下文采样禁用 MCP 连接，未包含在线服务器状态节；上下文字符数不等于 token，实际用量以模型返回值为准。Check 使用模拟审批和搜索响应，并验证真实 SDK 组件加载；日志每次覆盖 `reports/last-check.log`。单独的真实 API 探测会消耗账户额度，常规维护无需运行。
 
 恢复和备份清理默认只预览；加 `-Apply` 后仍须输入指定确认文字：
 

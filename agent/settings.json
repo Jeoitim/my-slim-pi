@@ -25,11 +25,6 @@
       "extensions": []
     },
     {
-      "source": "npm:pi-mcp-adapter@5.3.1",
-      "extensions": [],
-      "skills": []
-    },
-    {
       "source": "npm:pi-permission-suite@0.2.3",
       "extensions": []
     },
@@ -59,11 +54,9 @@
     "mermaid": "final"
   },
   "extensions": [
-    "-builtin:mcp",
     "-./extensions/timrt-suite/index.ts",
     "./npm/node_modules/pi-hermes-memory/src/timrt-fast.mjs",
     "./npm/node_modules/pi-hashline-edit-pro/timrt-fast.mjs",
-    "./npm/node_modules/pi-mcp-adapter/timrt-fast.mjs",
     "./npm/node_modules/pi-cc-extensions/extensions/timrt-fast.mjs",
     "./extensions/timrt-suite/timrt-fast.mjs"
   ],

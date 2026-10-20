@@ -8,6 +8,7 @@ export interface WebInput {
   provider?: WebProvider;
 }
 export interface WebAnswer { provider: string; text: string; credits?: number; }
+export class WebPermissionError extends Error {}
 export interface WebDeps {
   keys: { brave?: string; tavily?: string; exa?: string };
   mcp: (action: string, input: Record<string, unknown>, signal?: AbortSignal) => Promise<any>;
@@ -125,6 +126,7 @@ export async function runWeb(input: WebInput, deps: WebDeps, signal?: AbortSigna
       return { ...answer, text: `[Source: ${provider}${answer.credits !== undefined ? `; API credits: ${answer.credits}` : ""}]${reason}\n\n${answer.text.slice(0, 24000)}` };
     } catch (error) {
       checkAbort(signal);
+      if (error instanceof WebPermissionError) throw error;
       // Never include upstream response bodies or request headers in errors.
       failures.push(`${provider}: ${failureReason(error, deps.keys)}`);
     }

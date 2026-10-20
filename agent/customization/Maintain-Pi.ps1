@@ -53,10 +53,10 @@ function Protect-PiPath([string]$Path, [switch]$File) {
 }
 function Test-PiConfigPath([string]$Relative) {
     $name = $Relative.Replace('/','\')
-    return $name -match '^(settings\.json|models\.json|auth\.json|mcp\.json|mcp-adapter\.json|keybindings\.json|pi-cc-extensions\.json|pi-btw\.json|hermes-memory-config\.json|APPEND_SYSTEM\.md|pi-hermes-memory\\STANDING\.md|secrets\\web-keys\.json|extensions\\pi-permission-suite\\config\.json|extensions\\subagent\\config\.json|skills\\(?:pi-maintenance|principal)\\SKILL\.md|customization\\(?:README\.md|Pi Agent 本机配置维护手册\.md)|agents\\[^\\]+\.md|themes\\[^\\]+\.json|extensions\\timrt-suite\\[^\\]+\.(ts|ps1))$'
+    return $name -match '^(settings\.json|models\.json|auth\.json|mcp\.json|keybindings\.json|pi-cc-extensions\.json|pi-btw\.json|hermes-memory-config\.json|APPEND_SYSTEM\.md|pi-hermes-memory\\STANDING\.md|secrets\\web-keys\.json|extensions\\pi-permission-suite\\config\.json|extensions\\subagent\\config\.json|skills\\(?:pi-maintenance|principal)\\SKILL\.md|customization\\(?:README\.md|Pi Agent 本机配置维护手册\.md)|agents\\[^\\]+\.md|themes\\[^\\]+\.json|extensions\\timrt-suite\\[^\\]+\.(ts|ps1))$'
 }
 function Get-PiConfigFiles {
-    $files = @('settings.json','mcp.json','mcp-adapter.json','keybindings.json','pi-cc-extensions.json','pi-btw.json','hermes-memory-config.json','APPEND_SYSTEM.md','pi-hermes-memory\STANDING.md','extensions\pi-permission-suite\config.json','extensions\subagent\config.json','skills\pi-maintenance\SKILL.md','skills\principal\SKILL.md','customization\README.md','customization\Pi Agent 本机配置维护手册.md')
+    $files = @('settings.json','mcp.json','keybindings.json','pi-cc-extensions.json','pi-btw.json','hermes-memory-config.json','APPEND_SYSTEM.md','pi-hermes-memory\STANDING.md','extensions\pi-permission-suite\config.json','extensions\subagent\config.json','skills\pi-maintenance\SKILL.md','skills\principal\SKILL.md','customization\README.md','customization\Pi Agent 本机配置维护手册.md')
     foreach ($group in @(@{Path='agents';Filter='*.md'},@{Path='themes';Filter='*.json'},@{Path='extensions\timrt-suite';Filter='*.ts'},@{Path='extensions\timrt-suite';Filter='*.ps1'})) {
         $directory = Resolve-PiChild $script:AgentRoot $group.Path
         if (Test-Path -LiteralPath $directory) { $files += Get-ChildItem -LiteralPath $directory -File -Filter $group.Filter | ForEach-Object { $group.Path + '\' + $_.Name } }
@@ -166,7 +166,7 @@ function Open-PiConfig {
             @{Name='主设置';Path='settings.json'},@{Name='模型与供应商（含认证信息）';Path='models.json'},
             @{Name='系统附加提示词';Path='APPEND_SYSTEM.md'},@{Name='固定偏好';Path='pi-hermes-memory\STANDING.md'},
             @{Name='Hermes 记忆设置';Path='hermes-memory-config.json'},@{Name='审批模型定义';Path='agents\approver.md'},
-            @{Name='MCP 服务器';Path='mcp.json'},@{Name='MCP 适配器';Path='mcp-adapter.json'},
+            @{Name='MCP 服务器';Path='mcp.json'},
             @{Name='权限规则';Path='extensions\pi-permission-suite\config.json'},@{Name='快捷键';Path='keybindings.json'},
             @{Name='Claude 风格 UI';Path='pi-cc-extensions.json'},@{Name='任务子代理';Path='extensions\subagent\config.json'}
         )

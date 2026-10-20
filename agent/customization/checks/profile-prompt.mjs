@@ -5,6 +5,7 @@ import { pathToFileURL } from 'node:url';
 import { readFileSync } from 'node:fs';
 const root = process.env.PI_CODING_AGENT_DIR || join(homedir(), '.pi/agent');
 process.env.PI_OFFLINE = '1';
+process.env.PI_HASHLINE_DIR ??= join(root, 'pi-hashline-edit-pro');
 const version = readFileSync(join(root, 'install/current-version'), 'utf8').trim();
 const modules = join(root, 'install/releases', version, 'node_modules');
 const sdk = await import(pathToFileURL(join(modules, '@earendil-works/pi-coding-agent/dist/index.js')));
@@ -23,7 +24,7 @@ const capture = pi => pi.registerProvider('timrt-context-audit', { baseUrl: 'htt
   queueMicrotask(() => { stream.push({ type: 'start', partial: message }); stream.push({ type: 'done', reason: 'stop', message }); stream.end(); });
   return stream;
 } });
-const loader = new sdk.DefaultResourceLoader({ cwd: homedir(), agentDir: root, extensionFactories: [capture] });
+const loader = new sdk.DefaultResourceLoader({ cwd: homedir(), agentDir: root, extensionFactories: [capture, sdk.createMcpExtension({ loadConfig: () => ({ servers: [], errors: [] }) })] });
 await loader.reload();
 if (loader.getExtensions().errors.length) throw Error(JSON.stringify(loader.getExtensions().errors));
 const { session } = await sdk.createAgentSession({ cwd: homedir(), agentDir: root, resourceLoader: loader, sessionManager: sdk.SessionManager.inMemory(homedir()) });
@@ -47,7 +48,7 @@ try {
   }
   if (captured.systemPrompt) sections.legacy = captured.systemPrompt;
   for (const t of captured.tools || []) tools.set(t.name, t);
-  const result = { tag, prompt, measuredAt: new Date().toISOString(), noNetwork: true, sections: Object.entries(sections).map(([name, text]) => ({ name, chars: text.length })), tools: [...tools.values()].map(t => ({ name: t.name, chars: JSON.stringify(t).length })), contextFiles: loader.getAgentsFiles().agentsFiles.map(f => ({ path: f.path, chars: f.content.length, claudeMemoryChars: f.content.match(/<claude-mem-context>[\s\S]*?<\/claude-mem-context>/g)?.reduce((n, s) => n + s.length, 0) || 0 })), conversationChars };
+  const result = { tag, prompt, measuredAt: new Date().toISOString(), noNetwork: true, mcpConnections: "disabled for offline sampling; excludes live server section", sections: Object.entries(sections).map(([name, text]) => ({ name, chars: text.length })), tools: [...tools.values()].map(t => ({ name: t.name, chars: JSON.stringify(t).length })), contextFiles: loader.getAgentsFiles().agentsFiles.map(f => ({ path: f.path, chars: f.content.length, claudeMemoryChars: f.content.match(/<claude-mem-context>[\s\S]*?<\/claude-mem-context>/g)?.reduce((n, s) => n + s.length, 0) || 0 })), conversationChars };
   result.systemChars = result.sections.reduce((n, s) => n + s.chars, 0);
   result.toolSchemaChars = result.tools.reduce((n, t) => n + t.chars, 0);
   result.totalChars = result.systemChars + result.toolSchemaChars + conversationChars;

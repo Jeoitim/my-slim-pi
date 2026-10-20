@@ -29,7 +29,7 @@ export function validateMaintenance(root:string,request:string,changes:Maintenan
     const path=change.path.replaceAll("\\","/");
     if(!path || /[:\x00-\x1f]/.test(path) || path.startsWith("/") || path.split("/").some(p=>!p || p===".." || p==="."))throw Error("维护路径必须是配置目录内的明确相对文件路径。");
     const key=path.toLowerCase();if(seen.has(key))throw Error("维护补丁包含重复文件。");seen.add(key);
-    const allowed=/^(?:settings\.json|APPEND_SYSTEM\.md|agents\/approver\.md|extensions\/pi-permission-suite\/config\.json|extensions\/timrt-suite\/[^/]+\.ts|themes\/[^/]+\.json|skills\/(?:pi-maintenance|principal)\/SKILL\.md|customization\/(?:README\.md|Pi Agent 本机配置维护手册\.md)|(?:keybindings|pi-cc-extensions|pi-btw|mcp|mcp-adapter|hermes-memory-config)\.json)$/i.test(path);
+    const allowed=/^(?:settings\.json|APPEND_SYSTEM\.md|agents\/approver\.md|extensions\/pi-permission-suite\/config\.json|extensions\/timrt-suite\/[^/]+\.ts|themes\/[^/]+\.json|skills\/(?:pi-maintenance|principal)\/SKILL\.md|customization\/(?:README\.md|Pi Agent 本机配置维护手册\.md)|(?:keybindings|pi-cc-extensions|pi-btw|mcp|hermes-memory-config)\.json)$/i.test(path);
     if(!allowed || kernel.test(path))throw Error("该路径不属于自维护范围；授权、事务、审批及校验内核仍须外部维护："+path);
     if(/^(?:APPEND_SYSTEM\.md|agents\/approver\.md|extensions\/pi-permission-suite\/config\.json)$/i.test(path) && !/权限|审批|安全策略|删除规则|permission|approval/i.test(request))throw Error("修改权限相关配置须由用户明确提出 Pi 权限或审批维护，普通界面维护不授权此项。");
     const full=resolve(root,path);

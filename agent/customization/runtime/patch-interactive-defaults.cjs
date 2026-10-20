@@ -2,6 +2,11 @@
 const fs = require('node:fs');
 const path = require('node:path');
 module.exports = function patchInteractiveDefaults(root, version) {
+  if (version !== '1.3.0') throw Error('Review interactive persistence before changing Pi 1.3.0.');
+  const hostPackage = path.join(root, 'install/releases', version, 'node_modules/@earendil-works/pi-coding-agent/package.json');
+  if (JSON.parse(fs.readFileSync(hostPackage, 'utf8')).version !== version) throw Error('Installed Pi package does not match the managed version.');
+  const headerPackage = path.join(root, 'npm/node_modules/pi-cc-extensions/package.json');
+  if (JSON.parse(fs.readFileSync(headerPackage, 'utf8')).version !== '1.0.5') throw Error('Review startup header before changing pi-cc-extensions 1.0.5.');
   const file = path.join(root, 'install/releases', version, 'node_modules/@earendil-works/pi-coding-agent/dist/modes/interactive/interactive-mode.js');
   let text = fs.readFileSync(file, 'utf8');
   const replacements = [

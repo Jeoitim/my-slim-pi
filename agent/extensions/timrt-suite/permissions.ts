@@ -14,6 +14,7 @@ import { approvalEvidence, approvalReason, deletionPreparation } from "./approva
 import { confirmApprovalWithAlert, type ApprovalDialogOptions } from "./terminal-notifications.ts";
 import { readOnlyCall, protectedMutation, catastrophicCall, policyHealth } from "./call-policy.ts";
 import { createRuntimeStatus } from "./runtime-status.ts";
+import { exaReadPolicy } from "./native-exa.ts";
 
 export type PermissionMode = "auto" | "act" | "ask" | "plan";
 export const modeInfo = {
@@ -29,6 +30,8 @@ export function permissionBadge(mode: PermissionMode, appearance: string): strin
 
 export function installPermissions(pi: ExtensionAPI, review = createApprovalReviewer(pi)) {
   const rules = new RuleEngine();
+  let exaPolicy = { readOnly: (_name: string, _cwd: string) => false };
+  const isReadOnly = (name: string, input: Record<string, any>, cwd: string) => readOnlyCall(name, input) || exaPolicy.readOnly(name, cwd);
   const state = { mode: "auto" as PermissionMode, taskAgents: false, loaded: false, denied: false, development: false, maintenance:false, approvalHold: false, policyOk: true,reloadRequired:false };
   const runtime=createRuntimeStatus(getAgentDir());
   let maintenanceReload=false;
@@ -231,7 +234,7 @@ export function installPermissions(pi: ExtensionAPI, review = createApprovalRevi
   });
   const classify = async (name: string, input: Record<string, any>, ctx: ExtensionContext) => {
     const status = policyHealth(getAgentDir());
-    const readOnly = status.ok ? readOnlyCall(name, input) : ["read","ls","grep","find","explain_call"].includes(name);
+    const readOnly = status.ok ? isReadOnly(name, input, ctx.cwd) : ["read","ls","grep","find","explain_call"].includes(name);
     const policy = protectedMutation(getAgentDir(), ctx.cwd, name, input, readOnly);
     if (policy) return {route:"deny",reason:policy};
     if (!status.ok && !readOnly) return {route:"deny",reason:"策略文件校验失败，请通过外部维护入口核对并重建。"};
@@ -270,14 +273,14 @@ export function installPermissions(pi: ExtensionAPI, review = createApprovalRevi
   });
 
   const check = async (name: string, input: Record<string, any>, ctx: ExtensionContext): Promise<string | undefined> => {
-    if(maintaining && name!=="maintain_pi" && !readOnlyCall(name,input))return "Pi 维护事务进行中，其他修改暂不执行。";
+    if(maintaining && name!=="maintain_pi" && !isReadOnly(name,input,ctx.cwd))return "Pi 维护事务进行中，其他修改暂不执行。";
     if (name === "set_approval_mode") return "权限模式只能由用户通过 /approval-mode 或 Ctrl+Q 切换。";
     if (state.approvalHold && (name === "request_subagent" || agentTools.has(name) || /^(?:subagent|Agent$|delegate|spawn_agent)/i.test(name))) return holdMessage();
     if ((agentTools.has(name) || /^(?:subagent|Agent$|delegate|spawn_agent)/i.test(name)) && !state.taskAgents) return "任务子代理尚未获当前用户提示词授权。请在当前会话完成任务。";
     // Gate nested operations at their actual tool, without charging two Auto reviews.
     if (name === "memory" || name === "request_subagent" || name === "maintain_pi") return;
     health = policyHealth(getAgentDir());
-    const readOnly = health.ok ? readOnlyCall(name, input) : ["read","ls","grep","find","explain_call"].includes(name);
+    const readOnly = health.ok ? isReadOnly(name, input, ctx.cwd) : ["read","ls","grep","find","explain_call"].includes(name);
     const policy = protectedMutation(getAgentDir(), ctx.cwd, name, input, readOnly);
     if (policy) return policy;
     if (!health.ok) {
@@ -301,8 +304,6 @@ export function installPermissions(pi: ExtensionAPI, review = createApprovalRevi
     const catastrophe = catastrophicCall(ctx.cwd, name, input, inspected?.scripts);
     if (catastrophe) return catastrophe;
     if (state.mode === "ask") {
-      // The MCP broker asks once for the actual server tool, not twice for its envelope.
-      if (name === "mcp" && input.tool) return;
       if (!ctx.hasUI) return "ASK 需要人工确认，当前没有交互界面，本次未执行。";
       const generation=requestGeneration;
       const program= /^(?:powershell|bash)$/.test(name) ? inspectDeletionScripts(String(input.command||""),ctx.cwd,name) : undefined;
@@ -325,8 +326,6 @@ export function installPermissions(pi: ExtensionAPI, review = createApprovalRevi
     }
     if (state.mode === "plan") return "PLAN 仅允许只读操作。";
     if (state.mode === "act") return;
-    // Proxy execution is approved at the adapter's broker with the actual server/tool/args.
-    if (name === "mcp" && input.tool) return;
     let decision;
     try { decision = await reviewCall(ctx, name, input, sessionModelReference(ctx)); }
     catch { decision = { approved: false, source: "error", reason: "审批未完成" }; }
@@ -336,6 +335,7 @@ export function installPermissions(pi: ExtensionAPI, review = createApprovalRevi
     }
   };
   pi.on("session_start", (_event, ctx) => {
+    exaPolicy = exaReadPolicy(getAgentDir(), ctx.cwd);
     latestCtx = ctx;
     health = policyHealth(getAgentDir());
     if (!health.ok) ctx.ui.notify("审批策略校验失败：仅允许只读核对，请通过外部维护入口检查并重建。", "warning");
@@ -390,13 +390,6 @@ export function installPermissions(pi: ExtensionAPI, review = createApprovalRevi
     const reason = await check(event.toolName, event.input as any, ctx);
     return reason ? { block: true, reason } : undefined;
   });
-  const off = pi.events.on("pi-mcp-adapter:tool-approval-request", (request: any) => {
-    request.claim(async () => {
-      if (!latestCtx) return "deny";
-      const reason = await check(request.prefixedToolName, request.args, latestCtx);
-      return reason ? "deny" : "allow_once";
-    });
-  });
-  pi.on("session_shutdown", () => { latestCtx = undefined; off(); stopTimeouts(); });
+  pi.on("session_shutdown", () => { latestCtx = undefined; stopTimeouts(); });
   return state;
 }

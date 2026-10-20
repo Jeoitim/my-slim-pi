@@ -14,7 +14,7 @@
 |---|---|
 | 界面 | Claude 风格消息与输入框、紧凑底栏、主题实时预览、`/btw` 旁支对话 |
 | 编辑 | hashline 锚点、过期检查与撤销 |
-| 联网 | Exa 免费 MCP → Brave / Tavily / Exa API 按查询串行回退 |
+| 联网 | Pi 原生 Exa 免费 MCP → Brave / Tavily / Exa API 按查询串行回退 |
 | 权限 | AUTO / ACT / ASK / PLAN；ASK 无超时，自动模式审批不确定时暂停 |
 | 记忆与技能 | Hermes 懒初始化、Principal 单索引按需读取 |
 | 子代理 | 普通任务不自动委派；用户明确授权后加载 |
@@ -109,3 +109,5 @@ git diff
 ```
 
 导出会去除个人默认模型、规范化个人路径，并适配隔离安装；不会导出凭据、记忆、信任状态、依赖、缓存或本机供应商专属测试。提交前检查差异；Git 备份不替代本机私有配置和记忆备份。远端：[Jeoitim/my-slim-pi](https://github.com/Jeoitim/my-slim-pi)。推送与分享由用户或外部维护 agent 管理。
+
+原生 MCP 迁移、保留补丁、权限验证及性能采样见[架构审计报告](docs/extension-first-audit.md)。

@@ -13,7 +13,7 @@ const runs = [];
 for (let i = 0; i < count; i++) {
   runs.push(await new Promise((resolve, reject) => {
     const start = performance.now(); let stderr = '', stdout = '', ready;
-    const p = spawn(process.execPath, [entry, '--mode', 'rpc', '--no-session'], { cwd: homedir(), env: { ...process.env, PI_TIMING: '1', PI_OFFLINE: '1' }, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
+    const p = spawn(process.execPath, [entry, '--mode', 'rpc', '--no-session', '--no-mcp'], { cwd: homedir(), env: { ...process.env, PI_TIMING: '1', PI_OFFLINE: '1' }, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
     const deadline = setTimeout(() => { p.kill(); reject(Error('Startup benchmark timeout')); }, 20000);
     p.stderr.on('data', d => { stderr += d; });
     p.stdout.on('data', d => {
@@ -39,6 +39,6 @@ for (let i = 0; i < count; i++) {
 }
 const values = runs.map(r => r.processToRpcReadyMs).sort((a, b) => a - b);
 const result = { piVersion: version, measuredAt: new Date().toISOString(), entry: direct ? 'direct CLI' : 'managed launcher',
-  method: `${count} fresh processes to RPC get_state readiness; no model call; PI_OFFLINE=1. Filesystem and V8 compilation caches are not flushed. Excludes terminal rendering.`,
+  method: `${count} fresh processes to RPC get_state readiness; no model call; PI_OFFLINE=1; --no-mcp explicitly disables native connections. Filesystem and V8 compilation caches are not flushed. Excludes terminal rendering.`,
   firstRunMs: runs[0].processToRpcReadyMs, medianMs: values[Math.floor(values.length / 2)], minMs: values[0], maxMs: values.at(-1), runs };
 console.log(JSON.stringify(result, null, 2));

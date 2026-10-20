@@ -43,7 +43,7 @@ try {
     let keys = {}; try { keys = read('secrets/web-keys.json'); } catch { /* Presence only. */ }
     let valid = false; try { valid = createRequire(import.meta.url)('./build-extensions.cjs').valid(); } catch { /* Rebuild from menu. */ }
     const jsonErrors = [];
-    for (const file of ['settings.json', 'models.json', 'auth.json', 'mcp.json', 'mcp-adapter.json', 'hermes-memory-config.json', 'pi-cc-extensions.json', 'pi-btw.json', 'keybindings.json', 'extensions/subagent/config.json', 'extensions/pi-permission-suite/config.json']) {
+    for (const file of ['settings.json', 'models.json', 'auth.json', 'mcp.json',  'hermes-memory-config.json', 'pi-cc-extensions.json', 'pi-btw.json', 'keybindings.json', 'extensions/subagent/config.json', 'extensions/pi-permission-suite/config.json']) {
       if (existsSync(join(root, file))) try { read(file); } catch { jsonErrors.push(file); }
     }
     let policyIntegrity;

@@ -1,11 +1,11 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createRequire } from "node:module";
-import { homedir } from "node:os";
 import { getAgentDir, getPackageDir, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import { runWeb } from "./web-route.ts";
+import { EXA_TOOLS, executeExa, exaReadPolicy } from "./native-exa.ts";
 import { readWindowsProxyConfig, windowsHttpsProxy } from "./web-proxy.ts";
 import { installUiState } from "./ui-state.ts";
 import { installPermissions } from "./permissions.ts";
@@ -13,21 +13,6 @@ import { installComposer } from "./composer.ts";
 import { installMemoryGateway } from "./memory-gateway.ts";
 import { installPromptPolicy } from "./prompt-policy.ts";
 import { installTerminalNotifications } from "./terminal-notifications.ts";
-
-function onlyConfiguredExa(cwd: string): boolean {
-  const home = homedir();
-  const files = [join(home, ".config/mcp/mcp.json"), join(home, ".agents/mcp.json"), join(home, ".agents/mcp/mcp.json"), join(getAgentDir(), "mcp.json"), join(getAgentDir(), "mcp-adapter.json"), join(cwd, ".mcp.json"), join(cwd, ".pi/mcp.json"), join(cwd, ".pi/mcp-adapter.json")];
-  const servers = new Map<string, any>();
-  for (const file of files) {
-    let config: any;
-    try { config = JSON.parse(readFileSync(file, "utf8").replace(/^\uFEFF/, "")); }
-    catch (error: any) { if (error.code === "ENOENT") continue; return false; }
-    if (config.imports?.length || config.claudePlugins?.length || config.settings?.agentPluginPaths?.length || config.settings?.ancestorConfigRoots?.length || config.settings?.hostConfigDiscovery === "on") return false;
-    for (const [name, definition] of Object.entries(config.mcpServers || {})) servers.set(name, definition);
-  }
-  const enabled = [...servers].filter(([, definition]) => !definition.disabled);
-  return enabled.length === 1 && enabled[0][0] === "exa";
-}
 
 function readKeys(): { brave?: string; tavily?: string; exa?: string } {
   let saved: Record<string, string> = {};
@@ -47,11 +32,7 @@ export default function (pi: ExtensionAPI) {
   installPromptPolicy(pi);
   installTerminalNotifications(pi);
   let exaOnly = false;
-  pi.on("session_start", (_event, ctx) => { exaOnly = onlyConfiguredExa(ctx.cwd); });
-  const stopMcpStatus = pi.events.on("pi-mcp-adapter/status/v1", (snapshot: any) => {
-    const enabled = (snapshot.servers || []).filter((s: any) => !s.disabled);
-    exaOnly = enabled.length === 1 && enabled[0].name === "exa";
-  });
+  pi.on("session_start", (_event, ctx) => { exaOnly = exaReadPolicy(getAgentDir(), ctx.cwd).onlyExa; });
   const proxyTransports = new Map<string, { fetch: typeof fetch; dispatcher: any }>();
   let windowsProxyConfig: Promise<string> | undefined;
   const apiFetch = async (url: string, options: RequestInit) => {
@@ -71,7 +52,6 @@ export default function (pi: ExtensionAPI) {
     return proxyTransport.fetch(url, { ...options, dispatcher: proxyTransport.dispatcher } as any);
   };
   pi.on("session_shutdown", async () => {
-    stopMcpStatus();
     await Promise.all([...proxyTransports.values()].map(active => active.dispatcher.destroy()));
     proxyTransports.clear();
   });
@@ -89,16 +69,12 @@ export default function (pi: ExtensionAPI) {
       provider: Type.Optional(Type.Union([Type.Literal("auto"), Type.Literal("fallback"), Type.Literal("exa-mcp"), Type.Literal("brave"), Type.Literal("tavily"), Type.Literal("exa-api")])),
     }),
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
-    reachesTools: () => ["mcp"],
-    prepareLoadout: ({ declared }) => exaOnly ? { hiddenDeclarations: declared.filter(t => t.name === "mcp").map(t => t.name) } : undefined,
+    reachesTools: () => EXA_TOOLS,
+    prepareLoadout: ({ declared }) => ({ hiddenDeclarations: declared.filter(t => EXA_TOOLS.includes(t.name as any) || (exaOnly && t.name === "tool_search")).map(t => t.name) }),
     async execute(id, params, signal, onUpdate, ctx) {
       const answer = await runWeb(params, {
         keys: readKeys(),
-        mcp: async (action, input, callSignal) => {
-          const timeout = AbortSignal.timeout(25000);
-          const outcome = await ctx.executeTool("mcp", { tool: `exa_web_${action === "search" ? "search" : "fetch"}_exa`, args: input }, { signal: callSignal ? AbortSignal.any([callSignal, timeout]) : timeout });
-          return { ...outcome.result, isError: outcome.isError };
-        },
+        mcp: (action, input, callSignal) => executeExa(ctx, action, input, callSignal),
         post: async (url, key, body, callSignal) => {
           const timeout = AbortSignal.timeout(25000);
           const response = await apiFetch(url, {

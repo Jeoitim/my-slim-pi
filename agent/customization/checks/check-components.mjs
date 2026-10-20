@@ -5,12 +5,13 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 const root = process.env.PI_CODING_AGENT_DIR || join(homedir(), '.pi/agent');
 process.env.PI_OFFLINE = '1';
+process.env.PI_HASHLINE_DIR ??= join(root, 'pi-hashline-edit-pro');
 const version = readFileSync(join(root, 'install/current-version'), 'utf8').trim();
 const sdk = await import(pathToFileURL(join(root, 'install/releases', version, 'node_modules/@earendil-works/pi-coding-agent/dist/index.js')));
 const { initTheme } = await import(pathToFileURL(join(root, 'install/releases', version, 'node_modules/@earendil-works/pi-coding-agent/dist/modes/interactive/theme/theme.js')));
 initTheme('claude-warm');
 const started = performance.now();
-const loader = new sdk.DefaultResourceLoader({ cwd: homedir(), agentDir: root, noContextFiles: true });
+const loader = new sdk.DefaultResourceLoader({ cwd: homedir(), agentDir: root, noContextFiles: true, extensionFactories: [sdk.createMcpExtension(process.argv.includes('--live-web') ? {} : { loadConfig: () => ({ servers: [], errors: [] }) })] });
 await loader.reload();
 console.log('Loader ms:', Math.round(performance.now() - started));
 console.log('Extension errors:', JSON.stringify(loader.getExtensions().errors));
@@ -108,9 +109,8 @@ try {
   assert.ok(deniedWrite?.block);
   await handler('auto', session.extensionRunner.createContext());
   console.log('PLAN blocks writes; user command restores AUTO: OK');
-  const status = await session.extensionRunner.getToolDefinition('mcp').execute('check-lazy-status', {}, undefined, undefined, ctx);
-  const statusText = status.content.filter(c => c.type === 'text').map(c => c.text).join('\n');
-  console.log('MCP before use:', statusText.slice(0, 350));
+  assert.ok(session.extensionRunner.getCommand('mcp'), 'native MCP manager is registered');
+  console.log('Native MCP manager: OK; ' + (process.argv.includes('--live-web') ? 'live free Exa verification enabled.' : 'offline checks disable network connections.'));
   if (process.argv.includes('--auto-review')) {
     const blocked = await session.extensionRunner.emitToolCall({ type: 'tool_call', toolCallId: 'check-auto-review', toolName: 'write', input: { path: target, content: 'scoped local test file' } });
     console.log('Auto approval outcome:', blocked || 'approved');
@@ -120,7 +120,8 @@ try {
     const liveProvider = process.argv.includes('--live-brave') ? 'brave' : 'exa-mcp';
     const assistant = { role: 'assistant', content: [{ type: 'toolCall', id: 'verification', name: 'web', arguments: {} }], api: 'openai-completions', provider: 'verification', model: 'verification', usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } }, stopReason: 'toolUse', timestamp: Date.now() };
     session.agent.state.messages.push(assistant); session.sessionManager.appendMessage(assistant);
-    const result = await session.extensionRunner.getToolDefinition('web').execute('check-web', { action: 'search', query: 'site:pi.dev coding agent themes', provider: liveProvider }, undefined, undefined, ctx);
+    const outcome = await session.extensionRunner.createToolContext('verification').executeTool('web', { action: 'search', query: 'site:pi.dev coding agent themes', provider: liveProvider });
+    const result = { ...outcome.result, isError: outcome.isError };
     console.log('Web route:', result.details?.provider, 'isError:', result.isError || false);
     const text = result.content.filter(c => c.type === 'text').map(c => c.text).join('\n');
     console.log('Web preview:', text.slice(0, 220));

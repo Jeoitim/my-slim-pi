@@ -2,7 +2,14 @@
   "mcpServers": {
     "exa": {
       "url": "https://mcp.exa.ai/mcp?tools=web_search_exa,web_fetch_exa",
-      "description": "Public web search and URL reading. Cite primary source URLs."
+      "description": "Public web search and URL reading. Cite primary source URLs.",
+      "exposure": "hidden",
+      "toolExposure": {
+        "web_search_exa": "deferred",
+        "web_fetch_exa": "deferred"
+      },
+      "timeout": 25
     }
-  }
+  },
+  "autoEnableCodemode": false
 }

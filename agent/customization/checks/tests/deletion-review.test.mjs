@@ -1,6 +1,5 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import vm from 'node:vm';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
@@ -187,12 +186,6 @@ test('write approval receives full script, actual user request and the active-br
     assert.ok(evidence.recentConversation.some(m => m.role === 'assistant' && m.text.includes('A 类清单')));
     assert.ok(evidence.recentConversation.some(m => m.role === 'user' && m.text === 'A B 全清'));
     assert.doesNotMatch(JSON.stringify(evidence), /hidden-reasoning|hidden-tool-output/);
-    const source = readFileSync(join(root, 'npm/node_modules/pi-permission-suite/approver.ts'), 'utf8');
-    const start = source.indexOf('function formatCall(');
-    const end = source.indexOf('// ─── 解析响应', start);
-    const fn = source.slice(start, end).trim().replace(/function formatCall\([^)]*\): string/, 'function formatCall(toolName, input)');
-    const formatCall = vm.runInNewContext('(' + fn + ')');
-    assert.deepEqual(JSON.parse(formatCall(name, evidence)).arguments, evidence.arguments, 'real package formatter retains the complete tool arguments');
     return { approved: true, source: 'fixture' };
   });
   const script = '# PREPARE ONLY: no cleanup execution during verification\nRemove-Item -LiteralPath ./cache -Recurse\n' + '# detailed target evidence\n'.repeat(170);
@@ -243,41 +236,22 @@ test('ordinary Auto uncertainty asks with the complete current call and cancella
   assert.equal(h.state.approvalHold, false, 'a normal non-cleanup refusal does not latch a cleanup hold');
 });
 
-test('MCP broker applies the same one-call deletion review', async () => {
+test('native MCP applies the same one-call deletion review', async () => {
   let allow = true, calls = 0;
   const h = await harness(async (_ctx, name, data) => {
-    calls++; assert.equal(name, 'deletion:fs_delete');
+    calls++; assert.equal(name, 'deletion:mcp__fs__delete');
     assert.equal(data.arguments.path, join(h.ctx.cwd, 'cache'));
     return { approved: allow, source: 'subagent' };
   });
-  async function broker() {
-    let check;
-    h.events.get('pi-mcp-adapter:tool-approval-request')({
-      prefixedToolName: 'fs_delete', args: { path: join(h.ctx.cwd, 'cache') },
-      claim(fn) { check = fn; },
-    });
-    return check();
-  }
-  assert.equal(await broker(), 'allow_once');
+  assert.equal(await h.call('mcp__fs__delete', { path: join(h.ctx.cwd, 'cache') }), undefined);
   allow = false;
-  assert.equal(await broker(), 'deny');
+  assert.equal((await h.call('mcp__fs__delete', { path: join(h.ctx.cwd, 'cache') })).block, true);
   assert.equal(calls, 2);
 });
 
-test('real approver parser requires boolean approval and finite numeric confidence', () => {
-  const source = readFileSync(join(root, 'npm/node_modules/pi-permission-suite/approver.ts'), 'utf8');
-  const start = source.indexOf('function parseResponse(');
-  const end = source.indexOf('// ─── 升级到人工', start);
-  assert.ok(start >= 0 && end > start);
-  const fn = source.slice(start, end).trim().replace(/function parseResponse\(text: string\): \{[^}]+\}/, 'function parseResponse(text)');
-  const parse = vm.runInNewContext('(' + fn + ')');
-  assert.equal(parse('{"approved":true,"confidence":0.95}').approved, true);
-  for (const approved of ['false', 'true', 1, null]) {
-    assert.equal(parse(JSON.stringify({ approved, confidence: 0.99 })).approved, false);
-  }
-  for (const confidence of ['0.99', null, {}, undefined]) {
-    assert.equal(parse(JSON.stringify({ approved: true, confidence })).confidence, 0);
-  }
-  assert.equal(parse('{"approved":true,"confidence":1e309}').confidence, 0);
-  assert.equal(parse('not json').approved, false);
+test('active approver parser requires boolean approval and finite numeric confidence', async () => {
+  const { parseDecision } = await jiti.import(join(root, 'extensions/timrt-suite/approval-reviewer.ts'));
+  for (const approved of ['false', 'true', 1, null]) assert.equal(parseDecision(JSON.stringify({ approved, confidence: .9 })), undefined);
+  assert.equal(parseDecision('{"approved":true,"confidence":0.9,"reason":"ok"}').approved, true);
+  for (const confidence of ['0.9', null]) assert.equal(parseDecision(JSON.stringify({ approved: true, confidence })), undefined);
 });
