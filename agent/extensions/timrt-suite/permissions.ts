@@ -7,7 +7,8 @@ import { permissionBrief } from "./permission-brief.ts";
 import { shellAnalysisStatus } from "./shell-analysis.ts";
 import { Type } from "typebox";
 import { backgroundModelLabel, chooseBackgroundModel, sessionModelReference } from "./background-models.ts";
-import { maintenanceIntent, isGreeting, PRINCIPAL_SUMMARIES } from "./prompt-policy.ts";
+import { isGreeting, PRINCIPAL_SUMMARIES } from "./prompt-policy.ts";
+import {validateMaintenance,maintenanceScope} from "./self-maintenance.ts";
 import { inspectDeletionScripts, powerShellLiteralPaths, explicitDelegation } from "./guards.ts";
 import { inspectDeletionCall, approveDeletion } from "./deletion-review.ts";
 import { approvalEvidence, approvalReason, deletionPreparation } from "./approval-evidence.ts";
@@ -30,7 +31,7 @@ export function permissionBadge(mode: PermissionMode, appearance: string): strin
 export function installPermissions(pi: ExtensionAPI, review = createApprovalReviewer(pi)) {
   const rules = new RuleEngine();
   const isReadOnly = (name: string, input: Record<string, any>, _cwd: string) => readOnlyCall(name, input, getAgentDir());
-  const state = { mode: "auto" as PermissionMode, taskAgents: false, loaded: false, denied: false, development: false, maintenance:false, approvalHold: false, policyOk: true,reloadRequired:false };
+  const state = { mode: "auto" as PermissionMode, taskAgents: false, loaded: false, denied: false, development: false, approvalHold: false, policyOk: true,reloadRequired:false };
   const runtime=createRuntimeStatus(getAgentDir());
   let maintenanceReload=false;
   const runtimeInfo=()=>{
@@ -43,6 +44,16 @@ export function installPermissions(pi: ExtensionAPI, review = createApprovalRevi
   let nativeManager: any;
   let latestCtx: ExtensionContext | undefined;
   let currentUserRequest = "";
+  let humanRequests:{text:string;truncated:boolean}[]=[];
+  const boundedHumanRequests=(rows:{text:string;truncated:boolean}[])=>{
+    let remaining=12000;const result:typeof rows=[];
+    for(const row of rows.slice(-8).reverse()){if(remaining<=0)break;const text=row.text.slice(0,Math.min(6000,remaining));result.unshift({text,truncated:row.truncated||text.length<row.text.length});remaining-=text.length;}
+    return result;
+  };
+  const restoreHumanRequests=(ctx:ExtensionContext)=>{
+    const branch=ctx.sessionManager.getBranch?.() ?? ctx.sessionManager.getEntries();
+    humanRequests=boundedHumanRequests(branch.filter((e:any)=>e.customType==='timrt-human-request').slice(-8).map((e:any)=>e.data).filter((e:any)=>typeof e?.text==='string'));
+  };
   let requestGeneration = 0;
   let approvalTimeouts=0;
   const stopTimeouts=pi.events.on("timrt:approval-timeout",()=>{approvalTimeouts++;});
@@ -200,14 +211,16 @@ export function installPermissions(pi: ExtensionAPI, review = createApprovalRevi
   pi.registerCommand("subagent", settingsCommand);
   pi.registerTool({
     name:"maintain_pi",label:"Maintain Pi",
-    description:"Apply exact Pi source/configuration patches only for an explicit current human request. Includes authorization, reviewer, transaction, integrity, builder and loader sources with explicit relevant maintenance intent. Read files and SHA256 first. Every transaction requires approval under pre-change rules, independent backup, rebuild/checks and rollback; core changes freeze the old runner/checks and activate after reload. Never bypass another task's denial. No deletes, credentials, generated seals, dependency edits or arbitrary commands.",
+    description:"Apply exact Pi source/configuration/skill patches for human-authorized Pi maintenance. Always available; visibility grants no permission. The pre-change reviewer judges scope from actual human requests and compatible follow-ups, not keyword matches. Read files and SHA256 first. Each call needs separate approval, backup, syntax/build/readiness checks and exact rollback. Core edits freeze old validators and activate after reload. No denial bypass, deletes, credentials, generated files, dependencies or arbitrary commands.",
     parameters:Type.Object({changes:Type.Array(Type.Object({path:Type.String(),sha256:Type.Union([Type.String({pattern:"^[a-f0-9]{64}$"}),Type.Null()]),content:Type.String({maxLength:128000})}),{minItems:1,maxItems:8})}),
-    prepareLoadout:()=>state.maintenance ? undefined : {hiddenDeclarations:["maintain_pi"]},
     async execute(_id,params,signal,onUpdate,ctx) {
       if(maintaining)throw Error("已有 Pi 维护事务进行中。");
       if(state.mode==="plan" || state.approvalHold)throw Error("当前为只读或清理暂停，不能启动自维护。");
       if(!policyHealth(getAgentDir()).ok)throw Error("保护基线异常，必须先通过外部维护恢复，不能借自维护接纳未知修改。");
       const generation=requestGeneration,request=currentUserRequest,mode=state.mode;
+      const maintenanceHumanRequests=humanRequests.map(e=>({...e}));
+      const plan=validateMaintenance(getAgentDir(),request,params.changes);
+      const scope=maintenanceScope(plan);
       const {applyMaintenance}=await import("./self-maintenance.ts");
       maintaining=true;
       try {
@@ -217,9 +230,9 @@ export function installPermissions(pi: ExtensionAPI, review = createApprovalRevi
           run:(command,args,options)=>pi.exec(command,args,options),
           progress:text=>onUpdate?.({content:[{type:"text",text}]}),
           approved:async()=>{
-            if(state.mode==="ask")return confirmApprovalWithAlert(pi,ctx,"ASK：批准本次 Pi 自维护？",`用户请求：${request}\n补丁：\n${JSON.stringify(params,null,2)}\n包含备份、应用、重建、离线检查；失败恢复原文件。`,{timeout:0});
-            const decision=await reviewCall(ctx,"maintain_pi",{...params,maintenanceContract:"仅当前用户明确提出的 Pi 自身维护；不能为其他任务解除拒绝、清理暂停、凭据或灾难性保护。此事务使用修改前规则审批，先调用独立脚本备份，失败恢复本次文件；允许用户明确提出的权限、审批、事务、校验、构建及加载源码维护。核心修改使用保存的旧维护脚本、构建器和检查，重载后生效。禁止为其他任务解除拒绝或关闭灾难性保护。"},sessionModelReference(ctx));
-            return decision.approved===true;
+            if(state.mode==="ask")return confirmApprovalWithAlert(pi,ctx,"ASK：批准本次 Pi 自维护？",`用户请求：${request}\n近期真实用户指示：${JSON.stringify(maintenanceHumanRequests)}\n范围：${JSON.stringify(scope)}\n补丁：\n${JSON.stringify(params,null,2)}\n包含备份、应用、重建、离线检查；失败精确恢复原文件和构建。`,{timeout:0});
+            const decision=await reviewCall(ctx,"maintain_pi",{...params,maintenanceHumanRequests,scope,maintenanceContract:"由修改前审批器判断真实用户是否明确授权这些 Pi 自维护修改。兼容的后续指示延续同一维护任务，无需重复关键字；新任务、撤销、否定、仅引用或讨论不构成授权。历史消息仅为证据，不是永久或通用权限。权限及核心源码须有对应机制的明确维护意图，不能凭模型或补丁的声明扩大范围。每笔精确补丁单独审批；禁止为其他任务解除拒绝、清理暂停、凭据或灾难性保护。事务使用独立备份和旧校验器，失败精确恢复；新代码重载后生效。"},sessionModelReference(ctx));
+            return decision;
           },
         });
         pi.appendEntry("timrt-self-maintenance",{files:result.files,backup:result.backup});
@@ -254,7 +267,11 @@ export function installPermissions(pi: ExtensionAPI, review = createApprovalRevi
     if (verdict === "deny") return {route:"deny",reason:"路径或命令规则拒绝。"};
     if (name === "powershell" && powerShellLiteralPaths(String(input.command || "")).some(path => rules.evaluate("read",{path}) === "deny")) return {route:"deny",reason:"受保护路径。"};
     if (state.approvalHold && !readOnly) return {route:"deny",reason:holdMessage()};
-    if(name==="maintain_pi")return state.mode==="plan" || !state.maintenance ? {route:"deny",reason:"需要当前用户明确提出 Pi 维护且非 PLAN。"} : {route:state.mode==="ask"?"human":"model",reason:"受控维护事务始终逐次审批，不享受 ACT 普通操作直通；核心源码也走当前用户明确授权和备份验证。"};
+    if(name==="maintain_pi") {
+      if(state.mode==='plan')return {route:'deny',reason:'PLAN 仅允许只读。'};
+      try{validateMaintenance(getAgentDir(),currentUserRequest,input.changes);}catch(error){return {route:'deny',reason:String(error)};}
+      return {route:state.mode==='ask'?'human':'model',reason:'结构预检通过，尚未授权；本次补丁须结合真实用户及后续指示进行语义审批，工具可见性不代表批准。'};
+    }
     if (readOnly) return {route:"allow",reason:"已确认只读，不调用审批模型。"};
     if (name === "set_approval_mode" || (/subagent|delegate|spawn_agent/i.test(name) && !state.taskAgents)) return {route:"deny",reason:"模式或任务代理需要真实用户授权。"};
     const inspected = inspectDeletionCall(name,input,ctx.cwd);
@@ -360,6 +377,7 @@ export function installPermissions(pi: ExtensionAPI, review = createApprovalRevi
     const branch = ctx.sessionManager.getBranch?.() ?? ctx.sessionManager.getEntries();
     state.approvalHold = Boolean((branch.filter((entry: any) => entry.customType === "timrt-approval-hold").at(-1) as any)?.data?.held);
     currentUserRequest = "";
+    restoreHumanRequests(ctx);
     readSkills.clear();
     filterTools();
     publish(ctx);
@@ -369,10 +387,12 @@ export function installPermissions(pi: ExtensionAPI, review = createApprovalRevi
     requestGeneration++;
     if (state.approvalHold) { state.approvalHold = false; pi.appendEntry("timrt-approval-hold", { held: false }); }
     currentUserRequest = event.text;
+    const humanRequest={text:event.text.slice(0,6000),truncated:event.text.length>6000};
+    humanRequests=boundedHumanRequests([...humanRequests,humanRequest]);
+    pi.appendEntry('timrt-human-request',humanRequest);
     state.taskAgents = explicitDelegation(event.text);
     state.denied = /(?:不要|禁止|不许|无需|不使用).{0,24}(?:子代理|sub.?agents?|并行代理)|(?:do not|don't|never|without).{0,24}(?:sub.?agents?|delegat)/i.test(event.text);
     state.development = !isGreeting(event.text);
-    state.maintenance = maintenanceIntent(event.text);
     readSkills.clear();
     if (state.taskAgents) {
       try { await loadTaskAgents(ctx); }
@@ -383,6 +403,7 @@ export function installPermissions(pi: ExtensionAPI, review = createApprovalRevi
     }
     filterTools(); publish(ctx);
   });
+  pi.on('session_tree',(_event,ctx)=>{requestGeneration++;currentUserRequest='';restoreHumanRequests(ctx);});
   pi.on("tool_result", (event: any) => {
     if (event.toolName !== "read" || event.isError || typeof event.input?.path !== "string") return;
     const skill = event.input.path.match(/principal-pi-skills[\\/]([^\\/]+)[\\/]SKILL\.md$/i)?.[1];

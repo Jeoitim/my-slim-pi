@@ -44,7 +44,7 @@ test('a restore interrupted by a concurrent writer rolls back earlier writes and
 });
 test('a saved external maintainer recovers its broken live implementation',()=>{
   const root=fixture(),code=fs.readFileSync(new URL('../../runtime/maintenance.mjs',import.meta.url));
-  put(root,'customization/runtime/maintenance.mjs',code);put(root,'settings.json','original');
+  put(root,'customization/runtime/maintenance.mjs',code);put(root,'customization/runtime/policy-files.cjs',fs.readFileSync(new URL('../../runtime/policy-files.cjs',import.meta.url)));put(root,'settings.json','original');
   const snapshot=backup(root);put(root,'customization/runtime/maintenance.mjs','broken');put(root,'settings.json','changed');
   const result=spawnSync(process.execPath,[join(snapshot,'customization/runtime/maintenance.mjs'),'--agent-root',root,'Restore','--backup-path',snapshot,'--apply'],{encoding:'utf8',input:'RESTORE\n'});
   assert.equal(result.status,0,result.stderr);assert.equal(fs.readFileSync(join(root,'settings.json'),'utf8'),'original');assert.deepEqual(fs.readFileSync(join(root,'customization/runtime/maintenance.mjs')),code);

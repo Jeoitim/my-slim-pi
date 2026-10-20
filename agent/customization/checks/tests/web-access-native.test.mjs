@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFileSync,mkdirSync,mkdtempSync} from 'node:fs';
+import {readFileSync,writeFileSync,mkdirSync,mkdtempSync} from 'node:fs';
 import {join} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {createServer} from 'node:http';
@@ -13,8 +13,16 @@ const sdk=await import(pathToFileURL(join(host,'index.js')));
 const {initTheme}=await import(pathToFileURL(join(host,'modes/interactive/theme/theme.js')));initTheme('claude-warm');
 
 test('native package auto activation, real permission pipeline, serial fallback, fetch and cached retrieval',async()=>{
+  // An installer-imported proxy switches upstream fetch to curl, bypassing the
+  // fetch mock. Isolate the transport and credentials before loading the plugin.
+  const configFile=join(root,'web-search.json'),originalConfig=readFileSync(configFile);
+  const config=JSON.parse(originalConfig.toString('utf8'));delete config.proxy;
+  for(const key of Object.keys(config))if(/ApiKey$/.test(key))delete config[key];
+  writeFileSync(configFile,JSON.stringify(config));
+  try {
   mkdirSync(join(root,'cache'),{recursive:true});const cwd=mkdtempSync(join(root,'cache/native-web-'));
   const env={...process.env},originalFetch=globalThis.fetch,calls=[];let winner='tavily';
+  for(const key of Object.keys(process.env))if(/^(?:https?|all)_proxy$/i.test(key))delete process.env[key];
   // Every transport response is local; no keys or provider traffic are used.
   for(const p of ['EXA','BRAVE','TAVILY'])process.env[p+'_API_KEY']='fixture-native-'+p;
   process.env.DEGOOG_URL='https://93.184.216.34';
@@ -94,4 +102,5 @@ test('native package auto activation, real permission pipeline, serial fallback,
     await session.extensionRunner.emit({type:'session_shutdown',reason:'exit'});session.dispose();globalThis.fetch=originalFetch;
     for(const key of Object.keys(process.env))if(!(key in env))delete process.env[key];Object.assign(process.env,env);
   }
+  } finally {writeFileSync(configFile,originalConfig);}
 });

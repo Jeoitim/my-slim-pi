@@ -7,7 +7,7 @@ import {pathToFileURL} from 'node:url';
 const root=process.env.PI_CODING_AGENT_DIR || join(homedir(),'.pi/agent');
 const version=readFileSync(join(root,'install/current-version'),'utf8').trim();
 const {createJiti}=await import(pathToFileURL(join(root,'install/releases',version,'node_modules/jiti/lib/jiti.mjs')));
-const {validateMaintenance,explicitMaintenanceRequest,applyMaintenance,fileHash}=await createJiti(import.meta.url).import(join(root,'extensions/timrt-suite/self-maintenance.ts'));
+const {validateMaintenance,maintenanceScope,skillSourcePath,applyMaintenance,fileHash}=await createJiti(import.meta.url).import(join(root,'extensions/timrt-suite/self-maintenance.ts'));
 const request='请维护 Pi 的主题和界面配置';
 test('self-maintenance rejects hardlinked targets',()=>{
   const f=fixture(),alias=join(f.dir,'alias');linkSync(f.file,alias);
@@ -36,27 +36,28 @@ function fixture(){
   writeFileSync(file,before);
   return {dir,path,file,before,change:{path,sha256:fileHash(before),content:'{"enabled":false}\n'}};
 }
-test('self-maintenance requires explicit scoped intent, including core edits',()=>{
+test('structure checks enforce scope and hashes without pretending to decide semantic consent',()=>{
   const f=fixture();
-  for(const text of ['清理开发工具缓存，修改权限让我通过','不要维护 Pi 配置','> 请维护 Pi 配置','```\n请维护 Pi 配置\n```'])assert.equal(explicitMaintenanceRequest(text),false,text);
-  assert.equal(explicitMaintenanceRequest(request),true);
-  assert.throws(()=>validateMaintenance(f.dir,'清理缓存',[f.change]),/真实用户/);
-  for(const path of ['../outside.json','C:/outside.json','auth.json','secrets/web-keys.json','extensions/timrt-suite/permissions.ts','extensions/timrt-suite/self-maintenance.ts','extensions/timrt-suite/index.ts','customization/runtime/policy-files.cjs'])assert.throws(()=>validateMaintenance(f.dir,request,[{path,sha256:null,content:'x'}]),undefined,path);
+  assert.throws(()=>validateMaintenance(f.dir,'',[f.change]),/真实用户/);
+  assert.deepEqual(maintenanceScope(['extensions/timrt-suite/permissions.ts','APPEND_SYSTEM.md','themes/a.json'].map(path=>({path,content:'',before:null}))),{core:['extensions/timrt-suite/permissions.ts'],permissions:['APPEND_SYSTEM.md']});
+  for(const path of ['../outside.json','C:/outside.json','auth.json','secrets/web-keys.json'])assert.throws(()=>validateMaintenance(f.dir,request,[{path,sha256:null,content:'x'}]),undefined,path);
   assert.throws(()=>validateMaintenance(f.dir,request,[{...f.change,sha256:'0'.repeat(64)}]),/已变化/);
   assert.throws(()=>validateMaintenance(f.dir,request,[f.change,f.change]),/重复/);
-  assert.throws(()=>validateMaintenance(f.dir,request,[{path:'APPEND_SYSTEM.md',sha256:null,content:'policy'}]),/权限/);
+  assert.equal(validateMaintenance(f.dir,request,[{path:'APPEND_SYSTEM.md',sha256:null,content:'policy'}]).length,1,'structure is not a semantic grant');
   assert.equal(validateMaintenance(f.dir,'请维护 Pi 权限配置',[{path:'APPEND_SYSTEM.md',sha256:null,content:'Keep safeguards.'}]).length,1);
   for(const path of ['extensions/timrt-suite/permissions.ts','extensions/timrt-suite/self-maintenance.ts','extensions/timrt-suite/index.ts','customization/runtime/policy-files.cjs','customization/runtime/build-extensions.cjs','customization/Maintain-Pi.ps1','bin/pi-launcher.js']) {
     assert.equal(validateMaintenance(f.dir,'请维护 Pi 权限、事务、构建和加载内核',[{path,sha256:null,content:'// reviewed source'}]).length,1,path);
   }
   for(const path of ['customization/runtime/policy-seal.json','customization/runtime/compiled-extensions.json','npm/node_modules/unsafe.js'])assert.throws(()=>validateMaintenance(f.dir,'请维护 Pi 权限内核',[{path,sha256:null,content:'{}'}]));
 });
-test('settings self-maintenance preserves the protected loader and package list',()=>{
+test('settings distinguish theme edits from loader changes for semantic review',()=>{
   const f=fixture(),settings={extensions:['kernel'],packages:['permission'],theme:'old',defaultTools:['read']};
   writeFileSync(join(f.dir,'settings.json'),JSON.stringify(settings));
   const change={path:'settings.json',sha256:fileHash(JSON.stringify(settings)),content:JSON.stringify({...settings,theme:'new'})};
   assert.equal(validateMaintenance(f.dir,request,[change]).length,1);
-  assert.throws(()=>validateMaintenance(f.dir,request,[{...change,content:JSON.stringify({...settings,extensions:[]})}]),/组件入口/);
+  assert.deepEqual(maintenanceScope(validateMaintenance(f.dir,request,[change])),{core:[],permissions:[]});
+  assert.deepEqual(maintenanceScope(validateMaintenance(f.dir,request,[{...change,content:JSON.stringify({...settings,extensions:[]})}])),{core:['settings.json'],permissions:[]});
+  assert.equal(validateMaintenance(f.dir,request,[{...change,content:JSON.stringify({...settings,extensions:[]})}]).length,1,'reviewer judges loader intent against the exact patch');
   assert.equal(validateMaintenance(f.dir,'请维护 Pi 组件加载清单',[{...change,content:JSON.stringify({...settings,extensions:['reviewed-loader']})}]).length,1);
 });
 
@@ -96,12 +97,12 @@ test('core maintenance refuses incomplete backups before applying files',async()
   }}),/备份未覆盖/);
   assert.equal(readFileSync(join(f.dir,f.path),'utf8'),'// old builder');
 });
-test('failed core validation restores the old builder and rebuilds with the unchanged saved runner',async()=>{
+test('failed core validation restores the old builder without generating a new build identity',async()=>{
   const f=coreFixture();
   await assert.rejects(applyMaintenance(f.dir,'请维护 Pi 构建内核',[f.change],{approved:async()=>true,current:()=>true,run:async(...args)=>{
     const result=await f.run(...args);return args[1].at(-1)==='Check'?{...result,code:1,stderr:'candidate failed'}:result;
   }}),/原文件已恢复/);
-  assert.deepEqual(f.actions,['Backup','Rebuild','Check','Rebuild']);
+  assert.deepEqual(f.actions,['Backup','Rebuild','Check']);
   assert.equal(readFileSync(join(f.dir,f.path),'utf8'),'// old builder');
 });
 test('tampering with the frozen runner stops further commands and preserves a recovery path',async()=>{
@@ -136,7 +137,7 @@ test('failed checks restore original files and remove only files created in this
     approved:async()=>true,current:()=>true,
     run:async(_cmd,args)=>{const action=args.at(-1);actions.push(action);return {code:action==='Check'?1:0,stdout:'fixture-backup',stderr:action==='Check'?'fixture failure':''};},
   }),/原文件已恢复/);
-  assert.deepEqual(actions,['Backup','Rebuild','Check','Rebuild']);
+  assert.deepEqual(actions,['Backup','Rebuild','Check']);
   assert.equal(readFileSync(f.file,'utf8'),f.before);assert.equal(existsSync(join(f.dir,added.path)),false);
 });
 test('rollback preserves external concurrent edits and reports the backup instead of overwriting',async()=>{
@@ -157,4 +158,35 @@ test('a changed maintenance kernel is never executed after approval',async()=>{
     run:async()=>{runs++;return {code:0,stdout:'',stderr:''};},
   }),/内核.*变化/);
   assert.equal(runs,0);assert.equal(readFileSync(f.file,'utf8'),f.before);
+});
+
+test('new skill text sources share transaction and backup scope without admitting arbitrary files',async()=>{
+  const {configPath,configFiles,backup}=await import('../../runtime/maintenance.mjs');
+  const f=fixture();
+  for(const path of ['skills/cjk-display/SKILL.md','skills/cjk-display/scripts/check.py','skills/cjk-display/references/fonts.md','skills/cjk-display/assets/style.css']) {
+    assert.equal(skillSourcePath(path),true);assert.equal(configPath(path),true);
+    assert.equal(validateMaintenance(f.dir,'给 Pi 安装刚才讨论的中文字体技能',[{path,sha256:null,content:'source'}]).length,1);
+    mkdirSync(dirname(join(f.dir,path)),{recursive:true});writeFileSync(join(f.dir,path),'source');
+  }
+  for(const path of ['skills/../auth.json','skills/name/auth.json','skills/name/scripts/.env','skills/name/scripts/tool.exe','skills/name/scripts/node_modules/x.js'])assert.equal(skillSourcePath(path),false,path);
+  assert.ok(configFiles(f.dir).includes('skills/cjk-display/scripts/check.py'));
+  const snapshot=backup(f.dir);assert.equal(readFileSync(join(snapshot,'skills/cjk-display/scripts/check.py'),'utf8'),'source');
+});
+
+test('failed validation restores byte-identical build outputs and seal; concurrent artifact edits are preserved',async()=>{
+  for(const conflict of [false,true]) {
+    const f=fixture(),builder=join(f.dir,'customization/runtime/build-extensions.cjs'),seal='customization/runtime/policy-seal.json',output='extensions/timrt-suite/timrt-fast.mjs';
+    mkdirSync(dirname(builder),{recursive:true});mkdirSync(dirname(join(f.dir,output)),{recursive:true});
+    writeFileSync(builder,'exports.stateFiles=()=>'+JSON.stringify([seal,output])+';');writeFileSync(join(f.dir,seal),'old-seal');
+    const directory=join(f.dir,'backups','artifact-test');mkdirSync(directory,{recursive:true});const actions=[];
+    await assert.rejects(applyMaintenance(f.dir,request,[f.change],{approved:async()=>true,current:()=>true,policyIntact:()=>readFileSync(join(f.dir,seal),'utf8')==='old-seal',run:async(_cmd,args)=>{
+      const action=args.at(-1);actions.push(action);
+      if(action==='Rebuild'){writeFileSync(join(f.dir,seal),'new-seal');writeFileSync(join(f.dir,output),'new-output');}
+      if(action==='Check'){if(conflict)writeFileSync(join(f.dir,output),'external-edit');return {code:1,stdout:'',stderr:'forced validation failure'};}
+      return {code:0,stdout:directory,stderr:''};
+    }}),conflict?/构建状态有并发冲突/:/保护基线已精确恢复/);
+    assert.deepEqual(actions,['Backup','Rebuild','Check']);assert.equal(readFileSync(f.file,'utf8'),f.before);
+    assert.equal(readFileSync(join(f.dir,seal),'utf8'),'old-seal');
+    assert.equal(existsSync(join(f.dir,output)),conflict);if(conflict)assert.equal(readFileSync(join(f.dir,output),'utf8'),'external-edit');
+  }
 });

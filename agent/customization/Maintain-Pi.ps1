@@ -275,7 +275,7 @@ function Show-PiMenu {
                 '5' { Show-PiBackupMenu }
                 '6' { Invoke-PiMaintenance @('Rebuild'); Write-Host '构建完成。请重启 Pi。' -ForegroundColor Green }
                 '7' {
-                    $check = Select-PiItem '选择检查；均不调用模型，联网测试只用插件原生免费 Exa' @('Check','WebTest','Benchmark','Context') {param($item) switch($item){'Check'{'离线测试与组件集成'} 'WebTest'{'免费联网测试'} 'Benchmark'{'三次启动测速'} 'Context'{'离线首轮上下文采集'}}}
+                    $check = Select-PiItem '选择检查；均不调用模型，联网测试只用插件原生免费 Exa' @('Check','WebTest','Benchmark','Context') {param($item) switch($item){'Check'{'离线启动与完整性检查'} 'WebTest'{'免费联网测试'} 'Benchmark'{'三次启动测速'} 'Context'{'离线首轮上下文采集'}}}
                     if ($check) { Invoke-PiCheck $check }
                 }
                 '8' { Clear-PiGenerated -Commit }

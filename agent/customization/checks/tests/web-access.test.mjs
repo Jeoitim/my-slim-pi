@@ -6,7 +6,8 @@ import {pathToFileURL} from 'node:url';
 import {root,jiti,harness,APPROVE} from './auto-harness.mjs';
 import {migrateWebAccess,backup,restore,restorePlan,literalCredential} from '../../runtime/maintenance.mjs';
 const {webReadOnly}=await jiti.import(join(root,'extensions/timrt-suite/call-policy.ts'));
-const defaults=JSON.parse(readFileSync(join(root,'web-search.json'),'utf8'));
+// Test defaults never inherit an installation's credentials or proxy.
+const defaults={provider:'auto',toolActivation:'auto',workflow:'none',allowBrowserCookies:false,pdf:{enabled:false},githubClone:{enabled:false},githubPrIssue:{enabled:false},youtube:{enabled:false}};
 delete defaults.proxy;
 
 for(const mode of ['auto','act','ask','plan'])test(`native Web public calls are exempt; sensitive parameters follow ${mode}`,async()=>{

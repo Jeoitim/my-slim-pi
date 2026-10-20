@@ -61,4 +61,5 @@ function verify(root) {
     return {ok:expected.version === 1 && changed.length === 0,changed};
   } catch {return {ok:false,changed:['policy-seal.json 缺失或无效']};}
 }
-module.exports = {protectedPath, seal, verify};
+const skillSourcePath=(path)=> !/(?:^|\/)(?:node_modules|secrets|sessions|backups|cache)(?:\/|$)/i.test(path) && /^skills\/[a-z0-9][a-z0-9-]{0,63}\/(?:SKILL\.md|(?:scripts|references|assets)\/(?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9_\u3400-\u9fff][A-Za-z0-9_.\u3400-\u9fff -]*\.(?:py|mjs|cjs|js|ts|ps1|sh|md|css|json|txt|svg))$/.test(path);
+module.exports = {protectedPath, seal, verify, skillSourcePath};

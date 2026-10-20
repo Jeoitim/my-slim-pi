@@ -7,7 +7,7 @@
 
 二者独立。导出不修改运行目录；安装不把私有文件写回仓库。
 
-安装后的 `maintain_pi` 统一维护配置与授权/审批/事务/校验/构建/加载源码，要求当前用户明确提出对应维护意图。核心事务先调用独立维护脚本备份，保存旧维护/构建/检查代码完成本次验证，成功后重载生效。备份与恢复已覆盖这些源码；恢复损坏的维护入口可使用该次备份的 `node <快照>/transaction-runner/customization/runtime/maintenance.mjs --agent-root <实际目录> Restore --backup-path <快照> --apply`。使用细节见安装后的维护手册；此能力不承担仓库同步和发布。
+安装后的 `maintain_pi` 统一维护配置与授权/审批/事务/校验/构建/加载源码，要求当前用户明确提出对应维护意图。核心事务先调用独立维护脚本备份，保存旧维护/构建/检查代码完成本次验证，成功后重载生效。普通技能用普通文件工具增改，维护工具不作为技能安装门槛；语义授权、验证分层与精确回滚见[自维护架构](self-maintenance-architecture.md)。备份与恢复已覆盖这些源码；恢复损坏的维护入口可使用该次备份的 `node <快照>/transaction-runner/customization/runtime/maintenance.mjs --agent-root <实际目录> Restore --backup-path <快照> --apply`。使用细节见安装后的维护手册；此能力不承担仓库同步和发布。
 
 ## 从本机更新备份
 
@@ -42,14 +42,15 @@ Windows 先用 `Install.bat -Plan`、Linux 使用 `bash install.sh --agent-root 
 | npm test | 依赖锁、默认配置、安装器不覆盖、已有版本识别与 PATH 区块保护 |
 | npm run audit:share | 分享路径、凭据特征、源码 SHA256 |
 | node customization/checks/check-startup.mjs | 实际部署的 SDK 扩展启动；不调用模型或制造测试会话 |
-| 安装目录 node customization/runtime/maintenance.mjs Check | 权限、编辑、主题、记忆、搜索模拟、维护脚本和 SDK 集成 |
+| 实际安装 node customization/runtime/maintenance.mjs Check | 语法、策略完整性、离线 SDK 启动就绪；不将用户配置作为测试夹具 |
+| .local 独立安装的 Check --full-check | 加上权限、编辑、主题、记忆、搜索模拟、维护脚本和 SDK 完整回归 |
 | -Action Benchmark / Context / WebTest | 可选性能、上下文、插件原生免费 Exa 联网 |
 
 分享版不包含依赖个人 CC Switch 数据库与固定供应商列表的 effort/provider-compat 两项测试文件。终端响铃偏好由使用者管理；通用审批通知测试仍保留。不用本机认证或付费 API 来判定安装成功。
 
 平台提示词源文件是 `agent/APPEND_SYSTEM.windows.md` 和 `agent/APPEND_SYSTEM.linux.md`；运行入口 `APPEND_SYSTEM.md` 由安装器选择并部署，不作为第三份源码维护。导出使用 `--platform=win32|linux` 指定来源平台；该平台运行提示词导回对应源文件，另一平台独立导出。新平台文件和维护入口必须纳入分发白名单与保护清单。
 
-真实事务回归在一次性安装中运行 `node tests/integration-transactions.mjs <仓库/.local/AgentRoot>`；它会运行实际构建和完整离线 Check，并验证故意损坏维护器时旧代码恢复。不得使用个人运行目录。
+真实事务回归在一次性安装中运行 `node tests/integration-transactions.mjs <仓库/.local/AgentRoot>`；它会运行实际构建和离线就绪检查，并验证故意失败后的精确恢复及无效候选语法的拒绝；完整回归另在隔离安装执行。不得使用个人运行目录。
 
 安装器默认交互询问用户级 PATH 与可选搜索 Key；无交互环境必须显式选择 --add-to-path / --no-path，更新必须显式授权。隔离安装可加 -FullCheck / --full-check 执行完整回归；实际部署仅运行 check-startup.mjs，不把用户目录当测试夹具。Linux 记录的 install/node-path 是本机启动状态，纳入保护和本机备份但不导出、不提交。
 

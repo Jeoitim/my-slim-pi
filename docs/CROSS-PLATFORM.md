@@ -1,6 +1,6 @@
 # Windows / Linux 原生运行
 
-核对日期：2026-10-20。Pi 1.3.0；Windows 使用 Node 24.20.0 / PowerShell 7，WSL2 Arch Linux 使用 Linux 原生 Node 24.22.0 / Bash。两端的安装、依赖、凭据、缓存和测试夹具相互独立。
+核对日期：2026-10-21。Pi 1.3.0；Windows 使用 Node 24.20.0 / PowerShell 7，WSL2 Arch Linux 使用 Linux 原生 Node 24.22.0 / Bash。两端的安装、依赖、凭据、缓存和测试夹具相互独立。
 
 | 能力 | Windows | Linux |
 |---|---|---|
@@ -25,4 +25,10 @@ Backup/Restore/Check/Rebuild 使用同一 Node 核心。默认快照包含 npm/p
 
 当前维护器损坏时，用快照中的 customization/runtime/maintenance.mjs，或 transaction-runner 中冻结的旧维护器，指定 --agent-root 后执行 Restore。恢复配置源码后运行 Rebuild、Check 并重启；依赖损坏时另按锁文件重装。
 
-完整验证入口为 maintenance.mjs Check；事务验收为 tests/integration-transactions.mjs，Linux 隐藏输入验收为 tests/integration-private-input.py，目标均须为 .local 隔离安装。macOS 未验证，安装器不将 Darwin 视为 Linux。
+就绪检查入口为 maintenance.mjs Check；完整回归在 .local 独立安装显式执行 Check --full-check；事务验收为 tests/integration-transactions.mjs，Linux 隐藏输入验收为 tests/integration-private-input.py，目标均须为 .local 隔离安装。macOS 未验证，安装器不将 Darwin 视为 Linux。
+
+## 本次自维护验收
+
+Windows 与 WSL2 Linux 在各自 .local 原生安装验证：语义审批证据与后续指示、普通技能按当前模式增改、PLAN/清理暂停、核心范围与 SHA256、源码语法预检、真实备份与冻结旧校验器。故意在构建后让验证失败，确认源码、全部旧构建产物与原校验清单逐字节恢复，进程内保护检查和下次启动构建检查仍有效。无效维护器候选在写入前拒绝。
+
+两端完整离线 Check --full-check、组件集成和真实维护事务均通过。仓库测试：Windows 35 通过、3 项平台跳过；Linux 27 通过、11 项平台跳过；分享审计均通过。原生 Web 测试在加载插件前清除夹具代理与凭据，再使用模拟传输，保留本地代理验收；不依赖真实搜索 Key。语义审批使用模拟响应验证证据与控制流程，不代表真实审批模型的语义质量评测。

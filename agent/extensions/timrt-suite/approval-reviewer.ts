@@ -165,7 +165,7 @@ export function createApprovalReviewer(pi: ExtensionAPI, options?: {humanFallbac
     const serialized = JSON.stringify(input, null, 2);
     const risky = deletionRisk(serialized);
     // 删除审批永不复用旧授权；其余同参数调用在 2 分钟内复用成功结论。
-    const cacheKey = name.startsWith("deletion:") || risky ? "" : createHash("sha256").update(`${policyKey}\n${name}\n${serialized}`).digest("hex");
+    const cacheKey = name.startsWith("deletion:") || name === 'operation:maintain_pi' || risky ? "" : createHash("sha256").update(`${policyKey}\n${name}\n${serialized}`).digest("hex");
     if (cacheKey) {
       const hit = cache.get(cacheKey);
       if (hit && Date.now() - hit.at < CACHE_TTL_MS) return { ...hit.decision, source: "cache" };

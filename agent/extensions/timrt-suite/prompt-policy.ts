@@ -3,7 +3,6 @@ export const PRINCIPAL_SUMMARIES: Record<string, string> = {
   decide: "工程取舍与决策", architect: "架构与接口设计", plan: "需求拆解与实施计划", build: "编写、修改和重构代码", review: "代码审查", "test-review": "测试质量审查", debug: "定位未知故障", investigate: "技术调查与证据核验", "git-ops": "Git 分支、提交与冲突处理",
 };
 export const isGreeting = (text: string) => /^\s*(?:hello|hi|hey|你好|您好|嗨|早上好|晚上好)[\s!！。.，,?？]*$/i.test(text);
-export const maintenanceIntent = (text: string) => /pi-maintenance|timrt-suite|\.pi[\\/]agent|Pi-Maintenance\.bat/i.test(text) || (/\bpi\b|π/i.test(text) && /维护|插件|组件|配置|主题|模型|提示词|启动|升级|安装|修复|排查|优化|扩展|skill|maintain|config|theme|model|prompt|startup|updat|upgrad|install|repair|extension|plugin/i.test(text));
 export function stripForeignMemory(content: string): string {
   return content.replace(/<claude-mem-context>[\s\S]*?<\/claude-mem-context>/gi, "").trim();
 }

@@ -4,6 +4,7 @@ import {resolve,join,dirname,relative} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {homedir} from 'node:os';
 import {createHash} from 'node:crypto';
+import {skillSourcePath} from '../agent/customization/runtime/maintenance.mjs';
 const repo=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const source=resolve(process.argv.find(a=>a.startsWith('--source='))?.slice(9)||join(homedir(),'.pi/agent'));
 const apply=process.argv.includes('--apply');
@@ -15,6 +16,16 @@ selected.push(`install/releases/${version}/package.json`,`install/releases/${ver
 for(const [dir,pattern] of [['extensions/timrt-suite',/\.(?:ts|ps1)$/],['customization/runtime',/\.(?:cjs|mjs)$/],['customization/checks',/\.mjs$/],['customization/checks/tests',/\.(?:mjs|ps1)$/],['themes',/\.json$/],['agents',/\.md$/]]) {
   for(const entry of readdirSync(join(source,dir),{withFileTypes:true}))if(entry.isFile() && pattern.test(entry.name))selected.push(dir+'/'+entry.name);
 }
+// Skill source export shares the same textual-file scope as backup and transactions.
+function selectSkills(dir='skills') {
+  if(!existsSync(join(source,dir)))return;
+  for(const entry of readdirSync(join(source,dir),{withFileTypes:true})) {
+    const path=dir+'/'+entry.name;
+    if(entry.isSymbolicLink())throw Error('Skill export refuses links');
+    if(entry.isDirectory())selectSkills(path);else if(skillSourcePath(path))selected.push(path);
+  }
+}
+selectSkills();
 // These two files audit the author's personal model catalog/CC Switch database.
 const omitted=['customization/checks/tests/effort.test.mjs','customization/checks/tests/provider-compat.test.mjs','customization/runtime/patch-permission-runner.cjs'];
 const settings=JSON.parse(readFileSync(join(source,'settings.json'),'utf8'));

@@ -5,6 +5,7 @@ import {createHash, randomUUID} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
 import {pathToFileURL} from 'node:url';
 import {createInterface} from 'node:readline/promises';
+import {createRequire} from 'node:module';
 
 export const hash = data => createHash('sha256').update(data).digest('hex');
 export const pathKey = p => process.platform === 'win32' ? p.toLowerCase() : p;
@@ -22,7 +23,8 @@ export function child(base, relative) {
   }
   return full;
 }
-export const configPath = p => /^(?:npm\/(?:package|package-lock)\.json|install\/node-path|settings\.json|trust\.json|models\.json|auth\.json|web-search\.json|mcp\.json|keybindings\.json|pi-cc-extensions\.json|pi-btw\.json|hermes-memory-config\.json|APPEND_SYSTEM(?:\.(?:windows|linux))?\.md|pi-hermes-memory\/STANDING\.md|secrets\/web-keys\.json|extensions\/(?:pi-permission-suite|subagent)\/config\.json|skills\/(?:pi-maintenance|principal)\/SKILL\.md|customization\/(?:README\.md|Pi Agent 本机配置维护手册\.md|Maintain-Pi\.ps1|Pi-Maintenance\.bat|maintain-pi\.sh)|customization\/runtime\/[^/]+\.(?:cjs|mjs)|customization\/checks\/(?:tests\/)?[^/]+\.(?:mjs|ps1)|bin\/(?:pi|pi-launcher\.js|pi\.cmd|pi\.ps1)|agents\/[^/]+\.md|themes\/[^/]+\.json|extensions\/timrt-suite\/[^/]+\.(?:ts|ps1))$/.test(p.replaceAll('\\','/'));
+export const {skillSourcePath}=createRequire(import.meta.url)('./policy-files.cjs');
+export const configPath = p => skillSourcePath(p.replaceAll('\\','/')) || /^(?:npm\/(?:package|package-lock)\.json|install\/node-path|settings\.json|trust\.json|models\.json|auth\.json|web-search\.json|mcp\.json|keybindings\.json|pi-cc-extensions\.json|pi-btw\.json|hermes-memory-config\.json|APPEND_SYSTEM(?:\.(?:windows|linux))?\.md|pi-hermes-memory\/STANDING\.md|secrets\/web-keys\.json|extensions\/(?:pi-permission-suite|subagent)\/config\.json|skills\/(?:pi-maintenance|principal)\/SKILL\.md|customization\/(?:README\.md|Pi Agent 本机配置维护手册\.md|Maintain-Pi\.ps1|Pi-Maintenance\.bat|maintain-pi\.sh)|customization\/runtime\/[^/]+\.(?:cjs|mjs)|customization\/checks\/(?:tests\/)?[^/]+\.(?:mjs|ps1)|bin\/(?:pi|pi-launcher\.js|pi\.cmd|pi\.ps1)|agents\/[^/]+\.md|themes\/[^/]+\.json|extensions\/timrt-suite\/[^/]+\.(?:ts|ps1))$/.test(p.replaceAll('\\','/'));
 const credential = p => /^(?:models\.json|auth\.json|web-search\.json|secrets\/)/.test(p);
 export function protect(file, directory = false) {
   if (process.platform === 'linux') fs.chmodSync(file, directory ? 0o700 : 0o600);
@@ -42,6 +44,8 @@ export function configFiles(root) {
     if (fs.existsSync(base)) for (const name of fs.readdirSync(base)) if (configPath(dir+'/'+name)) files.push(dir+'/'+name);
   }
   files.push('npm/package.json','npm/package-lock.json');
+  const walk=dir=>{if(!fs.existsSync(child(root,dir)))return;for(const entry of fs.readdirSync(child(root,dir),{withFileTypes:true})){const name=dir+'/'+entry.name;if(entry.isSymbolicLink())throw Error('Skill backup refuses links');if(entry.isDirectory())walk(name);else if(skillSourcePath(name))files.push(name);}};
+  walk('skills');
   return [...new Set(files)];
 }
 export function backup(root, {label='manual', files} = {}) {
@@ -191,13 +195,15 @@ export function cleanup(root, plan, kind, mode) {
 export function runNode(root, args, log) {
   const result=spawnSync(process.execPath,args,{cwd:root,stdio:log?'pipe':'inherit',encoding:'utf8',maxBuffer:16_000_000,timeout:180_000,windowsHide:true,env:{...process.env,BRAVE_API_KEY:process.env.BRAVE_API_KEY||process.env.BRAVE_SEARCH_API_KEY,PI_CODING_AGENT_DIR:root,PI_MAINTENANCE_TARGET:root,PI_OFFLINE:'1',PI_HASHLINE_DIR:path.join(root,'pi-hashline-edit-pro')}});
   if(log){process.stdout.write(result.stdout||'');process.stderr.write(result.stderr||'');fs.appendFileSync(log,(result.stdout||'')+(result.stderr||''));}
-  if(result.status!==0)throw Error('Maintenance child failed ('+(result.status ?? result.error?.code)+')');
+  if(result.status!==0)throw Error('Maintenance child failed ('+(result.status ?? result.error?.code)+'): '+String(result.error?.message||'')+'\n'+((result.stderr||'')+'\n'+(result.stdout||'')).slice(-3500)+(log?'\nLog: '+log:''));
 }
 export async function main(args=process.argv.slice(2)) {
   const take=(name,fallback)=>{const i=args.indexOf(name);if(i<0)return fallback;if(!args[i+1] || args[i+1].startsWith('--'))throw Error('Missing '+name);const v=args[i+1];args.splice(i,2);return v;};
   const root=path.resolve(take('--agent-root',process.env.PI_MAINTENANCE_TARGET || path.resolve(import.meta.dirname,'../..')));
   const snapshot=take('--backup-path'),mode=take('--backup-mode','KeepLatestTwo'), filesArg=take('--files'),label=take('--label','manual');
-  const apply=args.includes('--apply');args=args.filter(a=>a!=='--apply');
+  const fullCheck=args.includes('--full-check');
+  if(fullCheck && !root.replaceAll('\\','/').includes('/.local/'))throw Error('Full regression requires an isolated .local AgentRoot');
+  const apply=args.includes('--apply');args=args.filter(a=>a!=='--apply' && a!=='--full-check');
   const [action='Status',...values]=args;
   const ask=async expected=>{const rl=createInterface({input:process.stdin,output:process.stdout});try{return await rl.question('Type '+expected+' to confirm: ')===expected;}finally{rl.close();}};
   const checks=path.resolve(import.meta.dirname,'../checks');
@@ -217,6 +223,9 @@ export async function main(args=process.argv.slice(2)) {
       // Validate candidate maintenance code with this pre-change runner. Never import it
       // merely to check its syntax, and never accept a broken next-start recovery path.
       for(const name of fs.readdirSync(child(root,'customization/runtime')))if(/\.(?:mjs|cjs)$/.test(name))execute(['--check',child(root,'customization/runtime/'+name)]);
+      const policy=createRequire(import.meta.url)('./policy-files.cjs').verify(root);if(!policy.ok)throw Error('Policy integrity failed: '+policy.changed.join(', '));
+      execute([path.join(checks,'check-startup.mjs')]);
+      if(!fullCheck){console.log('Readiness checks passed. Full regression requires Check --full-check in an isolated .local AgentRoot.');break;}
       if(process.platform==='win32') {const r=spawnSync('pwsh.exe',['-NoLogo','-NoProfile','-File',path.join(checks,'tests/Test-Maintenance.ps1')],{cwd:root,stdio:'inherit',windowsHide:true,env:{...process.env,PI_CODING_AGENT_DIR:root}});if(r.status!==0)throw Error('Windows maintenance check failed');}
       execute(['--test','--test-concurrency=1',...fs.readdirSync(path.join(checks,'tests')).filter(n=>n.endsWith('.test.mjs')).map(n=>path.join(checks,'tests',n))]);
       execute([path.join(checks,'check-components.mjs')]);break;

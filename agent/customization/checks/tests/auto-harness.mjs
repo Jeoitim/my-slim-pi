@@ -27,6 +27,7 @@ async function harness(responder, reviewerOptions) {
     registerCommand() {}, registerShortcut() {}, registerTool(t) {tools.set(t.name,t);},
     appendEntry(customType, data) { entries.push({ type: 'custom', customType, data }); },
     getActiveTools: () => [], setActiveTools() {},
+    exec: async()=>({code:1,stdout:'',stderr:'mock execution stopped before backup'}),
     events: {
       on(name,fn) { const set=listeners.get(name)||new Set();set.add(fn);listeners.set(name,set);return()=>set.delete(fn); },
       emit(name,event) { for(const fn of listeners.get(name)||[])fn(event); },
@@ -67,7 +68,7 @@ async function harness(responder, reviewerOptions) {
       for(const fn of hooks.get('before_agent_start')||[])await fn(event,ctx);
       return event.systemPromptOptions.sections['timrt-permissions'];
     },
-    async input(text) { for (const fn of hooks.get('input')) await fn({source:'interactive',text},ctx); },
+    async input(text,source='interactive') { for (const fn of hooks.get('input')) await fn({source,text},ctx); },
     setMode(mode) { state.mode = mode; },
     ask(answer) {
       let count = 0;

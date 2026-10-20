@@ -81,7 +81,7 @@ try {
     fs.writeFileSync(child(target,'install/node-path'),process.execPath+'\n',{mode:0o600});
     runNode(target,[child(target,'customization/runtime/maintenance.mjs'),'--agent-root',target,'Rebuild']);
     runNode(target,[child(target,'customization/checks/check-startup.mjs')]);
-    if(args.includes('--full-check'))runNode(target,[child(target,'customization/runtime/maintenance.mjs'),'--agent-root',target,'Check']);
+    if(args.includes('--full-check'))runNode(target,[child(target,'customization/runtime/maintenance.mjs'),'--agent-root',target,'Check','--full-check']);
     if(args.includes('--add-to-path')) {
       const changes=configureBashPath(child(target,'bin'));for(const item of changes)console.log('PATH: '+item.file+(item.backup?' (backup: '+item.backup+')':''));
       const rc=/(?:^|\/)zsh$/.test(process.env.SHELL||'')?'~/.zshrc':'~/.bashrc';

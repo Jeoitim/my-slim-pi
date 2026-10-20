@@ -161,7 +161,7 @@ try {
     & $node (Join-Path $target 'customization/checks/check-startup.mjs')
     if ($LASTEXITCODE -ne 0) { throw '启动验证未通过。' }
     if ($FullCheck) {
-        & $pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $target 'customization\Maintain-Pi.ps1') -Action Check
+        & $node (Join-Path $target 'customization/runtime/maintenance.mjs') --agent-root $target Check --full-check
         if ($LASTEXITCODE -ne 0) { throw '离线验证未通过。' }
     }
     if ($AddToPath) {

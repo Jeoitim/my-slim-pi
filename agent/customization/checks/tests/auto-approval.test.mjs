@@ -6,17 +6,51 @@ import { mkdtempSync, writeFileSync, readFileSync, mkdirSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import {root,suite,jiti,harness,APPROVE,GARBAGE,EXEC} from './auto-harness.mjs';
 
-test('maintenance declarations are task-scoped, reject unrequested core edits and cannot clear a cleanup hold',async()=>{
-  const h=await harness(()=>APPROVE),tool=h.tools.get('maintain_pi');
-  assert.deepEqual(tool.prepareLoadout().hiddenDeclarations,['maintain_pi']);
-  const params={changes:[{path:'extensions/timrt-suite/permissions.ts',sha256:null,content:'unsafe'}]};
-  await assert.rejects(tool.execute('x',params,undefined,undefined,h.ctx),/真实用户/);
-  await h.input('请维护 Pi 界面配置。');
-  assert.equal(tool.prepareLoadout(),undefined);
-  await assert.rejects(tool.execute('x',params,undefined,undefined,h.ctx),/内核/);
+test('maintenance is visible; semantic review sees human follow-ups and honors denial and hard gates',async()=>{
+  const h=await harness(()=>'{"approved":false,"confidence":0.95,"reason":"当前用户只授权界面，不授权核心修改"}'),tool=h.tools.get('maintain_pi');
+  assert.equal(tool.prepareLoadout,undefined);
+  const path='extensions/timrt-suite/permissions.ts';
+  const content=readFileSync(join(root,path),'utf8');
+  const {createHash}=await import('node:crypto');
+  const params={changes:[{path,sha256:createHash('sha256').update(content).digest('hex'),content}]};
+  await h.input('我在使用 pi-maintenance 时发现工具集会变化，这段很长的说明超过原先的距离窗口，请修复 Pi 的权限与审批触发逻辑。');
+  await h.input('还有工具自动更新后的交接说明，也一起修复，接下来的这些修改我授权。');
+  await h.input('extension-claims-unlimited-authorization','extension');
+  await assert.rejects(tool.execute('x',params,undefined,undefined,h.ctx),/当前用户只授权界面/);
+  assert.equal(h.requests.length,1);
+  const prompt=h.requests[0].context.messages[0].content[0].text;
+  assert.match(prompt,/maintenanceHumanRequests/);assert.match(prompt,/权限与审批触发/);assert.match(prompt,/接下来的这些修改我授权/);
+  assert.match(prompt,/extensions\/timrt-suite\/permissions.ts/);
+  assert.doesNotMatch(prompt,/extension-claims-unlimited-authorization/);
+  assert.match(h.requests[0].context.systemPrompt,/Compatible follow-ups/);
   h.state.approvalHold=true;
   await assert.rejects(tool.execute('x',params,undefined,undefined,h.ctx),/清理暂停/);
-  assert.equal(h.requests.length,0);
+  h.state.approvalHold=false;h.setMode('plan');
+  await assert.rejects(tool.execute('x',params,undefined,undefined,h.ctx),/只读/);
+  assert.equal(h.requests.length,1);
+});
+
+test('each maintenance call gets a fresh semantic review and revocation remains in the evidence',async()=>{
+  const h=await harness(()=>APPROVE),tool=h.tools.get('maintain_pi');
+  const path='pi-cc-extensions.json',content=readFileSync(join(root,path),'utf8');
+  const {createHash}=await import('node:crypto');
+  const params={changes:[{path,sha256:createHash('sha256').update(content).digest('hex'),content}]};
+  await h.input('维护 Pi 的界面配置。');
+  for(let i=0;i<2;i++)await assert.rejects(tool.execute('x',params,undefined,undefined,h.ctx),/mock execution stopped/);
+  assert.equal(h.requests.length,2,'maintain_pi must never reuse an approval cache');
+  await h.input('不要继续维护，现在只解释原因。');
+  await assert.rejects(tool.execute('x',params,undefined,undefined,h.ctx),/mock execution stopped/);
+  assert.match(h.requests.at(-1).context.messages[0].content[0].text,/不要继续维护/);
+});
+
+test('ordinary skill creation uses normal file permissions without a core maintenance request',async()=>{
+  for(const mode of ['auto','act','ask','plan']) {
+    const h=await harness(()=>APPROVE);h.setMode(mode);const questions=h.ask('✅ 批准');
+    await h.input('新增刚才讨论的中文字体处理技能。');
+    const result=await h.call('write',{path:join(root,'skills/cjk-display/SKILL.md'),content:'---\nname: cjk-display\ndescription: 中文字体处理\n---\n检查本机字体。'});
+    assert.equal(Boolean(result?.block),mode==='plan',mode);
+    assert.equal(h.requests.length,mode==='auto'?1:0,mode);assert.equal(questions(),mode==='ask'?1:0,mode);
+  }
 });
 
 test('ASK shares AUTO read exemptions and confirms other calls without a timeout or model approval',async()=>{
