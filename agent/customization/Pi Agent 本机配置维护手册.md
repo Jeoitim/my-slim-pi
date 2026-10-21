@@ -1,6 +1,6 @@
 # Pi 本机维护手册
 
-更新：2026-10-20 · Pi 1.3.0 · Node 24+ · Windows / PowerShell 7 · Linux / Bash
+更新：2026-10-21 · Pi 1.3.0 · Node 24+ · Windows / PowerShell 7 · Linux / Bash
 
 本安装目录自带锁定版本的 Pi，无需全局安装。Windows 使用 PowerShell 7，Linux 使用 Bash，均需要 Node.js 24+（含 npm）。
 
@@ -223,7 +223,7 @@ AUTO/ACT 均须内部审批，ASK 人工确认且无超时，PLAN/清理暂停�
 
 ### 搜索
 
-联网由固定版本 pi-web-access 0.43.0 提供，保留三个原生工具：`web_search` 搜索，`fetch_content` 读取正文，`get_search_content` 分页检索已缓存内容。搜索使用插件原生 auto 策略及串行回退，成功即停，不设置 searchRouting 或 allowedProviders 限制。仅有现行 Exa、Brave、Tavily 凭据时按原生顺序使用；原生 SearXNG、订阅账号等可改变实际优先级，不另写强制路由。未配 Exa Key 时使用插件内部的免费 Exa 服务。指定单一 provider 时遵循上游的严格选择语义。保留全部上游免 Key 入口：Exa、Parallel MCP、degoog、DuckDuckGo、Keenable，以及自建 SearXNG；OpenAI/Kimi 的订阅认证也遵循上游规则。Parallel MCP、degoog、DuckDuckGo、Keenable 在上游属于显式选择项，不擅自塞入 auto 或 all。抓取保留原生 HTTP、正文提取及原生 Fetch 回退和内容缓存；第三方托管抓取服务保持默认关闭。
+联网由固定版本 pi-web-access 0.43.0 提供，保留 `web_search`、`fetch_content`、`get_search_content` 三个原生工具。本机保持 `provider: "auto"`，不设置 `searchRouting` 或 `allowedProviders`；供应商顺序、串行回退、成功即停、显式 provider 的严格语义以及是否需要 Key，均以插件文档为准（`npm/node_modules/pi-web-access/README.md`）。安装器可选用 Exa、Brave、Tavily 的 Key，可跳过，也可完全不配（插件自带免费 Exa）；有 Key 不等于强制启用，实际是否使用由回退链决定，显式选择项不会因有 Key 自动进入 auto。追加其他供应商按插件文档修改 `web-search.json`：只增加 `*ApiKey` 或 `proxy` 不触发策略重建，改动能力或路由配置后需 Rebuild 并重启。抓取保留原生 HTTP、正文提取、Fetch 回退与内容缓存，第三方托管抓取服务默认关闭。
 
 `toolActivation: "auto"` 由插件按模型能力决定：支持会话中追加工具且保留提示缓存的模型先提供原生 `web_enable`，启用后追加三个工具；其他模型首轮直接声明三个工具。恢复会话沿用已有工具声明。没有统一 Web 包装工具。`/search` 查看原生缓存。
 
