@@ -184,7 +184,8 @@ test('write approval receives full script, actual user request and the active-br
     assert.equal(evidence.currentUserRequest, 'A B 全清');
     assert.equal(evidence.cwd, h.ctx.cwd);
     assert.ok(evidence.recentConversation.some(m => m.role === 'assistant' && m.text.includes('A 类清单')));
-    assert.ok(evidence.recentConversation.some(m => m.role === 'user' && m.text === 'A B 全清'));
+    assert.ok(evidence.humanInputs.some(m => m.text === 'A B 全清'));
+    assert.ok(!evidence.recentConversation.some(m => m.role === 'user'),'raw user record replaces duplicated conversation text');
     assert.doesNotMatch(JSON.stringify(evidence), /hidden-reasoning|hidden-tool-output/);
     return { approved: true, source: 'fixture' };
   });

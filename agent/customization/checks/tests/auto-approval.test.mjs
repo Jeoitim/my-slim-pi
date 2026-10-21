@@ -19,7 +19,7 @@ test('maintenance is visible; semantic review sees human follow-ups and honors d
   await assert.rejects(tool.execute('x',params,undefined,undefined,h.ctx),/当前用户只授权界面/);
   assert.equal(h.requests.length,1);
   const prompt=h.requests[0].context.messages[0].content[0].text;
-  assert.match(prompt,/maintenanceHumanRequests/);assert.match(prompt,/权限与审批触发/);assert.match(prompt,/接下来的这些修改我授权/);
+  assert.match(prompt,/humanInputs/);assert.match(prompt,/权限与审批触发/);assert.match(prompt,/接下来的这些修改我授权/);
   assert.match(prompt,/extensions\/timrt-suite\/permissions.ts/);
   assert.doesNotMatch(prompt,/extension-claims-unlimited-authorization/);
   assert.match(h.requests[0].context.systemPrompt,/Compatible follow-ups/);
@@ -296,4 +296,72 @@ test('policy denial and non-cleanup execution denial do not freeze unrelated wor
     assert.equal((await h.call('powershell',{command:'Remove-Item -LiteralPath ./cache -Recurse'})).block,true);
     assert.equal(h.state.approvalHold,true,'real cleanup still freezes later mutations');
   }
+});
+
+
+test('approval evidence preserves origin and revocation, deduplicates humans and places call bytes last', async () => {
+  const h=await harness(()=>APPROVE);
+  await h.input('ORIGINAL-TASK-AUTHORIZATION');
+  for(let i=0;i<12;i++)await h.input(`task-follow-up-${i}`);
+  await h.input('LATEST-REVOCATION: do not change core');
+  await h.call('write',{path:'./evidence.txt',content:'EXACT-PATCH-CONTENT'});
+  const request=h.requests[0],prompt=request.context.messages[0].content[0].text;
+  assert.match(prompt,/排查蓝屏/,'branch origin is retained without claiming it belongs to this task');
+  assert.match(prompt,/LATEST-REVOCATION/);
+  assert.equal(prompt.match(/LATEST-REVOCATION/g).length,1,'latest human input is not duplicated');
+  assert.ok(prompt.indexOf('LATEST-REVOCATION')<prompt.indexOf('EXACT-PATCH-CONTENT'));
+  assert.match(prompt,/"omitted":[1-9]/);
+  assert.equal(request.options.cacheRetention,'short');
+  assert.match(request.options.sessionId,/^[a-f0-9]{64}$/);
+  assert.equal(h.entries.filter(e=>e.customType==='timrt-approval-usage').length,1);
+  const usage=h.entries.find(e=>e.customType==='timrt-approval-usage').data;
+  assert.equal(usage.input,null,'missing provider usage must not look like zero');
+  assert.doesNotMatch(JSON.stringify(usage),/EXACT-PATCH-CONTENT|LATEST-REVOCATION/);
+});
+
+test('only low-confidence missing user history expands evidence once and never bypasses a refusal',async()=>{
+  const missing='{"approved":false,"confidence":0.4,"reason":"需要早期授权原文","reasonCode":"missing_context"}';
+  const h=await harness((_ctx,n)=>n===1?missing:APPROVE);
+  await h.input('MIDDLE-TASK-AUTHORIZATION');
+  for(let i=0;i<12;i++)await h.input(`continue-${i}`);
+  const result=await h.call('write',{path:'./expanded.txt',content:'candidate'});
+  assert.equal(result,undefined);assert.equal(h.requests.length,2);
+  assert.doesNotMatch(h.requests[0].context.messages[0].content[0].text,/MIDDLE-TASK-AUTHORIZATION/);
+  assert.match(h.requests[1].context.messages[0].content[0].text,/MIDDLE-TASK-AUTHORIZATION/);
+  assert.equal(h.entries.filter(e=>e.customType==='timrt-approval-usage').at(-1).data.expanded,true);
+  await h.call('write',{path:'./expanded.txt',content:'candidate'});
+  assert.equal(h.requests.length,3,'expanded approval cannot populate the smaller evidence cache');
+  assert.match(h.requests[2].context.messages[0].content[0].text,/MIDDLE-TASK-AUTHORIZATION/,'same human history reuses evidence selection, not the approval');
+  await h.input('NEW-USER-TASK');
+  await h.call('write',{path:'./new-task.txt',content:'candidate'});
+  assert.doesNotMatch(h.requests.at(-1).context.messages[0].content[0].text,/MIDDLE-TASK-AUTHORIZATION/,'new human input resets expanded-evidence preference');
+  const refused=await harness(()=>'{"approved":false,"confidence":0.95,"reason":"用户已撤销","reasonCode":"missing_context"}');
+  for(let i=0;i<12;i++)await refused.input(`follow-up-${i}`);
+  assert.equal((await refused.call('write',{path:'./refused.txt',content:'x'})).block,true);
+  assert.equal(refused.requests.length,1,'explicit confident refusal must never be retried');
+  const insufficient=await harness(()=>missing);
+  assert.equal((await insufficient.call('write',{path:'./unknown.txt',content:'x'})).block,true);
+  assert.equal(insufficient.requests.length,1,'no additional recorded history means no expansion call');
+});
+
+test('changing only call bytes preserves the exact cached evidence prefix',async()=>{
+  const h=await harness(()=>APPROVE);
+  for(const content of ['PATCH-ONE','PATCH-TWO'])await h.call('write',{path:'./prefix.txt',content});
+  const prompts=h.requests.map(r=>r.context.messages[0].content[0].text);
+  assert.equal(prompts.length,2);
+  assert.equal(prompts[0].split('待审调用：')[0],prompts[1].split('待审调用：')[0]);
+  assert.equal(h.requests[0].context.systemPrompt,h.requests[1].context.systemPrompt);
+  assert.equal(h.requests[0].options.sessionId,h.requests[1].options.sessionId);
+});
+
+
+test('reported cache usage stays numeric and low confidence is recorded as uncertainty',async()=>{
+  const h=await harness(()=>'{"approved":true,"confidence":0.4,"reason":"PRIVATE-REASON"}');
+  const complete=h.ctx.modelRegistry.complete;
+  h.ctx.modelRegistry.complete=async(...args)=>({...await complete(...args),usage:{input:25,output:10,cacheRead:1000,cacheWrite:0,cost:{total:0.002}}});
+  h.ask('❌ 拒绝');
+  assert.equal((await h.call('write',{path:'./usage.txt',content:'PRIVATE-CONTENT'})).block,true);
+  const row=h.entries.find(e=>e.customType==='timrt-approval-usage').data;
+  assert.equal(row.decision,'uncertain');assert.equal(row.cacheRead,1000);assert.equal(row.cost,0.002);
+  assert.doesNotMatch(JSON.stringify(row),/PRIVATE-REASON|PRIVATE-CONTENT/);
 });

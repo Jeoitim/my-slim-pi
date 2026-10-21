@@ -11,7 +11,7 @@ import { isGreeting, PRINCIPAL_SUMMARIES } from "./prompt-policy.ts";
 import {validateMaintenance,maintenanceScope} from "./self-maintenance.ts";
 import { inspectDeletionScripts, powerShellLiteralPaths, explicitDelegation } from "./guards.ts";
 import { inspectDeletionCall, approveDeletion } from "./deletion-review.ts";
-import { approvalEvidence, approvalReason, deletionPreparation } from "./approval-evidence.ts";
+import { approvalEvidence, approvalReason, deletionPreparation, humanApprovalEvidence } from "./approval-evidence.ts";
 import { confirmApprovalWithAlert, configuredHumanFallback, saveApprovalFallback, type ApprovalDialogOptions } from "./terminal-notifications.ts";
 import { readOnlyCall, webLocalPaths, protectedMutation, catastrophicCall, policyHealth } from "./call-policy.ts";
 import { createRuntimeStatus } from "./runtime-status.ts";
@@ -44,16 +44,6 @@ export function installPermissions(pi: ExtensionAPI, review = createApprovalRevi
   let nativeManager: any;
   let latestCtx: ExtensionContext | undefined;
   let currentUserRequest = "";
-  let humanRequests:{text:string;truncated:boolean}[]=[];
-  const boundedHumanRequests=(rows:{text:string;truncated:boolean}[])=>{
-    let remaining=12000;const result:typeof rows=[];
-    for(const row of rows.slice(-8).reverse()){if(remaining<=0)break;const text=row.text.slice(0,Math.min(6000,remaining));result.unshift({text,truncated:row.truncated||text.length<row.text.length});remaining-=text.length;}
-    return result;
-  };
-  const restoreHumanRequests=(ctx:ExtensionContext)=>{
-    const branch=ctx.sessionManager.getBranch?.() ?? ctx.sessionManager.getEntries();
-    humanRequests=boundedHumanRequests(branch.filter((e:any)=>e.customType==='timrt-human-request').slice(-8).map((e:any)=>e.data).filter((e:any)=>typeof e?.text==='string'));
-  };
   let requestGeneration = 0;
   let approvalTimeouts=0;
   const stopTimeouts=pi.events.on("timrt:approval-timeout",()=>{approvalTimeouts++;});
@@ -218,7 +208,7 @@ export function installPermissions(pi: ExtensionAPI, review = createApprovalRevi
       if(state.mode==="plan" || state.approvalHold)throw Error("当前为只读或清理暂停，不能启动自维护。");
       if(!policyHealth(getAgentDir()).ok)throw Error("保护基线异常，必须先通过外部维护恢复，不能借自维护接纳未知修改。");
       const generation=requestGeneration,request=currentUserRequest,mode=state.mode;
-      const maintenanceHumanRequests=humanRequests.map(e=>({...e}));
+      const maintenanceHumanRequests=humanApprovalEvidence(ctx).humanInputs;
       const plan=validateMaintenance(getAgentDir(),request,params.changes);
       const scope=maintenanceScope(plan);
       const {applyMaintenance}=await import("./self-maintenance.ts");
@@ -377,7 +367,6 @@ export function installPermissions(pi: ExtensionAPI, review = createApprovalRevi
     const branch = ctx.sessionManager.getBranch?.() ?? ctx.sessionManager.getEntries();
     state.approvalHold = Boolean((branch.filter((entry: any) => entry.customType === "timrt-approval-hold").at(-1) as any)?.data?.held);
     currentUserRequest = "";
-    restoreHumanRequests(ctx);
     readSkills.clear();
     filterTools();
     publish(ctx);
@@ -388,7 +377,6 @@ export function installPermissions(pi: ExtensionAPI, review = createApprovalRevi
     if (state.approvalHold) { state.approvalHold = false; pi.appendEntry("timrt-approval-hold", { held: false }); }
     currentUserRequest = event.text;
     const humanRequest={text:event.text.slice(0,6000),truncated:event.text.length>6000};
-    humanRequests=boundedHumanRequests([...humanRequests,humanRequest]);
     pi.appendEntry('timrt-human-request',humanRequest);
     state.taskAgents = explicitDelegation(event.text);
     state.denied = /(?:不要|禁止|不许|无需|不使用).{0,24}(?:子代理|sub.?agents?|并行代理)|(?:do not|don't|never|without).{0,24}(?:sub.?agents?|delegat)/i.test(event.text);
@@ -403,7 +391,7 @@ export function installPermissions(pi: ExtensionAPI, review = createApprovalRevi
     }
     filterTools(); publish(ctx);
   });
-  pi.on('session_tree',(_event,ctx)=>{requestGeneration++;currentUserRequest='';restoreHumanRequests(ctx);});
+  pi.on('session_tree',(_event,ctx)=>{requestGeneration++;currentUserRequest='';});
   pi.on("tool_result", (event: any) => {
     if (event.toolName !== "read" || event.isError || typeof event.input?.path !== "string") return;
     const skill = event.input.path.match(/principal-pi-skills[\\/]([^\\/]+)[\\/]SKILL\.md$/i)?.[1];

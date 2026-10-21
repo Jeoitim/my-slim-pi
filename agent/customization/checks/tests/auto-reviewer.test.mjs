@@ -16,7 +16,8 @@ test('AUTO reviews once in-process and reuses an identical approval', async () =
   assert.equal(request.model.id, 'mock-model', '审批默认跟随当前会话模型');
   assert.match(request.context.systemPrompt, /internal permission reviewer/, 'approver.md 正文作为 system prompt');
   assert.match(request.context.messages[0].content[0].text, /pnpm test/, '完整参数进入待审证据');
-  assert.equal(request.options.cacheRetention, 'none', '审批请求不污染会话提示缓存');
+  assert.equal(request.options.cacheRetention, 'short', '审批只复用计算前缀，审批会话标识与主会话分离');
+  assert.match(request.options.sessionId,/^[a-f0-9]{64}$/);
   assert.ok(request.options.signal instanceof AbortSignal, '请求带超时/取消信号');
   assert.equal(await h.call('powershell', command), undefined, '同参数调用复用成功结论');
   assert.equal(h.requests.length, 1);
@@ -117,7 +118,7 @@ test('ACT skips ordinary review and approves each risky deletion internally with
   assert.equal(h.requests.length,0,'ACT 普通写入不调用模型');
   for(let i=0;i<2;i++)assert.equal(await h.call('powershell',{command:'Remove-Item -LiteralPath ./cache -Recurse -Force'}),undefined);
   assert.equal(h.requests.length,2,'同一删除每次都审批，不缓存授权');
-  assert.ok(h.requests.every(r=>r.context.messages[0].content[0].text.startsWith('待审调用：deletion:powershell')));
+  assert.ok(h.requests.every(r=>/^待审调用：deletion:powershell$/m.test(r.context.messages[0].content[0].text)));
   assert.equal(dialogs,0);
   const explain=async(tool,args)=>JSON.parse((await h.tools.get('explain_call').execute('id',{tool,args},undefined,undefined,h.ctx)).content[0].text);
   assert.equal((await explain('write',{path:'./ordinary.txt',content:'ok'})).route,'allow');
@@ -200,7 +201,7 @@ test('deletion review follows executed scripts and stays per-invocation', async 
   h.setMode('auto');
   const run = { command: `powershell -NoProfile -File ${join(h.ctx.cwd, 'cleanup.ps1')}` };
   assert.equal(await h.call('powershell', run), undefined);
-  assert.match(seen[0], /^待审调用：deletion:powershell/, '被执行的脚本走删除审批');
+  assert.match(seen[0], /^待审调用：deletion:powershell$/m, '被执行的脚本走删除审批');
   assert.match(seen[0], /Remove-Item/, '删除审批带上脚本源码证据');
   assert.equal((await h.call('powershell', run)).block, true, '上一次批准不授权下一次删除');
   assert.equal(h.requests.length, 2, '删除审批不复用结论缓存');
