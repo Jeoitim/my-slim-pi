@@ -12,7 +12,7 @@ import { isGreeting, PRINCIPAL_SUMMARIES } from "./prompt-policy.ts";
 import {validateMaintenance,maintenanceScope} from "./self-maintenance.ts";
 import { inspectDeletionScripts, powerShellLiteralPaths } from "./guards.ts";
 import { inspectDeletionCall, approveDeletion } from "./deletion-review.ts";
-import { approvalEvidence, approvalReason, deletionPreparation, humanApprovalEvidence } from "./approval-evidence.ts";
+import { approvalEvidence, approvalReason, boundedText, deletionPreparation, humanApprovalEvidence, HUMAN_RECORD_LIMIT } from "./approval-evidence.ts";
 import { confirmApprovalWithAlert, configuredHumanFallback, saveApprovalFallback, type ApprovalDialogOptions } from "./terminal-notifications.ts";
 import { readOnlyCall, webLocalPaths, protectedMutation, catastrophicCall, policyHealth } from "./call-policy.ts";
 import { createRuntimeStatus } from "./runtime-status.ts";
@@ -440,7 +440,7 @@ export function installPermissions(pi: ExtensionAPI, review = createApprovalRevi
     requestGeneration++;
     if (state.approvalHold) { state.approvalHold = false; pi.appendEntry("timrt-approval-hold", { held: false }); }
     currentUserRequest = event.text;
-    const humanRequest={text:event.text.slice(0,6000),truncated:event.text.length>6000};
+    const humanRequest={text:boundedText(event.text,HUMAN_RECORD_LIMIT),truncated:event.text.length>HUMAN_RECORD_LIMIT};
     pi.appendEntry('timrt-human-request',humanRequest);
     state.development = !isGreeting(event.text);
     readSkills.clear();

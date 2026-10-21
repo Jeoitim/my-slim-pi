@@ -365,6 +365,66 @@ test('changing only call bytes preserves the exact cached evidence prefix',async
 });
 
 
+test('a thin continuation after an interrupted step keeps the earlier human task as evidence',async()=>{
+  const h=await harness(()=>APPROVE);
+  await h.input('完成 task-agent 授权开关面板，并同步修改配套测试文件。');
+  h.entries.push({message:{role:'assistant',content:[{type:'text',text:'文档已同步推送，面板任务收尾完成。'}]}});
+  h.state.approvalHold=true;
+  await h.input('继续，刚才误操作中断了');
+  assert.equal(await h.call('write',{path:'./panel-test.txt',content:'panel fixture'}),undefined);
+  assert.equal(h.requests.length,1);
+  const prompt=h.requests[0].context.messages[0].content[0].text;
+  assert.match(prompt,/"currentUserRequest":\{"source":"[^"]+","text":"继续，刚才误操作中断了"\}/,'最新消息单独占一个槽位');
+  assert.equal(prompt.match(/继续，刚才误操作中断了/g).length,1,'最新消息不再重复出现在更早记录里');
+  assert.match(prompt,/"humanInputs":\[[^\]]*完成 task-agent 授权开关面板/,'更早的用户任务仍在证据里');
+  assert.match(prompt,/"previousStepInterrupted":true/,'中断由宿主记录标记，不靠关键词推断');
+  assert.match(prompt,/文档已同步推送/);
+  assert.match(prompt,/"turn":"previous"/,'上一轮的助手消息不能说明当前任务状态');
+});
+
+test('low confidence on withheld records expands once; complete evidence goes straight to the human',async()=>{
+  const low='{"approved":true,"confidence":0.35,"reason":"任务范围不足"}';
+  const h=await harness((_context,n)=>n===1?low:APPROVE,{humanFallback:'ask'});
+  await h.input('TASK-ORIGIN：整理审批证据。');
+  await h.input('MIDDLE-TASK-AUTHORIZATION：允许修改配套测试文件。');
+  for(let i=0;i<12;i++)await h.input(`continue-${i}`);
+  const asked=h.ask('❌ 拒绝');
+  assert.equal(await h.call('write',{path:'./expanded.txt',content:'candidate'}),undefined);
+  assert.equal(h.requests.length,2,'低置信度且确有省略记录时先扩展一次');
+  assert.doesNotMatch(h.requests[0].context.messages[0].content[0].text,/MIDDLE-TASK-AUTHORIZATION/);
+  assert.match(h.requests[1].context.messages[0].content[0].text,/MIDDLE-TASK-AUTHORIZATION/);
+  assert.match(h.requests[1].context.messages[0].content[0].text,/"expanded":true/);
+  assert.match(h.requests[1].context.messages[0].content[0].text,/已补充此前被省略或截断的用户记录/);
+  assert.equal(asked(),0,'补充证据后得到结论就不再打断用户');
+  const thin=await harness(()=>low,{humanFallback:'ask'});
+  const thinAsked=thin.ask('❌ 拒绝');
+  assert.equal((await thin.call('write',{path:'./thin.txt',content:'candidate'})).block,true);
+  assert.equal(thin.requests.length,1,'没有可补充的记录就不额外花一次调用');
+  assert.equal(thinAsked(),1);
+});
+
+test('oversized human messages keep both ends so trailing limits stay visible',async()=>{
+  const long=`HEAD-范围：整理面板文档。${'中'.repeat(9000)}结尾限制：不要修改 core 源码，也不要推送远端。`;
+  const h=await harness(()=>APPROVE);
+  await h.input(long);
+  assert.equal(await h.call('write',{path:'./doc-notes.md',content:'ok'}),undefined);
+  const prompt=h.requests[0].context.messages[0].content[0].text;
+  assert.match(prompt,/HEAD-范围：整理面板文档。/);
+  assert.match(prompt,/结尾限制：不要修改 core 源码/);
+  assert.match(prompt,/省略中间 \d+ 字符/);
+  assert.equal(prompt.match(/省略中间/g).length,1,'截断后的最新消息只呈现一次');
+  // A clipped current message is withheld evidence too: one expansion shows more of the same text.
+  const uncertain=await harness(()=>'{"approved":false,"confidence":0.3,"reason":"范围不足"}',{humanFallback:'ask'});
+  const asked=uncertain.ask('❌ 拒绝');
+  await uncertain.input(long);
+  assert.equal((await uncertain.call('write',{path:'./doc-notes.md',content:'ok'})).block,true);
+  assert.equal(uncertain.requests.length,2,'被截断的最新消息同样先扩展一次');
+  const wider=uncertain.requests[1].context.messages[0].content[0].text;
+  assert.ok(wider.length>uncertain.requests[0].context.messages[0].content[0].text.length);
+  assert.match(wider,/"currentTruncated":false/);
+  assert.equal(asked(),1,'扩展后仍不确定才转人工');
+});
+
 test('reported cache usage stays numeric and low confidence is recorded as uncertainty',async()=>{
   const h=await harness(()=>'{"approved":true,"confidence":0.4,"reason":"PRIVATE-REASON"}');
   const complete=h.ctx.modelRegistry.complete;

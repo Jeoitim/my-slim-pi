@@ -184,7 +184,10 @@ test('write approval receives full script, actual user request and the active-br
     assert.equal(evidence.currentUserRequest, 'A B 全清');
     assert.equal(evidence.cwd, h.ctx.cwd);
     assert.ok(evidence.recentConversation.some(m => m.role === 'assistant' && m.text.includes('A 类清单')));
-    assert.ok(evidence.humanInputs.some(m => m.text === 'A B 全清'));
+    // The newest human message is its own slot; earlier records stay in humanInputs without a copy.
+    assert.ok(evidence.humanInputCoverage.latestRequestSource, '最新消息对应可引用的用户记录');
+    assert.ok(evidence.humanInputs.some(m => /清理当前项目/.test(m.text)));
+    assert.ok(!evidence.humanInputs.some(m => m.text === 'A B 全清'),'当前消息不重复出现在更早记录里');
     assert.ok(!evidence.recentConversation.some(m => m.role === 'user'),'raw user record replaces duplicated conversation text');
     assert.doesNotMatch(JSON.stringify(evidence), /hidden-reasoning|hidden-tool-output/);
     return { approved: true, source: 'fixture' };
