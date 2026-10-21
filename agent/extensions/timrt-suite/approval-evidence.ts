@@ -21,7 +21,7 @@ export function boundedText(text: string, limit: number): string {
 
 export function approvalReason(title: string): string {
   const lines = String(title).split("\n");
-  return (lines[0].includes("审批不确定") ? lines.slice(3).join("\n") : lines.at(-1) || "").slice(0, 1200);
+  return (lines[0].startsWith("🤖 Approval uncertain") ? lines.slice(3).join("\n") : lines.at(-1) || "").slice(0, 1200);
 }
 
 export function deletionPreparation(name: string, input: Record<string, any>): boolean {
@@ -123,7 +123,7 @@ export function approvalEvidence(ctx: ExtensionContext, name: string, input: Rec
     currentUserRequest: request,
     ...(interrupted ? { taskContinuity: { previousStepInterrupted: true } } : {}),
     recentConversation: conversation,
-    ...(["fetch_content","web_search"].includes(name) ? {webAccessEffects:"当前原生 Web 调用未通过只读豁免。按参数和配置可能读取本地文件或浏览器凭据、克隆 Git 仓库、将 PDF 写入临时目录、运行视频处理或模型分析、通过指定代理传输内容，或在 includeContent 后台抓取中执行这些操作。不能仅凭公开 URL 批准；影响不明确时转人工。"} : {}),
+    ...(["fetch_content","web_search"].includes(name) ? {webAccessEffects:"This native Web call is not covered by the read-only exemption. Depending on arguments and configuration it may read local files or browser credentials, clone Git repositories, write PDFs to temporary directories, run video processing or model analysis, send content through a configured proxy, or perform these during includeContent background fetching. A public URL alone is not enough to approve; route unclear effects to the human."} : {}),
     ...(name.startsWith("deletion:") ? { ...input, currentUserRequest: request } : { tool: name, arguments: argumentsWithoutDuplicate }),
   };
 }

@@ -29,5 +29,5 @@ export default function (pi: ExtensionAPI) {
   installMemoryGateway(pi);
   installPromptPolicy(pi);
   installTerminalNotifications(pi);
-  pi.registerShortcut("ctrl+shift+a", { description: "任务代理授权面板", handler: async ctx => { await taskAgentsPanel?.(ctx); } });
+  pi.registerShortcut("ctrl+shift+a", { description: "Task-agent authorization panel", handler: async ctx => { await taskAgentsPanel?.(ctx); } });
 }

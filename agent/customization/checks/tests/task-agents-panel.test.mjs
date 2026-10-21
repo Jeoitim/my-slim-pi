@@ -35,8 +35,8 @@ test('task-agents panel uses the existing command to toggle authorization', asyn
   assert.equal(f.enabled(), true);
   assert.deepEqual(f.calls, ['on']);
   assert.deepEqual(panels[0], {
-    title: '任务代理开关：已关闭',
-    rows: ['启用持续授权', '关闭面板'],
+    title: 'Task agents: off',
+    rows: ['Enable persistent authorization', 'Close panel'],
   });
   assert.equal(isApprovalPrompt(panels[0].title), false, 'the switch does not ring the terminal bell');
 
@@ -44,8 +44,8 @@ test('task-agents panel uses the existing command to toggle authorization', asyn
   assert.equal(f.enabled(), false);
   assert.deepEqual(f.calls, ['on', 'off']);
   assert.deepEqual(panels[1], {
-    title: '任务代理开关：已启用 ⋈',
-    rows: ['撤销持续授权', '关闭面板'],
+    title: 'Task agents: enabled ⋈',
+    rows: ['Revoke persistent authorization', 'Close panel'],
   });
   assert.equal(isApprovalPrompt(panels[1].title), false, 'the open switch stays silent');
 });

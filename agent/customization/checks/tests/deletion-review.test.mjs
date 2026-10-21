@@ -236,7 +236,7 @@ test('ordinary Auto uncertainty asks with the complete current call and cancella
   const result = await h.call('write', { path: './sample.txt', content: 'full test content' });
   assert.equal(result.block, true);
   assert.match(body, /full test content/);
-  assert.match(body, /工作目录|用户请求/);
+  assert.match(body, /Working directory|User request/);
   assert.equal(h.state.approvalHold, false, 'a normal non-cleanup refusal does not latch a cleanup hold');
 });
 

@@ -63,7 +63,7 @@ export function installComposer(pi: ExtensionAPI, permissions: { mode: Permissio
       const foreground = resolveColor(json.colors?.text);
       if (background) { terminal.write(oscColor(11, background)); terminalChanged = true; }
       if (foreground) { terminal.write(oscColor(10, foreground)); terminalChanged = true; }
-    } catch (error: any) { ctx.ui.notify(`主题背景读取失败：${error.code || "格式错误"}`, "warning"); }
+    } catch (error: any) { ctx.ui.notify(`Theme background could not be read: ${error.code || "invalid format"}`, "warning"); }
   };
   const stopTimer = () => { if (timer) clearInterval(timer); timer = undefined; };
   class Composer extends CustomEditor {
@@ -77,7 +77,7 @@ export function installComposer(pi: ExtensionAPI, permissions: { mode: Permissio
       const model = ctx.model?.name || "pi";
       const effort = ctx.model?.reasoning ? fg("mdHeading", `✦ ${effortLabel(ctx.model, pi.getThinkingLevel())}`) : "";
       const left = ` ${fg("muted", `◷ ${duration}`)} ${fg("dim", "·")} ${fg("accent", model)}${effort && width > 44 ? ` ${fg("dim", "·")} ${effort}` : ""}${hidden ? fg("muted", ` ↑${hidden}`) : ""} `;
-      const right = ` ${permissions.reloadRequired ? fg("warning", "↻ /reload ") : ""}${permissions.policyOk === false ? fg("error", "⚠ 策略变化") : permissionBadge(permissions.mode, t.appearance)}${permissions.taskAgents ? fg("accent", " ⋈") : ""} `;
+      const right = ` ${permissions.reloadRequired ? fg("warning", "↻ /reload ") : ""}${permissions.policyOk === false ? fg("error", "⚠ policy changed") : permissionBadge(permissions.mode, t.appearance)}${permissions.taskAgents ? fg("accent", " ⋈") : ""} `;
       return frame(width, left, right, s => fg("border", s), true);
     }
     protected renderBottomBorder(width: number, hidden: number): string {
@@ -152,7 +152,7 @@ export function installComposer(pi: ExtensionAPI, permissions: { mode: Permissio
   const off = pi.events.on("timrt:permissions", () => refresh?.());
   pi.on("session_shutdown", () => { stopTimer(); if (setupTimer) clearTimeout(setupTimer); setupTimer = undefined; restoreTerminal(); off(); refresh = undefined; terminal = undefined; });
   pi.registerCommand("theme", {
-    description: "主题与代码/diff 预览；上下移动预览，回车保存，Esc 取消。也支持 /theme ayu-dark、github-light。",
+    description: "Theme with code/diff preview: move to preview, Enter saves, Esc cancels. Also /theme ayu-dark, github-light.",
     getArgumentCompletions: p => (ctx?.ui.getAllThemes() || []).filter(t => t.name.startsWith(p)).map(t => ({ value: t.name, label: t.name })),
     handler: async (args, current) => {
       ctx = current;
@@ -162,7 +162,7 @@ export function installComposer(pi: ExtensionAPI, permissions: { mode: Permissio
       if (!name) return;
       name = aliases[name] || name;
       const result = ctx.ui.setTheme(name);
-      if (!result.success) { ctx.ui.notify(result.error || "主题不存在", "error"); return; }
+      if (!result.success) { ctx.ui.notify(result.error || "Theme not found", "error"); return; }
       // Pi 1.3 persists named themes through its settings manager; preview never calls setTheme.
       applyTerminalTheme();
       refresh?.();

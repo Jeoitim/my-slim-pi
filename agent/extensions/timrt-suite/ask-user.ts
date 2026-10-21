@@ -65,7 +65,7 @@ export function installAskUser(pi: ExtensionAPI, state: { mode: PermissionMode }
             throw new Error("AUTO/ACT 每题须提供 options，第一项为可继续工作的推荐方案；用户仍可自由回答。提问不能代替操作审批或任务代理授权。");
           }
           const prepare = (q: any) => ({ ...q, options: q.options?.map((o: any, i: number) => i === 0 && typeof o?.title === "string"
-            ? { ...o, title: /推荐|recommended/i.test(o.title) ? o.title : o.title + "（推荐）" } : o) });
+            ? { ...o, title: /推荐|recommended/i.test(o.title) ? o.title : o.title + " (recommended)" } : o) });
           const params = raw.questions != null ? { ...raw, questions: entries.map(prepare) } : prepare(raw);
           // One owned deadline distinguishes expiry from Esc, failures and caller cancellation.
           delete params.timeout;
@@ -75,7 +75,7 @@ export function installAskUser(pi: ExtensionAPI, state: { mode: PermissionMode }
           const toolCtx = withRpcDialogs(ctx);
           let expired = false;
           const timer = automatic && ctx.hasUI && !combined.aborted ? setTimeout(() => { expired = true; controller.abort(); }, QUESTION_TIMEOUT_MS) : undefined;
-          if (automatic && ctx.hasUI) ctx.ui.notify("问答等待 90 秒；未完成将自动采用每题第一项推荐方案继续。操作审批与任务代理授权仍按原规则处理。", "info");
+          if (automatic && ctx.hasUI) ctx.ui.notify("Questions wait 90 seconds; unanswered ones continue with the first recommended option. Operation approval and delegation authorization keep their own rules.", "info");
           try {
             let result;
             if (raw.questions == null) result = await tool.execute(id, params, combined, update, toolCtx);

@@ -37,17 +37,18 @@ export function saveBackgroundModel(role: BackgroundRole, reference: string | un
 }
 export function backgroundModelLabel(role: BackgroundRole, ctx: ExtensionContext): string {
   const ref = configuredBackgroundModel(role);
-  if (!ref) return `跟随会话 · ${ctx.model?.name || "未选择模型"}`;
+  if (!ref) return `Session model · ${ctx.model?.name || "no model selected"}`;
   const found = ctx.modelRegistry.getAll().find(m => `${m.provider}/${m.id}` === ref);
-  return found ? `${found.provider} · ${found.name}` : `${ref}（不可用，请重选）`;
+  return found ? `${found.provider} · ${found.name}` : `${ref} (unavailable; choose again)`;
 }
 export async function chooseBackgroundModel(role: BackgroundRole, ctx: ExtensionContext, pi: ExtensionAPI) {
-  const title = role === "approver" ? "权限审批模型" : "Hermes 总结/复盘模型";
+  const title = role === "approver" ? "Permission reviewer" : "Hermes summary model";
   const available = ctx.modelRegistry.getAvailable();
   const providers = [...new Set(available.map(m => m.provider))].sort();
-  const provider = await ctx.ui.select(`${title} · 选择供应商`, ["跟随当前会话（默认）", ...providers]);
+  const following = "Follow the session (default)";
+  const provider = await ctx.ui.select(`${title} · choose provider`, [following, ...providers]);
   if (!provider) return;
-  if (provider === "跟随当前会话（默认）") { saveBackgroundModel(role, undefined, pi); return; }
+  if (provider === following) { saveBackgroundModel(role, undefined, pi); return; }
   const models = available.filter(m => m.provider === provider);
   const labels = models.map(m => `${m.name}  [${m.id}]`);
   const selected = await ctx.ui.select(`${title} · ${provider}`, labels);

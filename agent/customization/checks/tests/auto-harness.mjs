@@ -75,7 +75,7 @@ async function harness(responder, reviewerOptions) {
       const approve = answer.includes('批准');
       // 普通调用经 permissions 的 select 代理走 confirm；删除审批直接用 select。
       ctx.ui.confirm = async () => { count++; return approve; };
-      ctx.ui.select = async (title, rows) => { if (title.startsWith('审批服务故障：')) return rows[1]; count++; return approve ? rows[0] : rows[1]; };
+      ctx.ui.select = async (title, rows) => { if (title.startsWith('Approval service failed:')) return rows[1]; count++; return approve ? rows[0] : rows[1]; };
       return () => count;
     },
     async call(toolName, input) {

@@ -25,7 +25,7 @@ const FIRST_BUDGET_MS = 30_000;
 const RETRY_BUDGET_MS = 20_000;
 const CACHE_TTL_MS = 120_000;
 const DOWN_WINDOW_MS = 60_000;
-const ANSWER_FORMAT = '只输出一个 JSON 对象，不要代码块、不要解释：{"approved": true 或 false, "confidence": 0 到 1 之间的数字, "reason": "简短中文理由", "reasonCode": "missing_context（仅必要用户历史缺失时）或 decision"}';
+const ANSWER_FORMAT = '只输出一个 JSON 对象，不要代码块、不要解释：{"approved": true 或 false, "confidence": 0 到 1 之间的数字, "reason": "brief reason in English", "reasonCode": "missing_context（仅必要用户历史缺失时）或 decision"}';
 
 /** Static policy first, branch evidence next, volatile call bytes last. */
 export function approvalPrompt(name: string, input: Record<string, unknown>, cwd: string): string {
@@ -111,18 +111,19 @@ export function approvalModelLabel(ctx: ExtensionContext): string {
 /** approvalReason() 依赖这里的行序：1 标题、3 调用摘要、4 起是理由。 */
 function formatCall(name: string, input: Record<string, unknown>): string {
   const json = JSON.stringify(input);
-  return json.length > 4000 ? `${json.slice(0, 4000)}…（共 ${json.length} 字符，已截断）` : json;
+  return json.length > 4000 ? `${json.slice(0, 4000)}… (${json.length} characters total, truncated)` : json;
 }
 
 function shortError(value: unknown): string {
   const text = String(value instanceof Error ? value.message : value ?? "").replace(/\s+/g, " ").trim();
-  return ((text || "审批请求失败").replace(/(?:sk|Bearer)\s*[-=]?[A-Za-z0-9_-]{6,}/gi, "<redacted>")).slice(0, 200);
+  return ((text || "approval request failed").replace(/(?:sk|Bearer)\s*[-=]?[A-Za-z0-9_-]{6,}/gi, "<redacted>")).slice(0, 200);
 }
 
 async function escalate(pi:ExtensionAPI,ctx: ExtensionContext, name: string, input: Record<string, unknown>, reason: string): Promise<ReviewDecision> {
   if (!ctx.hasUI) return { approved: false, source: "human", reason: "无人工界面且审批未完成" };
-  const choice = await selectApprovalWithAlert(pi,ctx,`🤖 审批不确定\n\n${name} ${formatCall(name, input)}\n${reason}`, ["✅ 批准", "❌ 拒绝"]);
-  return { approved: choice?.includes("批准") ?? false, source: "human",reason:choice?.includes("批准")?undefined:`${reason}；未获本次人工授权（拒绝、取消或超时）。本次未执行，请在回答中说明阻塞并等待后续用户授权。` };
+  const approve = "✅ Approve";
+  const choice = await selectApprovalWithAlert(pi,ctx,`🤖 Approval uncertain\n\n${name} ${formatCall(name, input)}\n${reason}`, [approve, "❌ Deny"]);
+  return { approved: choice === approve, source: "human",reason:choice === approve?undefined:`${reason}；未获本次人工授权（拒绝、取消或超时）。本次未执行，请在回答中说明阻塞并等待后续用户授权。` };
 }
 
 async function askModel(
@@ -237,7 +238,7 @@ export function createApprovalReviewer(pi: ExtensionAPI, options?: {humanFallbac
           }
         }
         if (decision.confidence < CONFIDENCE_THRESHOLD) {
-          return uncertain(ctx, name, input, `审批模型不确定（置信度 ${decision.confidence.toFixed(2)}）：${decision.reason || "无说明"}`);
+          return uncertain(ctx, name, input, `Reviewer uncertain (confidence ${decision.confidence.toFixed(2)}): ${decision.reason || "no reason given"}`);
         }
         const result: ReviewDecision = { approved: decision.approved, source: "subagent", reason: decision.reason, ...(decision.taskAgentAuthorization ? { taskAgentAuthorization: decision.taskAgentAuthorization } : {}) };
         if (result.approved && cacheKey && !attempt.expanded) {
@@ -259,11 +260,12 @@ export function createApprovalReviewer(pi: ExtensionAPI, options?: {humanFallbac
     }
     if (!outageChoice) {
       if (!ctx.hasUI) return {approved:false,source:"error",reason:"审批服务不可用且无人工界面，未执行。"};
-      const choice = await selectApprovalWithAlert(pi,ctx,`审批服务故障：选择后续处理\n${problem}\n本次及后续调用不会自动放行。`, [
-        "⏸ 暂停本轮待审操作，待修复或切换模型",
-        "👤 继续逐条人工审批",
+      const manualRow = "👤 Approve each call manually";
+      const choice = await selectApprovalWithAlert(pi,ctx,`Approval service failed: choose how to continue\n${problem}\nThis and later calls are not released automatically.`, [
+        "⏸ Pause this round's pending calls until fixed or the model is switched",
+        manualRow,
       ]);
-      outageChoice = choice?.startsWith("👤") ? "manual" : "pause";
+      outageChoice = choice === manualRow ? "manual" : "pause";
     }
     if (outageChoice === "pause") return {approved:false,source:"error",reason:"审批服务不可用；按用户选择暂停本轮待审操作。修复/切换模型或新用户指示后重新评估。"};
     // 熔断仅减少重复请求，不授予任何权限。逐条人工模式仍须确认当前完整调用。

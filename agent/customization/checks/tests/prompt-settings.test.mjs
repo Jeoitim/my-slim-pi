@@ -47,7 +47,7 @@ test('background roles default to session and persist independent model choices'
     const ctx = { model, modelRegistry: { getAll: () => [model], getAvailable: () => [model] } };
     for (const role of ['approver', 'hermes']) {
       assert.equal(settings.configuredBackgroundModel(role), undefined);
-      assert.match(settings.backgroundModelLabel(role, ctx), /跟随会话.*Actual Friendly Name/);
+      assert.match(settings.backgroundModelLabel(role, ctx), /Session model.*Actual Friendly Name/);
       let choice = 0;
       ctx.ui = { select: async (_title, rows) => rows[choice++ === 0 ? 1 : 0] };
       await settings.chooseBackgroundModel(role, ctx, pi);

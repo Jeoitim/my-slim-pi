@@ -32,19 +32,19 @@ export async function approveDeletion(mode: string, name: string, input: Record<
     if (!ctx.hasUI) return false;
     const parameters = JSON.stringify(input, null, 2);
     if (parameters.length > 12_000) { reason = "调用太长，无法完整人工核对；请先整理为可审阅的脚本。"; return false; }
-    const scripts = inspected.scripts.map(s => `  ${s.path}\n  SHA256 ${s.sha256}${s.truncated ? "（须先人工核对完整源码）" : ""}`).join("\n");
-    return (confirm || ctx.ui.confirm.bind(ctx.ui))(`批准本次${inspected.kind === "cleanup" ? "删除" : "执行"}操作？`, `${note ? note + "\n" : ""}工作目录：${ctx.cwd}\n用户请求：${request.slice(0, 1600)}\n工具：${name}\n调用：${parameters}${scripts ? "\n脚本：\n" + scripts : ""}\n仅批准当前调用；取消则不执行。`,opts);
+    const scripts = inspected.scripts.map(s => `  ${s.path}\n  SHA256 ${s.sha256}${s.truncated ? " (inspect the full source first)" : ""}`).join("\n");
+    return (confirm || ctx.ui.confirm.bind(ctx.ui))(`Approve this ${inspected.kind === "cleanup" ? "deletion" : "execution"}?`, `${note ? note + "\n" : ""}Working directory: ${ctx.cwd}\nUser request: ${request.slice(0, 1600)}\nTool: ${name}\nCall: ${parameters}${scripts ? "\nScripts:\n" + scripts : ""}\nOnly this call is approved; cancel leaves it unexecuted.`,opts);
   };
   try {
     if (mode === "ask") {
-      approved=await manual("ASK 逐次人工确认，无等待超时。",{timeout:0});
+      approved=await manual("ASK: per-call manual approval, no timeout.",{timeout:0});
     } else {
       // The upstream fallback puts the entire input in a selection title. Keep source in
       // the model's evidence, but show a bounded operation summary to the human.
       const ui = new Proxy(ctx.ui, { get(target, key) {
-        if (key === "select") return async (title: string, rows: string[],opts?:ApprovalDialogOptions) => title.startsWith("审批服务故障：")
+        if (key === "select") return async (title: string, rows: string[],opts?:ApprovalDialogOptions) => title.startsWith("Approval service failed:")
           ? ctx.ui.select(title,rows,opts)
-          : await manual("自动审批不确定或未完成：" + approvalReason(title),opts) ? rows[0] : rows[1];
+          : await manual("Automatic review uncertain or incomplete: " + approvalReason(title),opts) ? rows[0] : rows[1];
         return Reflect.get(target, key);
       } });
       const reviewCtx = new Proxy(ctx, { get: (target, key) => key === "ui" ? ui : Reflect.get(target, key) });

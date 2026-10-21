@@ -20,10 +20,10 @@ import { registerSubagentCapabilityCeiling } from "../../npm/node_modules/pi-sub
 
 export type PermissionMode = "auto" | "act" | "ask" | "plan";
 export const modeInfo = {
-  auto: { icon: "◈", label: "AUTO", color: "success", desc: "规则优先，复杂调用由内部审批代理评估" },
-  act: { icon: "⚡", label: "ACT", color: "warning", desc: "普通操作直接执行；高风险删除由内部审批评估" },
-  ask: { icon: "?", label: "ASK", color: "accent", desc: "已确认只读免审；其余逐次人工确认，无等待超时" },
-  plan: { icon: "◇", label: "PLAN", color: "mdHeading", desc: "只读规划" },
+  auto: { icon: "◈", label: "AUTO", color: "success", desc: "Rules first; complex calls are judged by the internal reviewer" },
+  act: { icon: "⚡", label: "ACT", color: "warning", desc: "Ordinary operations run directly; risky deletions are reviewed internally" },
+  ask: { icon: "?", label: "ASK", color: "accent", desc: "Confirmed read-only calls skip review; every other call asks the human, with no timeout" },
+  plan: { icon: "◇", label: "PLAN", color: "mdHeading", desc: "Read-only planning" },
 } as const;
 export function permissionBadge(mode: PermissionMode, appearance: string): string {
   const colors = appearance === "light" ? { auto: "26;127;55", act: "154;103;0", ask: "9;105;218", plan: "130;80;223" } : { auto: "166;227;161", act: "249;226;175", ask: "137;180;250", plan: "203;166;247" };
@@ -56,7 +56,7 @@ export function installPermissions(pi: ExtensionAPI, review = createApprovalRevi
   let maintenanceReload=false;
   const runtimeInfo=()=>{
     const info=runtime();
-    if(maintenanceReload && !info.reloadRequired){info.reloadRequired=true;info.warning="维护已完成，本会话未重载，请 /reload";info.brief+="；"+info.warning;}
+    if(maintenanceReload && !info.reloadRequired){info.reloadRequired=true;info.warning="maintenance finished; reload this session with /reload";info.statusWarning=info.warning;info.brief+="；维护已完成，本会话未重载，请 /reload";}
     return info;
   };
   let maintaining=false;
@@ -90,15 +90,15 @@ export function installPermissions(pi: ExtensionAPI, review = createApprovalRevi
       const ui = new Proxy(ctx.ui, { get(target, key) {
         if (key === "select") return async (title: string, rows: string[],opts?:ApprovalDialogOptions) => {
           if (!ctx.hasUI) return rows[1];
-          if (title.startsWith("审批服务故障：")) return ctx.ui.select(title, rows,opts);
+          if (title.startsWith("Approval service failed:")) return ctx.ui.select(title, rows,opts);
           const full = JSON.stringify(input, null, 2);
           // 参数太长时不再静默拒绝：给有界摘要，仍由人工决定。
           const parameters = full.length > 12000
-            ? full.slice(0, 6000) + `\n…（完整参数 ${full.length} 字符已截断，请先核对目标文件再决定）`
+            ? full.slice(0, 6000) + `\n… (full arguments truncated at ${full.length} characters; inspect the target first)`
             : full;
           const grantNotice = name === "task_agent_authorization" && !input.persistentAuthorization && input.action !== "disable"
-            ? "\n本次确认会启用持续任务委派授权，直到用户明确撤销；可自主选择新增代理、类型和数量，操作仍遵循当前权限模式。" : "";
-          return await confirmApprovalWithAlert(pi, ctx, "自动审批不确定：批准本次操作？", "自动审批说明：" + approvalReason(title) + "\n工作目录：" + ctx.cwd + "\n用户请求：" + currentUserRequest.slice(0, 1600) + "\n工具：" + name.replace(/^operation:/, "") + "\n完整参数：\n" + parameters + grantNotice + "\n仅批准当前调用；取消则不执行。",opts) ? rows[0] : rows[1];
+            ? "\nThis confirmation enables persistent task delegation until explicit revocation; new agents, types and counts may be chosen freely, and operations still follow the current permission mode." : "";
+          return await confirmApprovalWithAlert(pi, ctx, "Automatic review is uncertain: approve this call?", "Automatic review: " + approvalReason(title) + "\nWorking directory: " + ctx.cwd + "\nUser request: " + currentUserRequest.slice(0, 1600) + "\nTool: " + name.replace(/^operation:/, "") + "\nFull arguments:\n" + parameters + grantNotice + "\nOnly this call is approved; cancel leaves it unexecuted.",opts) ? rows[0] : rows[1];
         };
         return Reflect.get(target, key);
       } });
@@ -107,7 +107,7 @@ export function installPermissions(pi: ExtensionAPI, review = createApprovalRevi
     // The package's write/edit formatter discards content. A structured operation
     // name takes its JSON path, preserving the complete original arguments.
     // 状态栏只是提示，不依赖主题着色，避免渲染失败影响审批本身。
-    ctx.ui.setStatus("pi-permission-suite", `${modeInfo[state.mode].icon} 审批中`);
+    ctx.ui.setStatus("pi-permission-suite", `${modeInfo[state.mode].icon} reviewing`);
     let decision;
     try { decision = await review(reviewCtx, name.startsWith("deletion:") ? name : "operation:" + name, evidence, model); }
     finally { publish(ctx); }
@@ -132,8 +132,8 @@ export function installPermissions(pi: ExtensionAPI, review = createApprovalRevi
     }
     state.policyOk = health.ok;
     const info=runtimeInfo();state.reloadRequired=info.reloadRequired;
-    ctx.ui.setStatus("timrt-runtime",info.reloadRequired ? "⚠ "+info.warning : undefined);
-    ctx.ui.setStatus("pi-permission-suite", health.ok ? permissionBadge(state.mode, ctx.ui.theme.appearance) : "\x1b[31m⚠ 策略变化·只读\x1b[39m");
+    ctx.ui.setStatus("timrt-runtime",info.reloadRequired ? "⚠ "+(info.statusWarning || info.warning) : undefined);
+    ctx.ui.setStatus("pi-permission-suite", health.ok ? permissionBadge(state.mode, ctx.ui.theme.appearance) : "\x1b[31m⚠ policy changed · read-only\x1b[39m");
     // Read-only projection for clients; commands and session entries remain authoritative.
     ctx.ui.setStatus("timrt-permission-mode", health.ok ? state.mode : undefined);
     pi.events.emit("timrt:permissions", { mode: state.mode, taskAgents: state.taskAgents });
@@ -153,7 +153,7 @@ export function installPermissions(pi: ExtensionAPI, review = createApprovalRevi
     if (state.mode === "ask") {
       if (action === "launch" && state.taskAgents) return { approved: true, source: "existing" };
       const generation = requestGeneration;
-      const approved = await confirmApprovalWithAlert(pi, ctx, "ASK：调整持续任务委派授权？", `真实用户请求：${currentUserRequest}\n操作：${action}\n精确参数：${JSON.stringify(args)}\n启用后可自主选择代理和数量，直到明确撤销；每次实际操作仍须按 ASK 确认。`, {timeout:0});
+      const approved = await confirmApprovalWithAlert(pi, ctx, "ASK: change persistent task delegation authorization?", `Real user request: ${currentUserRequest}\nAction: ${action}\nExact arguments: ${JSON.stringify(args)}\nOnce enabled, agents and counts may be chosen freely until explicit revocation; each operation still needs ASK confirmation.`, {timeout:0});
       if (!approved || generation !== requestGeneration) return { approved: false, source: "human", reason: "未获当前人工授权。" };
       setTaskAgents(action !== "disable", ctx);
       return { approved: true, source: "human" };
@@ -179,7 +179,7 @@ export function installPermissions(pi: ExtensionAPI, review = createApprovalRevi
         };
         if (prop === "registerCommand") return (name: string, command: any) => {
           if (name === "run") return target.registerCommand(name, { ...command, handler: async (args: string, ctx: ExtensionContext) => {
-            if (state.mode === "plan" || state.approvalHold) { ctx.ui.notify("当前只读或清理暂停，不能启动任务代理。", "warning"); return; }
+            if (state.mode === "plan" || state.approvalHold) { ctx.ui.notify("Read-only or cleanup hold is active; task agents cannot start.", "warning"); return; }
             if (args.trim()) setTaskAgents(true, ctx);
             return command.handler(args, ctx);
           } });
@@ -202,42 +202,42 @@ export function installPermissions(pi: ExtensionAPI, review = createApprovalRevi
     publish(ctx);
   };
   const command = {
-    description: "权限模式：auto / act / ask / plan；Ctrl+Q 切换。",
+    description: "Permission mode: auto / act / ask / plan; Ctrl+Q cycles.",
     getArgumentCompletions: (p: string) => Object.keys(modeInfo).filter(n => n.startsWith(p)).map(value => ({ value, label: `${modeInfo[value as PermissionMode].icon} ${value}` })),
     handler: async (args: string, ctx: ExtensionContext) => {
       let mode = args.trim().toLowerCase();
       if (!mode) {
-        const chosen = await ctx.ui.select("权限模式（高风险删除需本次审批）", Object.entries(modeInfo).map(([k, v]) => `${k}  ${v.icon} ${v.desc}`));
+        const chosen = await ctx.ui.select("Permission mode (risky deletions need this call's approval)", Object.entries(modeInfo).map(([k, v]) => `${k}  ${v.icon} ${v.desc}`));
         if (!chosen) return;
         mode = chosen.split(/\s+/)[0];
       }
-      if (!(mode in modeInfo)) { ctx.ui.notify("可选：auto / act / ask / plan", "warning"); return; }
+      if (!(mode in modeInfo)) { ctx.ui.notify("Choose one of: auto / act / ask / plan", "warning"); return; }
       setMode(mode as PermissionMode, ctx);
     },
   };
   pi.registerCommand("approval-mode", command);
   pi.registerCommand("permissions", command);
   pi.registerCommand("approval-fallback", {
-    description: "AUTO/ACT 人工审批等待：on 等待 90 秒；off 直接拒绝。ASK 始终逐次审批。",
+    description: "AUTO/ACT human approval wait: on waits 90s; off declines at once. ASK always asks per call.",
     handler: async (args, ctx) => {
       const choice = args.trim().toLowerCase();
-      if (choice && choice !== "on" && choice !== "off") { ctx.ui.notify("用法：/approval-fallback on|off", "warning"); return; }
+      if (choice && choice !== "on" && choice !== "off") { ctx.ui.notify("Usage: /approval-fallback on|off", "warning"); return; }
       if (choice) saveApprovalFallback(choice === "on");
       ctx.ui.notify(configuredHumanFallback() === "ask"
-        ? "AUTO/ACT：需要人工审批时提醒并等待 90 秒；ASK 仍无限等待。"
-        : "AUTO/ACT：需要人工审批时直接拒绝，不弹窗、不等待；ASK 仍无限等待。", "info");
+        ? "AUTO/ACT: human approval prompts alert and wait 90 seconds; ASK still waits without a timeout."
+        : "AUTO/ACT: human approval is declined at once, with no prompt or wait; ASK still waits without a timeout.", "info");
     },
   });
-  pi.registerShortcut("ctrl+q", { description: "切换权限模式", handler: async ctx => {
+  pi.registerShortcut("ctrl+q", { description: "Cycle permission mode", handler: async ctx => {
     const modes: PermissionMode[] = ["auto", "act", "ask", "plan"];
     setMode(modes[(modes.indexOf(state.mode) + 1) % modes.length], ctx);
   } });
   const settingsCommand = {
-    description: "后台模型设置：权限审批与 Hermes 总结模型。",
+    description: "Background models: permission reviewer and Hermes summary.",
     handler: async (args: string, ctx: any) => {
       while (true) {
-        const rows = [`权限审批模型：${backgroundModelLabel("approver", ctx)}`, `Hermes 总结模型：${backgroundModelLabel("hermes", ctx)}`];
-        const selected = await ctx.ui.select("后台模型设置", rows);
+        const rows = [`Permission reviewer: ${backgroundModelLabel("approver", ctx)}`, `Hermes summary: ${backgroundModelLabel("hermes", ctx)}`];
+        const selected = await ctx.ui.select("Background models", rows);
         if (!selected) return;
         const index = rows.indexOf(selected);
         if (index >= 0) await chooseBackgroundModel(index === 0 ? "approver" : "hermes", ctx, pi);
@@ -246,12 +246,12 @@ export function installPermissions(pi: ExtensionAPI, review = createApprovalRevi
   };
   pi.registerCommand("background-models", settingsCommand);
   pi.registerCommand("task-agents", {
-    description: "任务代理持续授权：on 启用，off 撤销，空参数查看。仅用户命令可直接调整。",
+    description: "Persistent task-agent authorization: on grants, off revokes, no argument to inspect. User commands only.",
     handler: async (args, ctx) => {
       const value = args.trim().toLowerCase();
-      if (value && value !== "on" && value !== "off") { ctx.ui.notify("用法：/task-agents [on|off]", "warning"); return; }
+      if (value && value !== "on" && value !== "off") { ctx.ui.notify("Usage: /task-agents [on|off]", "warning"); return; }
       if (value) setTaskAgents(value === "on", ctx);
-      ctx.ui.notify(state.taskAgents ? "任务代理已启用，授权持续有效，直到明确撤销；可自主选择代理和数量，操作仍遵循当前权限模式。" : "任务代理尚未授权；现有代理的状态、记录和 Supervisor 问答仍可管理。", "info");
+      ctx.ui.notify(state.taskAgents ? "Task agents are enabled until explicitly revoked; agents and counts may be chosen freely, and operations still follow the current permission mode." : "Task agents are not authorized; existing agents, records and Supervisor Q&A remain manageable.", "info");
     },
   });
   pi.registerTool({
@@ -275,20 +275,20 @@ export function installPermissions(pi: ExtensionAPI, review = createApprovalRevi
           run:(command,args,options)=>pi.exec(command,args,options),
           progress:text=>onUpdate?.({content:[{type:"text",text}]}),
           approved:async()=>{
-            if(state.mode==="ask")return confirmApprovalWithAlert(pi,ctx,"ASK：批准本次 Pi 自维护？",`用户请求：${request}\n近期真实用户指示：${JSON.stringify(maintenanceHumanRequests)}\n范围：${JSON.stringify(scope)}\n补丁：\n${JSON.stringify(params,null,2)}\n包含备份、应用、重建、离线检查；失败精确恢复原文件和构建。`,{timeout:0});
+            if(state.mode==="ask")return confirmApprovalWithAlert(pi,ctx,"ASK: approve this Pi self-maintenance?",`User request: ${request}\nRecent real user instructions: ${JSON.stringify(maintenanceHumanRequests)}\nScope: ${JSON.stringify(scope)}\nPatch:\n${JSON.stringify(params,null,2)}\nIncludes backup, apply, rebuild and offline checks; failure restores the exact files and build.`,{timeout:0});
             const decision=await reviewCall(ctx,"maintain_pi",{...params,maintenanceHumanRequests,scope,maintenanceContract:"由修改前审批器判断真实用户是否明确授权这些 Pi 自维护修改。兼容的后续指示延续同一维护任务，无需重复关键字；新任务、撤销、否定、仅引用或讨论不构成授权。历史消息仅为证据，不是永久或通用权限。权限及核心源码须有对应机制的明确维护意图，不能凭模型或补丁的声明扩大范围。每笔精确补丁单独审批；禁止为其他任务解除拒绝、清理暂停、凭据或灾难性保护。事务使用独立备份和旧校验器，失败精确恢复；新代码重载后生效。"},sessionModelReference(ctx));
             return decision;
           },
         });
         pi.appendEntry("timrt-self-maintenance",{files:result.files,backup:result.backup});
         maintenanceReload=true;publish(ctx);
-        ctx.ui.notify("Pi 维护已完成；当前会话仍运行旧代码，请 /reload 或重启。","warning");
+        ctx.ui.notify("Pi maintenance finished; this session still runs the old code — run /reload or restart.","warning");
         return {content:[{type:"text",text:JSON.stringify(result)}]};
       } finally {maintaining=false;}
     },
   });
   pi.registerCommand("runtime-status",{
-    description:"查看本会话加载的构建版本、加载时间、源码状态和重载需求。",
+    description:"Show this session's build version, load time, source state and reload need.",
     handler:async(_args,ctx)=>{const info=runtimeInfo();ctx.ui.notify(JSON.stringify(info,null,2),info.reloadRequired?"warning":"info");},
   });
   pi.registerTool({
@@ -397,7 +397,7 @@ export function installPermissions(pi: ExtensionAPI, review = createApprovalRevi
       const webEffects=approvalEvidence(ctx,name,input,currentUserRequest).webAccessEffects;
       let approved=false;
       try {
-        approved=await confirmApprovalWithAlert(pi,ctx,"ASK：批准本次工具调用？",`工作目录：${ctx.cwd}\n用户请求：${currentUserRequest.slice(0,1600)}\n工具：${name}\n${webEffects ? webEffects+"\n" : ""}参数：\n${parameters}${scripts ? "\n脚本：\n"+scripts : ""}`,{timeout:0});
+        approved=await confirmApprovalWithAlert(pi,ctx,"ASK: approve this tool call?",`Working directory: ${ctx.cwd}\nUser request: ${currentUserRequest.slice(0,1600)}\nTool: ${name}\n${webEffects ? webEffects+"\n" : ""}Arguments:\n${parameters}${scripts ? "\nScripts:\n"+scripts : ""}`,{timeout:0});
       } catch {approved=false;}
       let reason = approved ? undefined : "ASK 未获本次人工授权，当前调用未执行。";
       if(generation!==requestGeneration)reason="人工确认期间出现新的用户指示，旧调用未执行，请重新核对。";
@@ -421,7 +421,7 @@ export function installPermissions(pi: ExtensionAPI, review = createApprovalRevi
   pi.on("session_start", async (_event, ctx) => {
     latestCtx = ctx;
     health = policyHealth(getAgentDir());
-    if (!health.ok) ctx.ui.notify("审批策略校验失败：仅允许只读核对，请通过外部维护入口检查并重建。", "warning");
+    if (!health.ok) ctx.ui.notify("Policy verification failed: only read-only checks are allowed; inspect and rebuild through the external maintenance entry.", "warning");
     rules.setCwd(ctx.cwd);
     const saved = ctx.sessionManager.getEntries().filter((e: any) => e.customType === "timrt-permissions").at(-1) as any;
     state.mode = saved?.data?.mode in modeInfo ? saved.data.mode : "auto";

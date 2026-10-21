@@ -30,7 +30,7 @@ export function saveApprovalFallback(enabled: boolean) {
 }
 
 export function isApprovalPrompt(title = ""): boolean {
-  if (/权限模式|审批模型|后台模型设置|主题|theme|model|settings|设置/i.test(title)) return false;
+  if (/权限模式|permission mode|审批模型|后台模型设置|主题|界面语言|设置|theme|model|settings|language/i.test(title)) return false;
   return /审批|批准|授权|权限确认|是否允许|是否同意|\b(?:approval|approve|permission|consent)\b/i.test(title);
 }
 
@@ -59,7 +59,7 @@ async function approvalDialog<T>(pi:ExtensionAPI,ctx:ExtensionContext,title:stri
     if(expired) {
       pi.appendEntry?.("timrt-approval-timeout",{title,timeoutMs:timeout});
       pi.events.emit("timrt:approval-timeout",{title,timeoutMs:timeout});
-      ctx.ui.notify("审批等待超时，本次未执行。请在回答中说明阻塞，等待用户下一轮授权；可继续其他已允许的安全步骤。","warning");
+      ctx.ui.notify("Approval timed out and this call did not run. Explain the blocker and wait for the next user instruction; other permitted safe steps may continue.","warning");
     }
   }
 }
@@ -70,7 +70,7 @@ export function selectApprovalWithAlert(pi:ExtensionAPI,ctx:ExtensionContext,tit
 
 /** Explicit approvals also work inside a BTW/custom overlay, where Pi emits only its outer UI event. */
 export async function confirmApprovalWithAlert(pi: ExtensionAPI, ctx: ExtensionContext, title: string, message: string, options?:ApprovalDialogOptions): Promise<boolean> {
-  const hint=options?.timeout===0 ? "\nASK 模式无等待超时；仅明确批准后执行本次调用，取消或拒绝不执行。" : "\n90 秒未回应则本次不执行，待下一轮用户授权。";
+  const hint=options?.timeout===0 ? "\nASK has no timeout; this call runs only after explicit approval. Cancel or deny leaves it unexecuted." : "\nWithout a reply within 90 seconds this call does not run; it waits for the next user instruction.";
   return await approvalDialog(pi,ctx,title,options,opts=>ctx.ui.confirm(title,message+hint,opts)) === true;
 }
 
@@ -94,11 +94,11 @@ export function installTerminalNotifications(pi: ExtensionAPI, output = {
   pi.on("session_start", () => { waiting = false; });
   pi.on("session_shutdown", () => { waiting = false; off(); });
   pi.registerCommand("notify-test", {
-    description: "测试终端审批提醒：发送一次 BEL，不执行命令或调用模型。",
+    description: "Test the terminal approval alert: one BEL, no command or model call.",
     handler: async (_args, ctx) => {
-      if (!ctx.hasUI || !output.enabled()) { ctx.ui.notify("提醒仅在交互终端中可用。", "info"); return; }
+      if (!ctx.hasUI || !output.enabled()) { ctx.ui.notify("Alerts are only available in an interactive terminal.", "info"); return; }
       output.write("\x07");
-      ctx.ui.notify("已发送终端提醒；Windows Terminal 按 bellStyle 设置响铃或闪烁任务栏。", "info");
+      ctx.ui.notify("Alert sent; Windows Terminal rings or flashes the taskbar according to bellStyle.", "info");
     },
   });
 }

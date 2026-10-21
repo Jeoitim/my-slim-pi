@@ -32,7 +32,7 @@ for(const mode of ['auto','act'])test(`${mode}: exactly 90 seconds defaults to t
   t.mock.timers.tick(QUESTION_TIMEOUT_MS-1);await flush();assert.equal(settled,false);
   t.mock.timers.tick(1);const result=await pending;
   assert.equal(result.details.cancelled,false);assert.equal(result.details.autoSelected,true);
-  assert.deepEqual(result.details.response,{kind:'selection',selections:['现有接口（推荐）']});
+  assert.deepEqual(result.details.response,{kind:'selection',selections:['现有接口 (recommended)']});
   assert.match(result.content[0].text,/非用户回答或操作授权/);
   assert.equal(h.events.filter(e=>e[0]==='ask:answered').length,0);
   assert.equal(h.events.filter(e=>e[0]==='timrt:question-default').length,1);
@@ -80,7 +80,7 @@ test('batch expiry supplies a recommendation for every unanswered question',asyn
   t.mock.timers.tick(90_000);const result=await pending;
   assert.equal(result.details.kind,'batch');assert.equal(result.details.cancelled,false);
   assert.equal(result.details.answers.length,2);
-  assert.ok(result.details.answers.every(a=>a.status==='answered'&&a.response.selections[0]==='现有接口（推荐）'));
+  assert.ok(result.details.answers.every(a=>a.status==='answered'&&a.response.selections[0]==='现有接口 (recommended)'));
 });
 test('batch expiry retains earlier submitted user answers and defaults only the rest',async t=>{
   t.mock.timers.enable({apis:['setTimeout']});const h=harness();
@@ -90,7 +90,7 @@ test('batch expiry retains earlier submitted user answers and defaults only the 
   t.mock.timers.tick(90_000);const result=await pending;
   assert.deepEqual(result.details.answers[0].response.selections,['新增接口']);
   assert.equal(result.details.answers[0].source,undefined);
-  assert.deepEqual(result.details.answers[1].response.selections,['现有接口（推荐）']);
+  assert.deepEqual(result.details.answers[1].response.selections,['现有接口 (recommended)']);
   assert.equal(result.details.answers[1].source,'timeout-default');
 });
 test('native picker renders the recommendation and closes exactly once on expiry',async t=>{
@@ -101,7 +101,7 @@ test('native picker renders the recommendation and closes exactly once on expiry
     component=factory({terminal:{rows:40,columns:100},requestRender(){}},theme,{getKeys:()=>['enter'],matches:()=>false},value=>{closed++;resolve(value);});
   });
   const pending=h.call();await flush();
-  for(const width of [40,80,120])assert.match(component.render(width).join('\n'),/推荐/);
+  for(const width of [40,80,120])assert.match(component.render(width).join('\n'),/recommended/);
   t.mock.timers.tick(90_000);assert.equal((await pending).details.autoSelected,true);
   assert.equal(closed,1);assert.equal(removed,1);assert.equal('timeout' in h.tool.parameters.properties,false);
 });

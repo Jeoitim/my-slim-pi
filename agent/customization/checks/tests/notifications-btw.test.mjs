@@ -26,26 +26,26 @@ test('approval dialogs ring once; settings, automatic approvals and non-TTY outp
   const ctx = { hasUI: true, ui: { notify() {} } };
   const start = title => hooks.get('ui_prompt_start')({ type: 'ui_prompt_start', kind: 'confirm', title }, ctx);
   const end = () => hooks.get('ui_prompt_end')({}, ctx);
-  for (const title of ['选择主题', '权限模式（高风险删除需本次审批）', '子代理与后台模型设置', 'Model settings']) { start(title); end(); }
+  for (const title of ['Choose a theme', "Permission mode (risky deletions need this call's approval)", 'Background models', '子代理与后台模型设置', 'Model settings']) { start(title); end(); }
   assert.equal(writes.length, 0);
-  start('自动审批不确定：批准本次操作？');
-  start('自动审批不确定：批准本次操作？');
+  start('Automatic review is uncertain: approve this call?');
+  start('Automatic review is uncertain: approve this call?');
   assert.deepEqual(writes, ['\x07']);
   end();
-  start('批准本次删除操作？'); end();
+  start('Approve this deletion?'); end();
   assert.equal(writes.length, 2);
   enabled = false;
   start('Approve tool call'); end();
   assert.equal(writes.length, 2);
   enabled = true; ctx.hasUI = false;
-  start('批准本次删除操作？'); end();
+  start('Approve this deletion?'); end();
   assert.equal(writes.length, 2);
   ctx.hasUI = true;
   await commands.get('notify-test').handler('', ctx);
   assert.equal(writes.length, 3);
   hooks.get('ui_prompt_start')({ type: 'ui_prompt_start', kind: 'custom' }, ctx);
   ctx.ui.confirm = async () => true;
-  assert.equal(await confirmApprovalWithAlert(pi, ctx, '批准本次删除操作？', 'fixture; no deletion executed'), true);
+  assert.equal(await confirmApprovalWithAlert(pi, ctx, 'Approve this deletion?', 'fixture; no deletion executed'), true);
   assert.equal(writes.length, 4, 'an approval inside an already open BTW/custom overlay still rings');
   await confirmApprovalWithAlert(pi, ctx, '自动审批不确定：批准本次操作？', 'fixture');
   assert.equal(writes.length, 5, 'closing a nested approval resets notification deduplication');
@@ -64,7 +64,7 @@ test('approval timeout aborts the real modal and never accepts a late approval',
       return new Promise(resolve=>signal.addEventListener('abort',()=>{closed=true;resolve(kind==='confirm'?true:'approve');},{once:true}));
     }}};
     const result=kind==='confirm'
-      ? await confirmApprovalWithAlert(pi,ctx,'批准本次操作？','fixture',{timeout:10})
+      ? await confirmApprovalWithAlert(pi,ctx,'Approve this call?','fixture',{timeout:10})
       : await selectApprovalWithAlert(pi,ctx,'审批本次操作',['approve','reject'],{timeout:10});
     assert.equal(result,kind==='confirm'?false:undefined);
     assert.equal(signal.aborted,true);assert.equal(closed,true);
@@ -93,10 +93,10 @@ test('ASK approval waits for an explicit choice and does not install a timeout',
   const pi={events:{emit:(name)=>events.push(name)},appendEntry(){throw Error('ASK must not expire');}};
   const ctx={hasUI:true,ui:{notify(){throw Error('ASK must not expire');},confirm:async(_title,body,opts)=>{options=opts;message=body;return new Promise(resolve=>{resolveDialog=resolve;});}}};
   let settled=false;
-  const pending=confirmApprovalWithAlert(pi,ctx,'ASK：批准本次工具调用？','fixture',{timeout:0}).then(value=>{settled=true;return value;});
+  const pending=confirmApprovalWithAlert(pi,ctx,'ASK: approve this tool call?','fixture',{timeout:0}).then(value=>{settled=true;return value;});
   await new Promise(resolve=>setTimeout(resolve,25));
   assert.equal(settled,false);assert.equal(options.timeout,undefined);assert.equal(options.signal.aborted,false);
-  assert.match(message,/无等待超时/);assert.doesNotMatch(message,/90 秒/);
+  assert.match(message,/no timeout/i);assert.doesNotMatch(message,/90 seconds/i);
   resolveDialog(true);assert.equal(await pending,true);
   assert.equal(events.includes('timrt:approval-timeout'),false);
 });
@@ -120,7 +120,7 @@ test('human fallback is shared, takes effect without reload and never weakens AS
     process.env.PI_CODING_AGENT_DIR=fixture;
     let dialogs=0,alerts=0;
     const pi={events:{emit(){alerts++;}},appendEntry(){}};
-    const ctx={hasUI:true,cwd:fixture,modelRegistry:{find(){}},ui:{notify(){alerts++;},select:async()=>{dialogs++;return '✅ 批准';},confirm:async()=>{dialogs++;return true;}}};
+    const ctx={hasUI:true,cwd:fixture,modelRegistry:{find(){}},ui:{notify(){alerts++;},select:async()=>{dialogs++;return '✅ Approve';},confirm:async()=>{dialogs++;return true;}}};
     const review=createApprovalReviewer(pi);
     assert.equal(configuredHumanFallback(),'ask');
     saveApprovalFallback(false);

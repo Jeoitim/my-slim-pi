@@ -52,7 +52,7 @@ test('filtering, navigation, no results and cancellation do not apply a theme', 
     assert.match(plain(picker.render(120).join('\n')), /github-light · light/);
     for (const letter of 'zzzz') picker.handleInput(letter);
     assert.equal(picker.selectedName, undefined);
-    assert.match(plain(picker.render(120).join('\n')), /没有匹配主题/);
+    assert.match(plain(picker.render(120).join('\n')), /No matching theme/);
     picker.handleInput('\r');
     assert.equal(result, 'pending', 'empty result must not save or close');
     picker.handleInput('\x1b');

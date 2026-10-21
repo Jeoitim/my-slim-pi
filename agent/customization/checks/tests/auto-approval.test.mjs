@@ -59,7 +59,7 @@ test('ASK shares AUTO read exemptions and confirms other calls without a timeout
   assert.match(policyText,/ASK 与 AUTO 共用只读免审判断/);
   assert.doesNotMatch(policyText,/含读取均须人工/);
   let prompts=0,approve=true;
-  h.ctx.ui.confirm=async(_title,message,opts)=>{prompts++;assert.equal(opts.timeout,undefined);assert.match(message,/无等待超时/);return approve;};
+  h.ctx.ui.confirm=async(_title,message,opts)=>{prompts++;assert.equal(opts.timeout,undefined);assert.match(message,/no timeout/i);return approve;};
   assert.equal(await h.call('read',{path:join(h.ctx.cwd,'cleanup.ps1')}),undefined);
   for (const [tool,args] of [
     ['grep',{pattern:'Remove-Item',path:h.ctx.cwd}],
