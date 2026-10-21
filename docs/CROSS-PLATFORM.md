@@ -15,6 +15,19 @@
 
 Web 的抓取代理使用上游 curl 传输；需要可用的 curl，不执行 Windows PAC。安装后通过 EditConfig web-search.json 更改 proxy；环境变量不会自动覆盖已保存配置。Web 参数权限、自动激活、缓存与回退详见 [架构审计](extension-first-audit.md)，当前测试与性能见 [迁移验收](web-access-migration.md)。
 
+## 关键问题问答验收（2026-10-21）
+
+`pi-ask-user@0.17.0` 已分别通过 Windows `.local/ask-user-windows` 与 WSL2 Linux 原生仓库 `.local/ask-user-linux-final` 的独立安装和构建，均无扩展加载错误，共享各自宿主 SDK；上游插件源码未修改。
+
+| 最终检查 | Windows | Linux |
+|---|---|---|
+| 完整离线回归 | 123 通过、0 失败、3 跳过 | 122 通过、0 失败、4 跳过 |
+| 组件集成 | 通过 | 通过 |
+| 仓库 npm test | 35 通过、0 失败、3 跳过 | 27 通过、0 失败、11 跳过 |
+| 分享审计 | 85 个白名单文件通过 | 85 个白名单文件通过 |
+
+新增 17 项用例覆盖 AUTO/ACT 恰好 90 秒时采用推荐项、ASK/PLAN 持续等待、主动取消、自由回答、界面故障与无 UI、外部中止与新指示、批量答复保留、真实 picker 渲染及关闭、Supervisor 优先和问答不授权。时间推进与 UI 驱动为本地模拟；未调用真实模型，未将开发任务委派给子代理，未更新用户实际运行目录或 PATH。
+
 ## 安装与恢复约束
 
 测试仅使用各自仓库 .local 内的一次性 AgentRoot，不使用 ~/.pi/agent、用户认证或用户 PATH。WSL 安装器拒绝 Windows 盘挂载目录作为 AgentRoot。Linux 启动器使用安装时记录的 install/node-path；它属于本机状态，不能导出或跨平台复制。

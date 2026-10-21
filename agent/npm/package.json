@@ -10,6 +10,7 @@
     "pi-permission-suite": "0.2.3",
     "pi-subagents": "0.78.0",
     "pi-web-access": "0.43.0",
-    "principal-pi-skills": "4.14.0"
+    "principal-pi-skills": "4.14.0",
+    "pi-ask-user": "0.17.0"
   }
 }

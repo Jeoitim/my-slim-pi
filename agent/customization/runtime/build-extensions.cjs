@@ -19,7 +19,8 @@ local.push('extensions/timrt-suite/read-only-parser.ps1');
 local.push('customization/runtime/policy-files.cjs');
 local.push('customization/runtime/patch-portable-paths.cjs');
 local.push('npm/node_modules/pi-permission-suite/config-loader.ts');
-const packageRoots = ['pi-hermes-memory', 'pi-hashline-edit-pro', 'pi-cc-extensions', 'pi-subagents', 'pi-permission-suite'];
+local.push(...['index.ts', 'settings.ts', 'single-select-layout.ts', 'tern.ts'].map(n => `npm/node_modules/pi-ask-user/${n}`));
+const packageRoots = ['pi-hermes-memory', 'pi-hashline-edit-pro', 'pi-cc-extensions', 'pi-subagents', 'pi-permission-suite', 'pi-ask-user'];
 const files = [...new Set([...sources, ...local, ...packageRoots.map(p => `npm/node_modules/${p}/package.json`), 'customization/runtime/build-extensions.cjs', 'customization/runtime/patch-background-models.cjs', 'customization/runtime/patch-interactive-defaults.cjs', `install/releases/${version}/node_modules/@earendil-works/pi-coding-agent/dist/modes/interactive/interactive-mode.js`])];
 const outputs = sources.map(s => s.replace(/index\.(?:ts|js)$/, 'timrt-fast.mjs'));
 files.push(`install/releases/${version}/node_modules/@earendil-works/pi-coding-agent/package.json`);
@@ -56,7 +57,7 @@ if (require.main === module) (async () => {
     name: 'pi-host-and-resource-paths',
     setup(b) {
       b.onResolve({ filter: /pi-subagents\/timrt-fast\.mjs$/ }, args => ({ path: pathToFileURL(path.resolve(args.resolveDir, args.path)).href, external: true }));
-      b.onResolve({ filter: /^(?:@earendil-works\/|typebox(?:\/|$))/ }, args => {
+      b.onResolve({ filter: /^(?:@earendil-works\/|@sinclair\/typebox(?:\/|$)|typebox(?:\/|$))/ }, args => {
         // Pi resolves these through its host aliases/virtual modules. Absolute
         // dist paths would load a second SDK beside the bundled CLI runtime.
         return { path: args.path, external: true };

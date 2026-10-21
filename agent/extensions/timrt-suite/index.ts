@@ -5,10 +5,12 @@ import { installComposer } from "./composer.ts";
 import { installMemoryGateway } from "./memory-gateway.ts";
 import { installPromptPolicy } from "./prompt-policy.ts";
 import { installTerminalNotifications } from "./terminal-notifications.ts";
+import { installAskUser } from "./ask-user.ts";
 
 export default function (pi: ExtensionAPI) {
   installUiState(pi);
   const permissions = installPermissions(pi);
+  installAskUser(pi, permissions);
   installComposer(pi, permissions);
   installMemoryGateway(pi);
   installPromptPolicy(pi);

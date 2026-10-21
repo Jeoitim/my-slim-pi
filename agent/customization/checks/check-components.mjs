@@ -32,6 +32,8 @@ try {
   console.log('Active tools:', JSON.stringify(session.getActiveToolNames()));
   assert.ok(session.extensionRunner.getCommand('btw'), 'native BTW package command is registered');
   assert.ok(session.extensionRunner.getCommand('notify-test'), 'terminal reminder check is registered');
+  assert.ok(session.getActiveToolNames().includes('ask_user'), 'ask_user is available through the single suite entry');
+  assert.ok(!loader.getSkills().skills.some(s => s.name === 'ask-user'), 'upstream mandatory question skill is disabled');
   const shell=process.platform==='win32'?'powershell':'bash',other=shell==='bash'?'powershell':'bash';
   const configured=JSON.parse(readFileSync(join(root,'settings.json'),'utf8')).defaultTools;
   assert.equal(session.getActiveToolNames().includes(shell),configured.includes(shell),'respect configured native shell');

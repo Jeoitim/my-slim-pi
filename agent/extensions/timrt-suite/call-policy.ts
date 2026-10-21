@@ -51,7 +51,7 @@ export function webLocalPaths(name: string, input: Record<string, any>): string[
 }
 
 export function readOnlyCall(name: string, input: Record<string, any>, root = ""): boolean {
-  return ["read", "grep", "find", "ls", "memory_search", "memory_get", "question", "questionnaire", "explain_call"].includes(name)
+  return ["read", "grep", "find", "ls", "memory_search", "memory_get", "question", "questionnaire", "ask_user", "explain_call"].includes(name)
     || webReadOnly(name, input, root)
     || (["bash", "powershell"].includes(name) && safeShellRead(String(input.command || ""), name));
 }
