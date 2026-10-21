@@ -62,8 +62,29 @@ foreach ($item in $targets) {
     }
 }
 
+# Get-ChildItem 默认不进入目录链接；只接纳已选测试目录内的普通 Junction/SymbolicLink。
+$links = @(Get-ChildItem -LiteralPath $expectedLocal -Recurse -Force -Attributes ReparsePoint |
+    Where-Object {
+        $path = $_.FullName
+        foreach ($dir in $dirs) {
+            if ($path.StartsWith($dir.FullName + [IO.Path]::DirectorySeparatorChar, $comparison)) {
+                return $true
+            }
+        }
+        return $false
+    })
+foreach ($link in $links) {
+    if ($link.LinkType -notin @('Junction', 'SymbolicLink')) {
+        throw "发现未识别的链接类型，已停止：$($link.FullName) ($($link.LinkType))"
+    }
+}
+
 Write-Output "仓库：$repo"
 Write-Output "待清理：$($dirs.Count) 个目录、$($files.Count) 个输出文件。"
+if ($links.Count -gt 0) {
+    Write-Output "其中有 $($links.Count) 个目录内链接，只删除链接本身："
+    $links | ForEach-Object { Write-Output "  $($_.FullName) -> $($_.Target)" }
+}
 if ($unknownDirs.Count -gt 0) {
     Write-Warning "有 $($unknownDirs.Count) 个未识别目录将保留：$($unknownDirs.Name -join ', ')"
 }
@@ -75,11 +96,27 @@ if (-not $Delete) {
     exit 0
 }
 
-# 递归删除前检查链接，避免清理过程涉及 .local 外部路径。
-$link = Get-ChildItem -LiteralPath $expectedLocal -Recurse -Force -Attributes ReparsePoint |
-    Select-Object -First 1
-if ($null -ne $link) {
-    throw "发现链接，已停止；请先人工检查：$($link.FullName)"
+# .NET 的非递归删除只移除 Junction/SymbolicLink 本身，不触及其目标。
+foreach ($link in $links) {
+    if ($link.PSIsContainer) {
+        [IO.Directory]::Delete($link.FullName, $false)
+    } else {
+        [IO.File]::Delete($link.FullName)
+    }
+}
+
+$remainingLinks = @(Get-ChildItem -LiteralPath $expectedLocal -Recurse -Force -Attributes ReparsePoint |
+    Where-Object {
+        $path = $_.FullName
+        foreach ($dir in $dirs) {
+            if ($path.StartsWith($dir.FullName + [IO.Path]::DirectorySeparatorChar, $comparison)) {
+                return $true
+            }
+        }
+        return $false
+    })
+if ($remainingLinks.Count -gt 0) {
+    throw "仍有链接，已停止：$($remainingLinks[0].FullName)"
 }
 
 $failures = [System.Collections.Generic.List[string]]::new()
@@ -87,7 +124,8 @@ $removed = 0
 foreach ($item in $targets) {
     try {
         if ($item.PSIsContainer) {
-            Remove-Item -LiteralPath $item.FullName -Recurse -Force -ErrorAction Stop
+            # Directory.Delete 不会穿过清理过程中新增的链接；失败时保留目录并报告。
+            [IO.Directory]::Delete($item.FullName, $true)
         } else {
             Remove-Item -LiteralPath $item.FullName -Force -ErrorAction Stop
         }
