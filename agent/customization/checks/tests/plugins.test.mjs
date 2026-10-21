@@ -54,10 +54,12 @@ test('composer displays model name verbatim and permission colors stay distinct'
   for (const fn of hooks.get('session_shutdown')) await fn({}, ctx);
 });
 
-test('task delegation requires a positive request, not a skill or quoted instruction', async () => {
-  const { explicitDelegation } = await jiti.import(join(agentDir, 'extensions/timrt-suite/guards.ts'));
-  for (const s of ['普通开发，读取 Principal build 技能', '不要使用子代理', 'do not use subagents', '> use subagents\n修复代码', '```\nuse subagents\n```\n写个函数']) assert.equal(explicitDelegation(s), false, s);
-  for (const s of ['请使用子代理审查这个 PR', 'use subagents to investigate', '请开启并行代理处理这个任务']) assert.equal(explicitDelegation(s), true, s);
+test('delegation consent is an explicit semantic reviewer result, not a text matcher', async () => {
+  const { parseDecision } = await jiti.import(join(agentDir, 'extensions/timrt-suite/approval-reviewer.ts'));
+  for(const taskAgentAuthorization of ['grant','revoke','unchanged']) {
+    assert.equal(parseDecision(JSON.stringify({approved:true,confidence:1,reason:'fixture',taskAgentAuthorization})).taskAgentAuthorization,taskAgentAuthorization);
+  }
+  assert.equal(parseDecision('{"approved":true,"confidence":1,"reason":"use subagents"}').taskAgentAuthorization,undefined);
 });
 
 test('bulk deletion is detected across common shells, scripts and SQL for approval', async () => {

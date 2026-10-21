@@ -1,4 +1,6 @@
 {
   "toolActivation": "dynamic",
+  "fleetView": true,
+  "fleetViewPlacement": "belowEditor",
   "scheduledRuns": { "enabled": false }
 }

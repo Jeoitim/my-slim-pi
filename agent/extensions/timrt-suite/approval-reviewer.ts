@@ -17,6 +17,7 @@ export interface ReviewDecision {
   approved: boolean;
   source: "subagent" | "human" | "cache" | "fallback" | "error" | "paused";
   reason?: string;
+  taskAgentAuthorization?: "grant" | "revoke" | "unchanged";
 }
 
 const CONFIDENCE_THRESHOLD = 0.7;
@@ -64,7 +65,7 @@ export function jsonObjects(text: string): string[] {
   return out;
 }
 
-export function parseDecision(raw: string): { approved: boolean; confidence: number; reason: string; reasonCode?: string } | undefined {
+export function parseDecision(raw: string): { approved: boolean; confidence: number; reason: string; reasonCode?: string; taskAgentAuthorization?: "grant" | "revoke" | "unchanged" } | undefined {
   for (const candidate of jsonObjects(raw.replace(/```(?:json)?/gi, "")).reverse()) {
     let value: unknown;
     try { value = JSON.parse(candidate); } catch { continue; }
@@ -75,7 +76,9 @@ export function parseDecision(raw: string): { approved: boolean; confidence: num
     if (typeof flag !== "boolean" || typeof confidence !== "number"
       || !Number.isFinite(confidence) || confidence < 0 || confidence > 1) continue;
     const reason = String(record.reason ?? record.reasoning ?? "").replace(/\s+/g, " ").trim().slice(0, 600);
-    return { approved: flag, confidence, reason, ...(record.reasonCode === 'missing_context' ? { reasonCode: 'missing_context' } : {}) };
+    const authorization = record.taskAgentAuthorization;
+    return { approved: flag, confidence, reason, ...(record.reasonCode === 'missing_context' ? { reasonCode: 'missing_context' } : {}),
+      ...(authorization === "grant" || authorization === "revoke" || authorization === "unchanged" ? {taskAgentAuthorization:authorization} : {}) };
   }
   return;
 }
@@ -230,7 +233,7 @@ export function createApprovalReviewer(pi: ExtensionAPI, options?: {humanFallbac
         if (decision.confidence < CONFIDENCE_THRESHOLD) {
           return uncertain(ctx, name, input, `审批模型不确定（置信度 ${decision.confidence.toFixed(2)}）：${decision.reason || "无说明"}`);
         }
-        const result: ReviewDecision = { approved: decision.approved, source: "subagent", reason: decision.reason };
+        const result: ReviewDecision = { approved: decision.approved, source: "subagent", reason: decision.reason, ...(decision.taskAgentAuthorization ? { taskAgentAuthorization: decision.taskAgentAuthorization } : {}) };
         if (result.approved && cacheKey && !attempt.expanded) {
           if (cache.size > 64) cache.delete(cache.keys().next().value as string);
           cache.set(cacheKey, { at: Date.now(), decision: result });

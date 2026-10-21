@@ -1,6 +1,6 @@
 # 扩展架构与维护边界
 
-当前基线为 Pi 1.3.0，Web 扩展为 [nicobailon/pi-web-access 0.43.0](https://github.com/nicobailon/pi-web-access)。核对日期 2026-10-20，仓库远端 main 为 82374337ec7a6a8f3815735805b4fadeb89b960b；保留工作区原有审批与通知修改。
+当前基线为 Pi 1.3.0，Web 扩展为 [nicobailon/pi-web-access 0.43.0](https://github.com/nicobailon/pi-web-access)，任务代理为 pi-subagents 0.78.0，关键澄清为 pi-ask-user 0.17.0。核对日期 2026-10-21；固定版本与分发哈希以 distribution.json 为准。
 
 ## Web 扩展
 
@@ -18,9 +18,19 @@ web-search.json 的能力配置进入策略校验；Key 和代理轮换不改变
 
 AUTO/ACT 整次问答 90 秒到期后，保留已提交回答，为未回答题目采用第一项推荐方案，标记 `source: timeout-default`，不写入人类输入、不发出 `ask:answered`。主动取消、调用中止、新人类输入、会话切换、界面错误及无 UI 不产生默认答案。ASK/PLAN 不自动选择；任务委派和操作审批维持原机制。`ask_user` 在健康策略下按信息收集免审，避免先审批“是否可以提问”。
 
-依赖源码未改动；SDK/TUI 和旧名 `@sinclair/typebox` 使用 Pi 1.3.0 现有宿主别名，共享宿主实例。构建有效性检查覆盖该包全部四个运行时源码及 package.json，保持四个预编译启动入口和一个按授权加载的任务代理入口。双平台隔离安装、超时与取消、真实 picker 渲染和组件集成结果见 [跨平台验收](CROSS-PLATFORM.md#关键问题问答验收2026-10-21)。
+依赖源码未改动；SDK/TUI 和旧名 `@sinclair/typebox` 使用 Pi 1.3.0 现有宿主别名，共享宿主实例。构建有效性检查覆盖该包全部四个运行时源码及 package.json，保持四个预编译扩展入口和一个任务代理产物；任务代理运行时在启动时加载以提供原生管理和 Fleet，声明仍按需激活。双平台隔离安装、超时与取消、真实 picker 渲染和组件集成结果见 [跨平台验收](CROSS-PLATFORM.md#关键问题问答验收2026-10-21)。
 
 回退时恢复整组 suite 源码、构建器、子代理角色、settings、npm 包清单和锁文件，按旧锁重新安装并重建；从分发清单移除新增文件后刷新已有哈希并审计。普通 Restore 不会卸载新依赖。升级该插件时重新核对公开工具接口、UI AbortSignal 关闭行为及宿主 TypeBox 别名，不通过修改第三方源码兼容。
+
+## 任务代理原生管理与持续授权
+
+`/subagents` 直接使用 pi-subagents 0.78.0 上游管理页，`/subagents-fleet` 使用原生 Fleet Inspector；后台审批/Hermes 模型选择移至 `/background-models`。原生 FleetView 使用 `belowEditor`，其空编辑器方向键交互和 Inspector 路由由上游实现。本地不复制管理界面或代理监控状态。
+
+启动时通过现有单一 suite 入口初始化上游运行时，恢复管理、监督问答和 Fleet；工具声明继续采用原生 dynamic 策略。新建任务与管理既有任务分开：状态/记录、`bg_wait`、`contact_supervisor` 和 `subagent_supervisor` 不要求新一轮委派授权。原有输入正则授权函数已删除，用户消息只记录为真实证据；在具体授权变化或创建任务时交原审批器语义判断，不为每条普通消息额外调用模型。
+
+持续授权只保存为当前安装 permission config 的布尔 `taskAgentsEnabled`，由用户 `/task-agents on|off` 或经审批器核对的真实用户授权修改；默认分发不含此状态，白名单导出主动剔除。只有该布尔字段不影响策略摘要，整个配置路径仍受保护。跨轮次、换任务及重启保留授权；明确撤销阻止后续创建，管理既有代理继续可用。普通批准结论不等于首次委派同意；审批器须返回 `taskAgentAuthorization: grant`，明确人工确认也可启用。撤销不以关键词推断，返回 `revoke` 后保存；四模式及删除、维护保护独立执行。
+
+使用上游公开 `pi-subagents/capability-ceiling` API 按会话设置 `allowedAgents: []`，在未授权、PLAN、清理暂停、维护或策略异常时拦截原生新任务入口，解除时只撤销本地注册的限制，不覆盖其他扩展限制。该 API 的导出和实现已核对当前固定版本；相关两个源码纳入构建有效性检查。没有修改插件、宿主或运行中的编译产物，也没有新增管理抽象层。回退需恢复权限、角色、配置、构建器、导出规则和对应清单，重建并重载；个人授权配置与快照须保留。
 
 ## 已删除的维护负担
 
@@ -34,7 +44,7 @@ AUTO/ACT 整次问答 90 秒到期后，保留已提交回答，为未回答题�
 | patch-interactive-defaults：手动 /model、选择器和循环持久化 | 保留，锁定 Pi 1.3.0 | model_select.source 只有 set/cycle/restore，set 不能区分人类选择与后台 setModel；ExtensionAPI 没有等价的用户选择持久化入口。没有用私有会话对象替换补丁；源模块与 CLI bundle 均保留跨供应商行为测试 |
 | patch-interactive-defaults：pi-cc 启动页的宿主快捷键桥接 | 保留，锁定 pi-cc 1.0.5 | 公开 editor 工厂提供宿主 key manager，但依赖启动页仍读旧 TUI 单例。公开 setHeader 能替换整页，尚不能证明可等价保留原有早期启动交换、布局及渲染；本次不复制或改写整套启动页 |
 | patch-portable-paths | 保留，锁定 permission-suite 0.2.3 | RuleEngine 的公开构造函数没有配置路径注入参数；config-loader 硬编码默认用户目录。补丁维持独立 AgentRoot 与凭据路径规则 |
-| build-extensions | 保留预编译，简化为四个启动入口加一个授权后加载入口 | SDK/TypeBox 继续 external，由宿主共享；移除 Adapter 的分块构建，无新增编译依赖 |
+| build-extensions | 保留四个扩展入口和一个原生任务代理产物，后者随 suite 启动初始化 | SDK/TypeBox 继续 external；原生工具声明按需激活，管理与 Fleet 可用性不等于委派授权，无新增编译依赖 |
 
 第三方 pi-cc 自身还使用 prototype / patchRegistry，包括 compact-thinking、default/compact renderer、startup-header、flush-docked-bash、fullscreen-detect、mouse interaction/scroll/sticky-prompt、tool grouping/message-display。这些是固定版本依赖内部的运行时实现，不是已迁移的公开 API。此次保留现有消息、diff、鼠标、启动页及界面能力，未声称实现“零 Monkey Patch”。上游升级仍需完整界面回归。
 

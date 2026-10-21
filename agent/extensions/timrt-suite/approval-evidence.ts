@@ -22,7 +22,7 @@ export function humanApprovalEvidence(ctx: ExtensionContext, expanded = false) {
   // Preserve the branch origin, then prioritize the newest instructions (including revocations).
   // The origin is NOT assumed to authorize the current task. Missing middle records stay explicit.
   for (const index of [...new Set([rows.length - 1, 0, ...rows.map((_, i) => i).reverse()])]) {
-    if (index < 0 || remaining <= 0 || (!expanded && selected.size >= 8)) continue;
+    if (index < 0 || index >= rows.length || remaining <= 0 || (!expanded && selected.size >= 8)) continue;
     const row = rows[index], text = row.text.slice(0, Math.min(6000, remaining));
     selected.set(index, { ...row, text, truncated: row.truncated || text.length < row.text.length });
     remaining -= text.length;

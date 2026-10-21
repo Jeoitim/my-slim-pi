@@ -58,6 +58,10 @@ for(const path of [...new Set(selected)].sort()){
     // authenticated proxies. Export the reviewed public template only.
     text=readFileSync(join(payload,'web-search.json'),'utf8');
   }
+  if(path==='extensions/pi-permission-suite/config.json') {
+    const config=JSON.parse(text); delete config.taskAgentsEnabled;
+    text=JSON.stringify(config,null,2)+'\n';
+  }
   if(path.endsWith('.json'))privacyCheck(JSON.parse(text),path);
   if(path==='settings.json'){
     const clean=JSON.parse(text);delete clean.defaultProvider;delete clean.defaultModel;delete clean.lastChangelogVersion;

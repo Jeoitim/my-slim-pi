@@ -106,7 +106,7 @@ test('memory gateway keeps schemas on demand and forwards real tool error state'
   assert.deepEqual(calls[1].slice(0, 2), ['memory_add', { target: 'user', content: 'Chinese responses' }]);
 });
 
-test('skill delegation cannot authorize itself and legacy singular command stays local', async () => {
+test('skill text cannot authorize itself and native management is separate from background models', async () => {
   const { installPermissions } = await jiti.import(source('permissions'));
   const hooks = new Map(), commands = new Map(), tools = new Map();
   const pi = {
@@ -115,7 +115,10 @@ test('skill delegation cannot authorize itself and legacy singular command stays
     registerTool: tool => tools.set(tool.name, tool), getActiveTools: () => [], setActiveTools() {},
     appendEntry() {}, events: { on: () => () => {}, emit() {} },
   };
-  const state = installPermissions(pi);
+  const native = {handler:async()=>{}};
+  const state = installPermissions(pi,async()=>({approved:false,source:'subagent',reason:'真实用户未授权'}),async api=>{
+    api.registerCommand('subagents',native);api.registerCommand('subagents-fleet',native);
+  });
   let confirmations = 0, menus = 0;
   const ctx = { cwd: homedir(), hasUI: true, model: { name: 'Session Model' }, modelRegistry: { getAll: () => [] }, sessionManager: { getEntries: () => [] }, ui: { theme: { appearance: 'dark' }, setStatus() {}, notify() {}, select: async () => { menus++; }, confirm: async () => { confirmations++; return false; } } };
   for (const fn of hooks.get('session_start')) await fn({}, ctx);
@@ -127,16 +130,17 @@ test('skill delegation cannot authorize itself and legacy singular command stays
   assert.equal(confirmations, 0);
   for (const fn of hooks.get('tool_result')) await fn({ toolName: 'read', input: { path: join(root, 'npm/node_modules/principal-pi-skills/build/SKILL.md') }, isError: false }, ctx);
   await assert.rejects(request.execute('id', { skill: 'build', reason: 'Skill recommends review' }, undefined, undefined, ctx), /未授权/);
-  assert.equal(confirmations, 1);
-  assert.equal(state.loaded, false);
+  assert.equal(confirmations, 0);
+  assert.equal(state.loaded, true);
   assert.equal(state.taskAgents, false);
   await input('不要使用子代理，继续修复代码');
-  await assert.rejects(request.execute('id', { skill: 'build', reason: 'Request again' }, undefined, undefined, ctx), /不要使用/);
-  assert.equal(confirmations, 1);
-  assert.equal(commands.get('subagent'), commands.get('subagents'));
-  await commands.get('subagent').handler('off', ctx);
-  assert.equal(menus, 0);
+  await assert.rejects(request.execute('id', { reason: 'Request again' }, undefined, undefined, ctx), /未授权/);
+  assert.equal(confirmations, 0);
+  assert.equal(commands.get('subagents'),native);
+  assert.equal(commands.get('subagents-fleet'),native);
   await commands.get('subagents').handler('', ctx);
+  assert.equal(menus, 0);
+  await commands.get('background-models').handler('', ctx);
   assert.equal(menus, 1);
-  assert.equal(state.loaded, false);
+  assert.equal(state.loaded, true);
 });

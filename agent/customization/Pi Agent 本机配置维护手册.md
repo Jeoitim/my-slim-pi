@@ -81,7 +81,10 @@ bash "$maint" EditConfig settings.json        # 先备份，再打开编辑器
 - `/model` 选择模型；新会话沿用最后一次手动选择，恢复旧会话使用该会话模型。项目设置和启动参数可覆盖全局默认。
 - `/effort` 调节思考程度；Shift+Tab 或 Ctrl+Alt+E 循环切换。可选级别以当前模型配置为准。
 - 默认主题为 `claude-warm`（橙色强调色、暖深色背景）。`/theme` 筛选并实时预览主题，回车保存，Esc 取消；支持 `/theme github-light`。宽终端左右排列，窄终端上下排列。
-- `/subagents`（别名 `/subagent`）设置审批、Hermes 模型及任务代理。后台模型默认跟随当前会话，也可分别覆盖；打开设置不授予任务委派权限。
+- `/background-models` 设置权限审批与 Hermes 总结模型，默认跟随当前会话，也可分别覆盖。
+- `/subagents` 直接打开上游原版子代理管理界面；`/subagents-fleet` 打开原生 Fleet Inspector，查看运行中及最近完成的代理、对话与工具记录，也可管理已有任务。
+- 原生 FleetView 在编辑器下方显示活跃任务。编辑器为空且有任务条目时，按 `↓` 或 `←` 进入代理列表；继续选择条目并回车打开 Inspector，Esc 返回。没有条目时上游会收起视图。
+- `/task-agents on|off` 由用户直接启用或撤销持续委派授权，空参数查看状态。授权保存在当前安装目录，跨轮次、换任务和重启保留；启用后可自主决定新增代理、类型和数量。打开管理界面或激活工具声明本身不授权。
 - `/runtime-status` 查看本会话加载的构建编号、加载时间、源码更新时间和重载需求。源码待重建或新构建尚未重载时，底栏显示 `↻ /reload`，权限摘要给出当前状态。
 - 底栏显示模型实际 `name`、思考程度、权限、上下文、输入/输出和缓存命中率；宽度足够时显示费用、速度、分支与目录。未配置单价时隐藏费用；后台审批与 Hermes 消耗不计入主会话底栏。
 
@@ -170,7 +173,9 @@ flowchart TD
 
 ### 技能与授权
 
-非问候对话固定提供简短的 `principal` 工程索引和 `pi-maintenance` 维护技能描述；执行模型自行决定何时读取完整技能。普通开发在当前会话完成；只有用户明确要求子代理，或同意技能提出的委派申请后，才运行任务代理。内部审批与 Hermes 复盘是已允许的后台组件。
+非问候对话固定提供简短的 `principal` 工程索引和 `pi-maintenance` 维护技能描述；执行模型自行决定何时读取完整技能。普通开发默认在当前会话完成。首次任务委派由审批器结合真实用户消息和精确调用语义核对；不做自然语言关键词或正则授权匹配，复杂度或技能文字不能授权。已读技能建议可申请人工确认。授权一旦启用便持续有效，直到用户明确撤销；后续进度查看、Supervisor 问答或换任务不会收回授权。AUTO/ACT 核对真实用户当前限制和精确委派参数；ASK 保持人工逐次确认，PLAN 不创建任务。内部审批与 Hermes 复盘是已允许的后台组件。
+
+`contact_supervisor`、`subagent_supervisor`、`bg_wait`、代理状态与记录读取独立于创建新任务的授权；下一轮不重复“使用子代理”也能继续处理。撤销阻止新增工作，保留对既有代理的查看和问答，不自动终止已有任务。上游公开 capability-ceiling API 在未授权、PLAN、清理暂停或策略异常时禁止新代理启动，覆盖原生执行入口。委派许可不豁免子代理实际操作的权限与删除规则。自然语言撤销通过 `request_subagent(action:disable)` 语义核对并保存；新的委派调用也会检查当前真实指示中的撤销和限制。
 
 可以直接说“维护 Pi 的主题配置”，或使用 `/skill:pi-maintenance` 读取操作指南。**读取技能不等于授权修改**；`maintain_pi` 只接受当前真实用户明确提出的 Pi 维护请求，权限相关修改还须明确提出 Pi 权限或审批维护。不能为通过其他任务的拒绝而改规则。
 
@@ -234,7 +239,7 @@ AUTO/ACT 均须内部审批，ASK 人工确认且无超时，PLAN/清理暂停�
 
 Hermes 按需初始化，每 12 轮或 30 次工具调用复盘，使用最近 20 条消息；退出时不额外整理。模型通过 `memory` 按需检索或更新，只保存已确认的长期偏好、约定与经验。
 
-常用命令：`/memory-insights`、`/memory-skills`、`/memory-preview-context`、`/memory-pin`。后台模型在 `/subagents` 中设置。
+常用命令：`/memory-insights`、`/memory-skills`、`/memory-preview-context`、`/memory-pin`。后台模型在 `/background-models` 中设置。
 
 ## 备份与清理
 
@@ -311,7 +316,7 @@ PruneBackups（Windows 菜单 5）先展示清单，再确认：
 | `ask_user` | 先调查再澄清关键问题；AUTO/ACT 90 秒后使用推荐项继续 | 默认提供；只收集信息，不授予权限 |
 | `memory` | 统一检索、保存记忆，高级 schema 按需读取 | 默认提供；隐藏底层六个记忆工具的完整声明 |
 | `explain_call` | 查询某次调用的权限路线及当前运行构建状态 | 默认提供；仅诊断，不执行或授予权限 |
-| `request_subagent` | 已读技能建议委派后申请当前任务授权 | 非问候且尚未授权时提供；申请本身不启动任务 |
+| `request_subagent` | 语义核对真实用户的持续委派授权或明确撤销；已读技能可建议人工确认 | 非问候时提供；申请本身不启动任务，授权直到明确撤销 |
 | `maintain_pi` | 受控 Pi 配置及源码补丁事务 | 始终可见，具体维护意图与补丁逐次审批 |
 
 Web 工具由固定版社区扩展注册，不在本地整合层增加包装或路由。MCP 管理保留宿主默认实现；默认没有搜索 MCP 服务器。工具声明数量以上方 Context 实测为准。
@@ -329,11 +334,11 @@ Web 工具由固定版社区扩展注册，不在本地整合层增加包装或�
 | pi-hashline-edit-pro | 6.4.6 | 锚点读取、编辑、过期检测与撤销 |
 | Pi 原生 MCP | 随 Pi 1.3.0 | 原生连接、延迟发现及统一权限执行管线 |
 | pi-permission-suite | 0.2.3 | 权限规则与内部审批 |
-| pi-subagents | 0.78.0 | 授权后的任务子代理 |
+| pi-subagents | 0.78.0 | 原生管理、FleetView / Inspector 与获授权的任务委派 |
 | principal-pi-skills | 4.14.0 | 单个索引下的 9 项工程技能 |
 | @anishthite/pi-themes | 0.1.9 | Ayu、Catppuccin、GitHub 等主题 |
 | @narumitw/pi-btw | 0.61.2 | 独立旁聊 |
 
-本地 `timrt-suite` 整合界面、权限与维护。启动器使用本机 Node；Windows 使用 PowerShell 7，Linux 使用 Bash。四个本地预编译启动入口，第五个任务代理入口授权后加载。pi-web-access 直接使用上游预构建包的单一原生入口，共享宿主 SDK；不修改插件、宿主或其编译产物来实现 Web。
+本地 `timrt-suite` 整合界面、权限与维护。启动器使用本机 Node；Windows 使用 PowerShell 7，Linux 使用 Bash。四个本地预编译启动入口，suite 在启动时加载第五个任务代理产物以恢复原生管理与 Fleet；任务工具声明仍由上游 dynamic 策略按需激活，显示与执行授权分别处理。pi-web-access 直接使用上游预构建包的单一原生入口，共享宿主 SDK；不修改插件、宿主或其编译产物来实现 Web。
 
 `cache/node-compile` 与 `cache/jiti` 日常保留。Hashline 默认数据放在当前 AgentRoot 的 `pi-hashline-edit-pro`；显式设置 PI_HASHLINE_DIR 时遵循该设置。启动器依据 `customization/runtime/compiled-extensions.json` 检测源码、SDK 和输出变化，必要时自动重建。

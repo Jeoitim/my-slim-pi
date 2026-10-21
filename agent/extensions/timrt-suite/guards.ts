@@ -31,11 +31,6 @@ export function deletionRisk(text: string): boolean {
   return false;
 }
 
-export function explicitDelegation(text: string): boolean {
-  const clean = text.replace(/```[\s\S]*?```/g, "").replace(/^\s*>.*$/gm, "");
-  if (/(?:不要|禁止|不得|不许|别|无需|不使用|不要开启).{0,24}(?:子代理|子智能体|sub.?agents?|并行代理)|(?:do not|don't|never|without|disable).{0,24}(?:sub.?agents?|delegat)/i.test(clean)) return false;
-  return /(?:使用|启用|调用|开启|启动|让|请用|安排).{0,24}(?:子代理|子智能体|sub.?agents?|并行代理)|(?:use|run|spawn|enable|delegate\s+to).{0,24}(?:sub.?agents?|parallel agents?)/i.test(clean);
-}
 
 const SCRIPT_EXT = "ps1|py|js|mjs|cjs|sh|cmd|bat";
 /** Every path token that merely ends in a script extension, executed or not. */

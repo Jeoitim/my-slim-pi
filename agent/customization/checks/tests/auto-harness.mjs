@@ -33,7 +33,7 @@ async function harness(responder, reviewerOptions) {
       emit(name,event) { for(const fn of listeners.get(name)||[])fn(event); },
     },
   };
-  const state = installPermissions(pi, createApprovalReviewer(pi,reviewerOptions));
+  const state = installPermissions(pi, createApprovalReviewer(pi,reviewerOptions), async()=>{});
   const ctx = {
     cwd: mkdtempSync(join(tmpdir(), 'pi-auto-approval-')), hasUI: true, signal: undefined,
     model: { provider: 'verification', id: 'mock-model', name: 'Mock model' },

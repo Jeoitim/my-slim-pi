@@ -44,6 +44,7 @@ function digest(root, file) {
     const config = JSON.parse(data.toString('utf8'));
     const value = config.reviewer?.humanFallback;
     if (config.reviewer && (value === undefined || value === 'ask' || value === 'pause')) delete config.reviewer.humanFallback;
+    if (typeof config.taskAgentsEnabled === 'boolean') delete config.taskAgentsEnabled;
     data = Buffer.from(JSON.stringify(config));
   }
   return crypto.createHash('sha256').update(data).digest('hex');

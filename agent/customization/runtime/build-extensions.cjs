@@ -20,6 +20,7 @@ local.push('customization/runtime/policy-files.cjs');
 local.push('customization/runtime/patch-portable-paths.cjs');
 local.push('npm/node_modules/pi-permission-suite/config-loader.ts');
 local.push(...['index.ts', 'settings.ts', 'single-select-layout.ts', 'tern.ts'].map(n => `npm/node_modules/pi-ask-user/${n}`));
+local.push('npm/node_modules/pi-subagents/src/api/capability-ceiling.js', 'npm/node_modules/pi-subagents/src/runs/shared/capability-ceiling.js');
 const packageRoots = ['pi-hermes-memory', 'pi-hashline-edit-pro', 'pi-cc-extensions', 'pi-subagents', 'pi-permission-suite', 'pi-ask-user'];
 const files = [...new Set([...sources, ...local, ...packageRoots.map(p => `npm/node_modules/${p}/package.json`), 'customization/runtime/build-extensions.cjs', 'customization/runtime/patch-background-models.cjs', 'customization/runtime/patch-interactive-defaults.cjs', `install/releases/${version}/node_modules/@earendil-works/pi-coding-agent/dist/modes/interactive/interactive-mode.js`])];
 const outputs = sources.map(s => s.replace(/index\.(?:ts|js)$/, 'timrt-fast.mjs'));

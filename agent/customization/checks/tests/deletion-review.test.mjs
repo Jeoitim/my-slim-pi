@@ -24,7 +24,7 @@ async function harness(review) {
     getActiveTools: () => [], setActiveTools() {},
     events: { on(event, fn) { events.set(event, fn); return () => events.delete(event); }, emit() {} },
   };
-  const state = installPermissions(pi, review);
+  const state = installPermissions(pi, review, async()=>{});
   const ctx = {
     cwd: mkdtempSync(join(tmpdir(), 'pi-delete-review-')), hasUI: true,
     model: { provider: 'verification', id: 'mock-model', name: 'Mock model' },

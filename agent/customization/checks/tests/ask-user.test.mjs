@@ -112,7 +112,7 @@ test('child agents contact their Supervisor instead of opening a user prompt',as
 });
 test('question defaults cannot enable delegation, approve operations or change permission modes',async()=>{
   const {harness:permissions}=await import('./auto-harness.mjs');
-  const h=await permissions(()=>{throw Error('Question must not invoke approval model');});
+  const h=await permissions(()=>'{"approved":false,"confidence":0.99,"reason":"没有用户委派授权","taskAgentAuthorization":"unchanged"}');
   for(const mode of ['auto','act','ask','plan']) {
     h.setMode(mode);assert.equal(await h.call('ask_user',question),undefined);
     assert.equal(h.state.mode,mode);assert.equal(h.state.taskAgents,false);

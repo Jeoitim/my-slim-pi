@@ -12,6 +12,7 @@ function fixture(){
  const put=(file,text)=>{mkdirSync(dirname(join(root,file)),{recursive:true});writeFileSync(join(root,file),text);};
  for(const [name,version] of Object.entries({'pi-permission-suite':'0.2.3','pi-hermes-memory':'0.9.10','pi-cc-extensions':'1.0.5','pi-hashline-edit-pro':'6.4.6','pi-subagents':'0.78.0','pi-ask-user':'0.17.0'}))put('npm/node_modules/'+name+'/package.json',JSON.stringify({version}));
  for(const file of ['index.ts','settings.ts','single-select-layout.ts','tern.ts'])put('npm/node_modules/pi-ask-user/'+file,'// fixture');
+ for(const file of ['src/api/capability-ceiling.js','src/runs/shared/capability-ceiling.js'])put('npm/node_modules/pi-subagents/'+file,'// fixture');
  put('install/current-version','1.3.0');
  put('npm/node_modules/pi-permission-suite/config-loader.ts','return homedir() + "/.pi/agent/extensions/pi-permission-suite/config.json";');
  put('npm/node_modules/pi-hermes-memory/src/index.ts','  const config = loadConfig();');
