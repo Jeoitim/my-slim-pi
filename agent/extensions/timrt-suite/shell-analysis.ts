@@ -19,10 +19,13 @@ export function resolvePowerShellExecutable(env: Record<string,string|undefined>
   return candidates.find(file=>exists(file));
 }
 
-/** Native grammar, stdin data only; never run the proposed command to classify it. Lazy and bounded. */
+/** Native grammar, stdin data only; never run the proposed command to classify it. Lazy and bounded.
+ * The budget covers PowerShell process startup as well as AST work; a cold pwsh start dominates. */
+export const DEFAULT_SHELL_ANALYSIS_TIMEOUT_MS = 3000;
 export function createShellAnalyzer(options: {run?:(...args:any[])=>any;resolveExecutable?:()=>string|undefined;now?:()=>number;timeoutMs?:number} = {}) {
   const cache = new Map<string,ShellAnalysis>(), run=options.run || spawnSync, clock=options.now || Date.now;
-  let retryAt=0, state="unused", reason="";
+  const timeoutMs = options.timeoutMs ?? DEFAULT_SHELL_ANALYSIS_TIMEOUT_MS;
+  let retryAt=0, state="unused", reason="", executable:string|undefined;
   const fault = (message:string) => {state="unavailable";reason=message;retryAt=clock()+2000;return failed;};
   const analyze = (command:string): ShellAnalysis => {
     if (process.platform !== "win32" || command.length > 100_000) return failed;
@@ -31,12 +34,19 @@ export function createShellAnalyzer(options: {run?:(...args:any[])=>any;resolveE
     if (clock()<retryAt) return failed;
     try {
     const parser = fileURLToPath(new URL("./read-only-parser.ps1", import.meta.url));
-    const exe = (options.resolveExecutable || resolvePowerShellExecutable)();
-    if (!exe) return fault("未找到 PowerShell，保留字面量只读快路径");
-    const result = run(exe, ["-NoLogo", "-NoProfile", "-NonInteractive", "-File", parser], {
-      input: command, encoding: "utf8", windowsHide: true, timeout: options.timeoutMs ?? 1200, maxBuffer: 2_000_000,
+    executable ??= (options.resolveExecutable || resolvePowerShellExecutable)();
+    if (!executable) return fault("未找到 PowerShell，保留字面量只读快路径");
+    const started = clock();
+    const result = run(executable, ["-NoLogo", "-NoProfile", "-NonInteractive", "-File", parser], {
+      input: command, encoding: "utf8", windowsHide: true, timeout: timeoutMs, maxBuffer: 2_000_000,
+      // PowerShell update checks and telemetry add jitter to short-lived parser processes.
+      env: { ...process.env, POWERSHELL_TELEMETRY_OPTOUT: "1", POWERSHELL_UPDATECHECK: "Off" },
     });
-    if (result.error || result.status !== 0) return fault(result.error?.code === "ETIMEDOUT" ? "解析器超时" : "解析器启动失败");
+    const elapsed = Math.max(0, clock() - started);
+    if (result.error || result.status !== 0) {
+      if (result.error?.code === "ENOENT") executable = undefined;
+      return fault(result.error?.code === "ETIMEDOUT" ? `解析器超时（${elapsed}ms，预算 ${timeoutMs}ms）` : "解析器启动失败");
+    }
     const value = JSON.parse(result.stdout.replace(/^\uFEFF/, ""));
     if (typeof value.valid !== "boolean" || typeof value.readOnly !== "boolean" || !Array.isArray(value.commands)) return fault("解析器响应无效");
     const parsed = {...value,readOnly:value.valid && value.readOnly} as ShellAnalysis;

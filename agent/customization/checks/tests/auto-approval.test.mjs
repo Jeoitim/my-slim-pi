@@ -140,7 +140,7 @@ test('optional parser failures recover without caching errors or blocking litera
   const {createShellAnalyzer,resolvePowerShellExecutable,nativeRead}=await jiti.import(join(suite,'extensions/timrt-suite/shell-analysis.ts'));
   let now=100, requests=0;
   const parser=createShellAnalyzer({now:()=>now,resolveExecutable:()=> 'C:\\fixture\\pwsh.exe',run:(_exe,_args,options)=>{
-    requests++;assert.equal(options.timeout,1200);assert.equal(options.windowsHide,true);
+    requests++;assert.equal(options.timeout,3000);assert.equal(options.windowsHide,true);assert.equal(options.env.POWERSHELL_UPDATECHECK,'Off');
     return requests===1 ? {status:null,error:{code:'ETIMEDOUT'}} : {status:0,stdout:JSON.stringify({valid:true,readOnly:true,commands:[]})};
   }});
   assert.equal(parser.analyze('Get-Location; Get-Date').valid,false);
@@ -151,6 +151,16 @@ test('optional parser failures recover without caching errors or blocking litera
   assert.equal(parser.analyze('Get-Location; Get-Date').readOnly,true);
   assert.equal(requests,2,'同一命令可重试恢复');
   parser.analyze('Get-Location; Get-Date');assert.equal(requests,2,'成功结果才缓存');
+  let resolved=0;
+  const cached=createShellAnalyzer({resolveExecutable:()=>{resolved++;return 'C:\\fixture\\pwsh.exe';},run:()=>({status:0,stdout:JSON.stringify({valid:true,readOnly:true,commands:[]})})});
+  cached.analyze('Get-Date');cached.analyze('Get-Location');
+  assert.equal(resolved,1,'可执行文件解析结果应复用');
+  let exeCalls=0,runCalls=0;
+  const recover=createShellAnalyzer({now:()=>now,resolveExecutable:()=>{exeCalls++;return 'C:\\fixture\\pwsh.exe';},run:()=>++runCalls===1?{error:{code:'ENOENT'}}:{status:0,stdout:JSON.stringify({valid:true,readOnly:true,commands:[]})}});
+  assert.equal(recover.analyze('Get-Date').valid,false);
+  now+=2001;
+  assert.equal(recover.analyze('Get-Date').valid,true);
+  assert.equal(exeCalls,2,'可执行文件消失后应重新解析路径');
   const scoop=resolvePowerShellExecutable({ProgramFiles:'C:\\missing',PATH:'C:\\scoop\\shims',SystemRoot:'C:\\Windows'},path=>path.includes('scoop')&&path.endsWith('pwsh.exe'));
   assert.match(scoop,/scoop/);
   const legacy=resolvePowerShellExecutable({ProgramFiles:'C:\\missing',PATH:'',SystemRoot:'C:\\Windows'},path=>path.endsWith('WindowsPowerShell\\v1.0\\powershell.exe'));
