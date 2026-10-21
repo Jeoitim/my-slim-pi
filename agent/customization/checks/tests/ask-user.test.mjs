@@ -16,12 +16,12 @@ const jiti=createJiti(import.meta.url,{alias:{
 }});
 const {installAskUser,QUESTION_TIMEOUT_MS}=await jiti.import(join(root,'extensions/timrt-suite/ask-user.ts'));
 const question={question:'选择实现？',options:[{title:'现有接口'},{title:'新增接口'}]};
-function harness(mode='auto') {
+function harness(mode='auto', contextMode) {
   const hooks=new Map(),events=[],notices=[];let tool;
   const pi={on(name,fn){hooks.set(name,[...(hooks.get(name)||[]),fn]);},registerTool(t){tool=t;},events:{emit:(...args)=>events.push(args)}};
   const state={mode};installAskUser(pi,state);
   const wait=(_title,_rows,{signal}={})=>new Promise(resolve=>signal?.aborted?resolve(undefined):signal?.addEventListener('abort',()=>resolve(undefined),{once:true}));
-  const ctx={hasUI:true,ui:{custom:async()=>undefined,select:wait,input:wait,notify:(...args)=>notices.push(args)}};
+  const ctx={mode:contextMode,hasUI:true,ui:{custom:async()=>undefined,select:wait,input:wait,notify:(...args)=>notices.push(args)}};
   return {tool,ctx,state,events,notices,call:(args=question,signal)=>tool.execute('question',args,signal,undefined,ctx),
     emit(name,event={}){for(const fn of hooks.get(name)||[])fn(event,ctx);}};
 }
@@ -104,6 +104,15 @@ test('native picker renders the recommendation and closes exactly once on expiry
   for(const width of [40,80,120])assert.match(component.render(width).join('\n'),/推荐/);
   t.mock.timers.tick(90_000);assert.equal((await pending).details.autoSelected,true);
   assert.equal(closed,1);assert.equal(removed,1);assert.equal('timeout' in h.tool.parameters.properties,false);
+});
+test('rpc mode uses native dialogs instead of the terminal custom UI',async()=>{
+  const h=harness('ask','rpc');let custom=0;
+  h.ctx.ui.custom=async()=>{custom++;return {kind:'selection',selections:['不应使用']};};
+  h.ctx.ui.select=async(_title,rows)=>rows[1];
+  const result=await h.call();
+  assert.equal(custom,0);
+  assert.deepEqual(result.details.response,{kind:'selection',selections:['新增接口']});
+  assert.equal(result.details.cancelled,false);
 });
 test('child agents contact their Supervisor instead of opening a user prompt',async()=>{
   const before=process.env.PI_SUBAGENT_CHILD;

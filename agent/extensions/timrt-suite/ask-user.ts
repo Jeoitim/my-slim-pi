@@ -5,6 +5,31 @@ import type { PermissionMode } from "./permissions.ts";
 export const QUESTION_TIMEOUT_MS = 90_000;
 export const QUESTION_POLICY = "仅当缺失信息会实质影响用户意图、技术架构或不可逆操作时，先调查现有证据，仍无法确定才提问；文档、代码和测试能解决的问题自主处理。子代理优先用 contact_supervisor 询问 Supervisor，仅 Supervisor 无权决定时由其向用户升级。提问、任务交接和操作授权互不替代。";
 
+/**
+ * RPC hosts (including pi-web) implement select/input as native dialogs but
+ * can also expose a generic custom(). pi-ask-user's rich terminal component is
+ * the TUI experience; RPC should use its intended dialog fallback so desktop
+ * and browser clients do not have to replay the terminal widget by keystroke.
+ */
+function withRpcDialogs<T extends { mode?: string; ui: unknown }>(ctx: T): T {
+  if (ctx.mode !== "rpc") return ctx;
+  const uiTarget = ctx.ui as Record<PropertyKey, unknown>;
+  const ui = new Proxy(uiTarget, {
+    get(target, key) {
+      if (key === "custom") return async () => undefined;
+      const value = Reflect.get(target, key);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  });
+  return new Proxy(ctx, {
+    get(target, key) {
+      if (key === "ui") return ui;
+      const value = Reflect.get(target, key);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  });
+}
+
 /** Adapt the package through public registration APIs; vendor sources stay intact. */
 export function installAskUser(pi: ExtensionAPI, state: { mode: PermissionMode }) {
   let generation = 0;
@@ -47,12 +72,13 @@ export function installAskUser(pi: ExtensionAPI, state: { mode: PermissionMode }
           const controller = new AbortController();
           pending.add(controller);
           const combined = AbortSignal.any([controller.signal, ...(signal ? [signal] : []), ...(ctx.signal ? [ctx.signal] : [])]);
+          const toolCtx = withRpcDialogs(ctx);
           let expired = false;
           const timer = automatic && ctx.hasUI && !combined.aborted ? setTimeout(() => { expired = true; controller.abort(); }, QUESTION_TIMEOUT_MS) : undefined;
           if (automatic && ctx.hasUI) ctx.ui.notify("问答等待 90 秒；未完成将自动采用每题第一项推荐方案继续。操作审批与任务代理授权仍按原规则处理。", "info");
           try {
             let result;
-            if (raw.questions == null) result = await tool.execute(id, params, combined, update, ctx);
+            if (raw.questions == null) result = await tool.execute(id, params, combined, update, toolCtx);
             else {
               // Sequential pages retain already submitted answers when a later
               // question expires. One deadline covers the entire batch.
@@ -60,7 +86,7 @@ export function installAskUser(pi: ExtensionAPI, state: { mode: PermissionMode }
               const answers: any[] = [];
               let cancelled = false;
               for (const q of questions) {
-                const answer = await tool.execute(id, { ...common, ...q, question: heading ? `${heading}\n${q.question}` : q.question }, combined, undefined, ctx);
+                const answer = await tool.execute(id, { ...common, ...q, question: heading ? `${heading}\n${q.question}` : q.question }, combined, undefined, toolCtx);
                 if (answer.details?.cancelled) { cancelled = true; break; }
                 answers.push({ status: "answered", response: answer.details.response });
               }

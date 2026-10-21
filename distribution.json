@@ -99,8 +99,8 @@
     "web-search.json": "4bde4524d929cd77cc43df9c5600f2817a9c656a0112cfccd6b942f6e4668a0a",
     "customization/checks/tests/web-access.test.mjs": "2065c5341393f413c07fdecdea50fc6024500a1bbeacd0cbfd9f440e0d6592e1",
     "customization/checks/tests/web-access-native.test.mjs": "121c2bf3cfb2db6c144a7fbb55ab2f482bf3dbf3eafc5045f72be5fd9a590070",
-    "extensions/timrt-suite/ask-user.ts": "ecaa4996bc80a81f17a130accc7df9819e0352be7cc3dbed325c3bef098838c6",
-    "customization/checks/tests/ask-user.test.mjs": "e7d0700d8ce9a5960038ab07670ad9970fcd57121f4d383542f4f4589395812c",
+    "extensions/timrt-suite/ask-user.ts": "77dafa861d174b6dcad5356bd3754e0f8a7e19a74956c4fe71273c10417269de",
+    "customization/checks/tests/ask-user.test.mjs": "c596cf776bfff87b8adb0811feb26312ec00e8d66f2677b16f65d2c4043f0f49",
     "customization/checks/tests/subagents.test.mjs": "87b7d959cb3003833020bbcc0b97bebaec952a932821a1ac51bfd74c819269a5"
   },
   "platforms": [
