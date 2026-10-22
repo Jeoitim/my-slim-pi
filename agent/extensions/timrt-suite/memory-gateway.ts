@@ -1,5 +1,6 @@
 import { Type } from "typebox";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { compactToolDescriptions } from "./prompt-policy.ts";
 export const MEMORY_TOOLS = ["memory_search", "memory_add", "memory_replace", "memory_remove", "skill_manage", "session_search"];
 export function installMemoryGateway(pi: ExtensionAPI) {
   pi.registerTool({
@@ -14,7 +15,10 @@ export function installMemoryGateway(pi: ExtensionAPI) {
       args: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
     }),
     reachesTools: input => input.action === "search" ? ["memory_search"] : input.action === "add" ? ["memory_add"] : MEMORY_TOOLS,
-    prepareLoadout: ({ declared }) => ({ hiddenDeclarations: declared.filter(t => MEMORY_TOOLS.includes(t.name)).map(t => t.name) }),
+    prepareLoadout: ({ declared }) => ({
+      hiddenDeclarations: declared.filter(t => MEMORY_TOOLS.includes(t.name)).map(t => t.name),
+      descriptions: compactToolDescriptions(declared),
+    }),
     execute: async (_id, input, signal, _onUpdate, ctx) => {
       const name = input.action === "search" ? "memory_search" : input.action === "add" ? "memory_add" : input.tool;
       if (!name || !MEMORY_TOOLS.includes(name)) throw new Error("Choose one of the supported memory tools.");

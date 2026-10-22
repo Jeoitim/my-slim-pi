@@ -16,6 +16,28 @@ const jiti=createJiti(import.meta.url,{alias:{
 }});
 const {installAskUser,QUESTION_TIMEOUT_MS}=await jiti.import(join(root,'extensions/timrt-suite/ask-user.ts'));
 const question={question:'选择实现？',options:[{title:'现有接口'},{title:'新增接口'}]};
+test('compact declaration preserves upstream validation and UI controls',async()=>{
+  const {default:register}=await jiti.import(join(root,'npm/node_modules/pi-ask-user/index.ts'));
+  let original;register({on(){},registerTool(t){original=t;},events:{emit(){}}});
+  const originalJson=JSON.stringify(original.parameters);
+  const compact=harness().tool.parameters;
+  // Keep non-enumerable and symbol keys too: TypeBox uses optional markers.
+  const constraints=(value,properties=false)=>{
+    if(Array.isArray(value))return value.map(v=>constraints(v));
+    if(!value || typeof value!=='object')return value;
+    return Object.fromEntries(Reflect.ownKeys(value).filter(key=>properties || key!=='description').map(key=>[key,constraints(value[key],key==='properties')]));
+  };
+  const expected=Object.create(Object.getPrototypeOf(original.parameters),Object.getOwnPropertyDescriptors(original.parameters));
+  expected.properties={...original.parameters.properties};
+  delete expected.properties.timeout;
+  assert.deepEqual(constraints(compact),constraints(expected));
+  assert.equal(JSON.stringify(original.parameters),originalJson,'vendor schema was not mutated');
+  assert.ok(JSON.stringify(compact).length<JSON.stringify(expected).length);
+  assert.match(compact.properties.question.description,/heading/);
+  assert.doesNotMatch(compact.properties.questions.items.properties.question.description,/heading/);
+  assert.equal(harness().tool.exposure,'model-only');
+  assert.equal(harness().tool.executionMode,'sequential');
+});
 function harness(mode='auto', contextMode) {
   const hooks=new Map(),events=[],notices=[];let tool;
   const pi={on(name,fn){hooks.set(name,[...(hooks.get(name)||[]),fn]);},registerTool(t){tool=t;},events:{emit:(...args)=>events.push(args)}};

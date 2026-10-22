@@ -106,6 +106,22 @@ test('memory gateway keeps schemas on demand and forwards real tool error state'
   assert.deepEqual(calls[1].slice(0, 2), ['memory_add', { target: 'user', content: 'Chinese responses' }]);
 });
 
+test('loadout compaction preserves hidden memory tools and leaves policy and custom declarations intact', async () => {
+  const { installMemoryGateway, MEMORY_TOOLS } = await jiti.import(source('memory-gateway'));
+  let gateway;installMemoryGateway({registerTool:t=>{gateway=t;}});
+  const declared=[...MEMORY_TOOLS.map(name=>({name,description:'memory'})),
+    {name:'replace',description:'Original anchor guidance. '.repeat(30)},
+    {name:'fetch_content',description:'Configured fetch modes and media capabilities.'},
+    {name:'maintain_pi',description:'Per-patch authorization and rollback.'},
+    {name:'custom_tool',description:'Custom extension instructions.'}];
+  const before=structuredClone(declared),result=gateway.prepareLoadout({declared});
+  assert.deepEqual(result.hiddenDeclarations,MEMORY_TOOLS);
+  assert.deepEqual(Object.keys(result.descriptions),['replace']);
+  assert.match(result.descriptions.replace,/anchors/);
+  assert.doesNotMatch(result.descriptions.replace,/replace_match/);
+  assert.deepEqual(declared,before);
+});
+
 test('skill text cannot authorize itself and native management is separate from background models', async () => {
   const { installPermissions } = await jiti.import(source('permissions'));
   const hooks = new Map(), commands = new Map(), tools = new Map();

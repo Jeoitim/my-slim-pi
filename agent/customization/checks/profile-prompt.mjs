@@ -1,6 +1,6 @@
 // Captures a fresh request using a local fake provider. No network/model request is sent.
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { readFileSync } from 'node:fs';
 const root = process.env.PI_CODING_AGENT_DIR || join(homedir(), '.pi/agent');
@@ -14,6 +14,8 @@ const { initTheme } = await import(pathToFileURL(join(modules, '@earendil-works/
 initTheme('claude-warm');
 const prompt = process.argv.find(a => a.startsWith('--prompt='))?.slice(9) || 'hello';
 const tag = process.argv.find(a => a.startsWith('--tag='))?.slice(6) || 'current';
+const cwd = resolve(process.argv.find(a => a.startsWith('--cwd='))?.slice(6) || homedir());
+const noContextFiles = process.argv.includes('--no-context-files');
 let captured;
 const zero = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } };
 const model = { id: 'audit', name: 'Offline prompt audit', provider: 'timrt-context-audit', api: 'openai-completions', input: ['text'], reasoning: false, contextWindow: 1000000, maxTokens: 100, cost: zero.cost };
@@ -25,10 +27,10 @@ const capture = pi => pi.registerProvider('timrt-context-audit', { baseUrl: 'htt
   queueMicrotask(() => { stream.push({ type: 'start', partial: message }); stream.push({ type: 'done', reason: 'stop', message }); stream.end(); });
   return stream;
 } });
-const loader = new sdk.DefaultResourceLoader({ cwd: homedir(), agentDir: root, extensionFactories: [capture, sdk.createMcpExtension({ loadConfig: () => ({ servers: [], errors: [] }) })] });
+const loader = new sdk.DefaultResourceLoader({ cwd, agentDir: root, noContextFiles, extensionFactories: [capture, sdk.createMcpExtension({ loadConfig: () => ({ servers: [], errors: [] }) })] });
 await loader.reload();
 if (loader.getExtensions().errors.length) throw Error(JSON.stringify(loader.getExtensions().errors));
-const { session } = await sdk.createAgentSession({ model, cwd: homedir(), agentDir: root, resourceLoader: loader, sessionManager: sdk.SessionManager.inMemory(homedir()) });
+const { session } = await sdk.createAgentSession({ model, cwd, agentDir: root, resourceLoader: loader, sessionManager: sdk.SessionManager.inMemory(cwd) });
 try {
   await session.bindExtensions({ mode: 'json' });
   const resolved = session.extensionRunner.createContext().modelRegistry.find('timrt-context-audit', 'audit');

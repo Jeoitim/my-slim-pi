@@ -324,6 +324,8 @@ PruneBackups（Windows 菜单 5）先展示清单，再确认：
 
 Web 工具由固定版社区扩展注册，不在本地整合层增加包装或路由。MCP 管理保留宿主默认实现；默认没有搜索 MCP 服务器。工具声明数量以上方 Context 实测为准。
 
+默认 memory 编排工具通过公开 prepareLoadout 为已声明的部分工具提供较短描述，不增加工具、改变可见性或转发执行；未知工具、权限/维护声明及随配置变化的 fetch_content 描述保持原样。ask_user 在注册时缩短字段说明，保留上游参数、约束、非枚举 TypeBox 校验标记与界面偏好；原有 timeout 参数仍由本地模式规则接管。Context 采样支持 --cwd=<空白测试目录> --no-context-files，配合 --dynamic-model 分别检查动态与兼容回退路径；字符数不等于 token 或工具选择准确率。
+
 每轮系统提示包含**本机日期和时区**。需要实时钟点或精确日志时间范围时，Windows 在 PowerShell 执行 `Get-Date -Format o`，Linux 在 Bash 执行 `date --iso-8601=seconds`，无需额外时间工具；日常提示不持续写入变化的时分秒。
 
 ### 当前组件

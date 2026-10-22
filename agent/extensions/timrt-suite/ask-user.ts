@@ -5,6 +5,33 @@ import type { PermissionMode } from "./permissions.ts";
 export const QUESTION_TIMEOUT_MS = 90_000;
 export const QUESTION_POLICY = "Ask only when missing information materially affects user intent, technical architecture, or an irreversible action. Inspect available evidence first; resolve questions answered by documentation, code, or tests yourself. A task agent asks its Supervisor through contact_supervisor first; only the Supervisor escalates matters it cannot decide to the user. Questions, task delegation, and operation authorization are separate.";
 
+// Replace documentation only: retain upstream types, required fields, limits,
+// enum values and non-enumerable TypeBox metadata. UI defaults stay upstream.
+const QUESTION_FIELDS: Record<string, string> = {
+  question: "Single question; with questions, optional batch heading only.",
+  questions: "2–4 independent questions. Put context/options/allowMultiple/allowFreeform inside each entry; other settings apply to the batch.",
+  context: "Brief findings and the unresolved decision.",
+  options: "Choices; put the workable recommendation first (required in AUTO/ACT).",
+  title: "Short choice label.",
+  description: "Choice explanation.",
+  allowMultiple: "Multi-select; default false.",
+  allowFreeform: "Offer free-text input; default true.",
+  allowComment: "Optional comment after selection; omit to keep user preference (fallback false).",
+  displayMode: "overlay: modal; inline: in-place. Omit UI settings to keep user preferences (fallback overlay).",
+  singleSelectLayout: "auto: wide-screen details pane; list: descriptions below choices. Fallback auto.",
+  contextExpanded: "Expand long context initially; fallback false.",
+  overlayToggleKey: "Overlay visibility shortcut; 'off' disables. Fallback alt+o.",
+  commentToggleKey: "Comment-row shortcut when allowComment; 'off' disables. Fallback ctrl+g.",
+};
+export function compactQuestionSchema(schema: any, field = "", inBatch = false): any {
+  const compact = Object.create(Object.getPrototypeOf(schema), Object.getOwnPropertyDescriptors(schema));
+  if (typeof schema.description === "string" && QUESTION_FIELDS[field]) compact.description = QUESTION_FIELDS[field];
+  if (field === "question" && inBatch) compact.description = "One independent question.";
+  if (schema.properties) compact.properties = Object.fromEntries(Object.entries(schema.properties).map(([key, value]) => [key, compactQuestionSchema(value, key, inBatch)]));
+  if (schema.items) compact.items = compactQuestionSchema(schema.items, "", inBatch || field === "questions");
+  return compact;
+}
+
 /**
  * RPC hosts (including pi-web) implement select/input as native dialogs but
  * can also expose a generic custom(). pi-ask-user's rich terminal component is
@@ -42,12 +69,14 @@ export function installAskUser(pi: ExtensionAPI, state: { mode: PermissionMode }
     if (key !== "registerTool") return Reflect.get(target, key);
     return (tool: ToolDefinition<any, any>) => {
       if (tool.name !== "ask_user") return target.registerTool(tool);
+      const parameters = compactQuestionSchema(tool.parameters);
+      delete parameters.properties.timeout;
       target.registerTool({
         ...tool,
-        parameters: { ...tool.parameters, properties: Object.fromEntries(Object.entries(tool.parameters.properties).filter(([name]) => name !== "timeout")) },
-        description: "Ask the user one critical question or 2–4 independent questions. Inspect evidence first and use context to state what remains undecided. The first option for each question is recommended; free-form answers are allowed. In AUTO/ACT, after 90 seconds for the whole exchange, unanswered questions use the recommended options as working assumptions. ASK/PLAN never auto-select. Asking grants no operation or delegation permission.",
-        promptSnippet: "Clarify critical questions with recommended options and free-form answers when needed",
-        promptGuidelines: [QUESTION_POLICY, "Ask one question by default; put the recommended option first. An AUTO/ACT timeout selecting that option is only a working assumption, not a user reply or authorization."],
+        parameters,
+        description: "Clarify one critical question (default) or 2–4 independent questions. Inspect evidence first. Recommend the first choice; allow free text. AUTO/ACT: one 90s deadline, then use unanswered recommendations as working assumptions, never human replies or authorization. ASK/PLAN never auto-select. Omit UI settings to keep user preferences.",
+        promptSnippet: "Clarify critical decisions with recommended choices and free text",
+        promptGuidelines: [QUESTION_POLICY],
         async execute(id, raw: any, signal, update, ctx) {
           if (process.env.PI_SUBAGENT_CHILD === "1") throw new Error("Task agents must use contact_supervisor first; if unavailable, report missing information to the Supervisor for any user escalation.");
           const mode = state.mode, current = generation;

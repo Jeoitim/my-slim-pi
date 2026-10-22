@@ -1,6 +1,12 @@
 # 扩展架构与维护边界
 
-当前基线为 Pi 1.3.0，Web 扩展为 [nicobailon/pi-web-access 0.43.0](https://github.com/nicobailon/pi-web-access)，任务代理为 pi-subagents 0.78.0，关键澄清为 pi-ask-user 0.17.0。核对日期 2026-10-21；固定版本与分发哈希以 distribution.json 为准。
+当前基线为 Pi 1.3.0，Web 扩展为 [nicobailon/pi-web-access 0.43.0](https://github.com/nicobailon/pi-web-access)，任务代理为 pi-subagents 0.78.0，关键澄清为 pi-ask-user 0.17.0。核对日期 2026-10-22；固定版本与分发哈希以 distribution.json 为准。
+
+## 工具声明压缩
+
+沿用默认 memory 编排工具的公开 prepareLoadout hook，为已声明工具提供稳定的短描述，仅在确实更短时替换；隐藏底层记忆声明的原逻辑不变。保留完整参数、执行入口、exposure、reachesTools 和上游 promptGuidelines；不增加路由工具或补丁。read 的锚点规则、权限/维护工具说明和依配置生成的 fetch_content 能力说明不压缩，其他未知工具不改写。技能继续使用稳定描述和 Principal 分层索引。
+
+ask_user 通过现有公开 registerTool 适配缩短字段文案，省略重复的环境变量与配置路径，保留全部界面参数和用户偏好解析。复制 schema 时保留属性描述符，包括 TypeBox 的非枚举元数据；除既有 timeout 接管外，类型、必填项、枚举和数量约束与上游等价。整次问答超时、取消、RPC/TUI、Supervisor 优先及问答不授权等语义保持原样。未改变依赖、宿主、默认工具或实际运行目录。测量与验收见 [工具声明优化](tool-declarations.md)。
 
 ## Web 扩展
 
