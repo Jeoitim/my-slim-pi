@@ -55,7 +55,7 @@ macOS 应走 Bash 版本的适配方向。目前安装器明确支持 Windows / 
 
 ## 开始使用
 
-- **联网**：`pi-web-access@0.43.0` 原生 `web_search`、`fetch_content`、`get_search_content`；原生 auto 策略，保留全部免 Key 供应商和已有平台凭据，自动激活，保留内容缓存。
+- **联网**：`pi-web-access@0.44.0` 原生 `web_search`、`fetch_content`、`get_search_content`；原生 auto 策略，保留全部免 Key 供应商和已有平台凭据，自动激活，保留内容缓存。
 - **模型**：用 `/login` 或自己的 `models.json` 配置供应商，`/model` 选择模型。
 - **关键澄清**：`pi-ask-user@0.17.0` 先调查再按需提问；AUTO / ACT 问答 90 秒未完成自动采用第一项推荐方案继续，ASK / PLAN 不自动选择。提问不代替审批或委派授权。
 - **权限**：提供 AUTO / ACT / ASK / PLAN；ASK 的非只读操作逐次人工确认，PLAN 保持只读。
@@ -66,12 +66,14 @@ macOS 应走 Bash 版本的适配方向。目前安装器明确支持 Windows / 
 
 ## 更新与恢复
 
+日常更新 Pi 本体直接运行 `pi update`。插件在实际 AgentRoot 的 `npm` 目录运行 `npm install 包名@latest --save-exact --legacy-peer-deps --ignore-scripts`，然后重启 Pi；下一次启动自动同步已配置包的版本、重建并检查，无需手动修改补丁版本门禁。插件继续精确固定，普通 `npm update` 和 `pi update --extensions` 不会跨过固定版本。真实接口不兼容时仍会停止并保留修复入口，见[升级与更新方式](docs/pi-1.4-upgrade-assessment.md)。
+
 重新运行安装器，选择“备份后更新或修复”。已有模型、搜索 Key 和代理会保留；Web 能力设置采用本仓库已审查的原生配置，其他长期规则及个人配置保留；更新前生成配置和核心源码快照。安装失败会保留目录及备份，方便继续修复。
 
 需要预览、自定义目录或自动化安装时，见[安装选项](docs/INSTALLATION.md)。启动损坏和恢复步骤见[维护手册](agent/customization/Pi%20Agent%20本机配置维护手册.md#备份与清理)。
 
 ## 关于此仓库
 
-当前固定版本为 **Pi 1.3.0**，包含十个社区组件；不包含个人模型、密钥、会话或记忆数据库。具体版本见 [distribution.json](distribution.json)。
+当前固定版本为 **Pi 1.4.0**，包含十个社区组件；不包含个人模型、密钥、会话或记忆数据库。具体版本见 [distribution.json](distribution.json)。
 
 [维护仓库](docs/MAINTAINING.md) · [双平台验证报告](docs/CROSS-PLATFORM.md) · [架构审计](docs/extension-first-audit.md)

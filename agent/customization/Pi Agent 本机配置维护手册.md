@@ -1,6 +1,6 @@
 # Pi 本机维护手册
 
-更新：2026-10-21 · Pi 1.3.0 · Node 24+ · Windows / PowerShell 7 · Linux / Bash
+更新：2026-10-22 · Pi 1.4.0 · Node 24+ · Windows / PowerShell 7 · Linux / Bash
 
 本安装目录自带锁定版本的 Pi，无需全局安装。Windows 使用 PowerShell 7，Linux 使用 Bash，均需要 Node.js 24+（含 npm）。
 
@@ -217,16 +217,20 @@ AUTO/ACT 均须内部审批，ASK 人工确认且无超时，PLAN/清理暂停�
 
 ### 外部维护与组件升级
 
-1. 使用上方本系统的 `Backup` 命令建立快照。
-2. 核对具体补丁或组件版本。包管理使用 `pi list`、`pi install npm:包名@明确版本`；保留包资源过滤和单一扩展入口。
-3. 应用后依次运行本系统的 `Rebuild`、`Check`。重建会应用兼容补丁、编译并生成 `customization/runtime/policy-seal.json`。
-4. `/reload` 或重启，检查状态和实际行为；验证后再清理旧版与快照。构建失败先定位原因，保留回退资料。
+升级前保留一次 Backup 快照和 npm/package.json、npm/package-lock.json；快照含私密网络配置，不外传。
+
+- **Pi 本体**：直接运行 `pi update --self`（`pi update` 也可按上游默认流程运行）。使用原生多版本安装目录，保留升级时运行的旧版。
+- **插件**：在 AgentRoot/npm 目录运行 `npm install 包名@latest --save-exact --legacy-peer-deps --ignore-scripts`，然后重新启动 Pi。最后两个选项保持宿主 SDK 共享和跳过安装脚本。一次可列多个 包名@latest。
+- **自动完成**：下次启动同步已配置包的版本，保留包资源过滤和单一入口，应用结构兼容补丁、重建并检查离线启动；正常升级无需手动修改版本门禁或重复 Rebuild/Check。
+- **实际不兼容**：替换位置或加载行为发生变化时，停止会话并报告；更新、安装和版本查询仍可运行。恢复插件需用旧锁重新安装；只恢复配置不会恢复 node_modules。Pi 可将 install/current-version 切回保留的旧版后重启。
+
+插件仍精确固定，因此 `pi update --extensions` 或普通 `npm update` 会遵循固定版本，不会自动升到下一版。未来版本的结构兼容检查不能代替重大更新的行为验收；本次保留 AUTO / ACT / ASK / PLAN、逐次审批和任务代理授权。
 
 ## 联网与记忆
 
 ### 搜索
 
-联网由固定版本 pi-web-access 0.43.0 提供，保留 `web_search`、`fetch_content`、`get_search_content` 三个原生工具。本机保持 `provider: "auto"`，不设置 `searchRouting` 或 `allowedProviders`；供应商顺序、串行回退、成功即停、显式 provider 的严格语义以及是否需要 Key，均以插件文档为准（`npm/node_modules/pi-web-access/README.md`）。安装器可选用 Exa、Brave、Tavily 的 Key，可跳过，也可完全不配（插件自带免费 Exa）；有 Key 不等于强制启用，实际是否使用由回退链决定，显式选择项不会因有 Key 自动进入 auto。追加其他供应商按插件文档修改 `web-search.json`：只增加 `*ApiKey` 或 `proxy` 不触发策略重建，改动能力或路由配置后需 Rebuild 并重启。抓取保留原生 HTTP、正文提取、Fetch 回退与内容缓存，第三方托管抓取服务默认关闭。
+联网由固定版本 pi-web-access 0.44.0 提供，保留 `web_search`、`fetch_content`、`get_search_content` 三个原生工具。本机保持 `provider: "auto"`，不设置 `searchRouting` 或 `allowedProviders`；供应商顺序、串行回退、成功即停、显式 provider 的严格语义以及是否需要 Key，均以插件文档为准（`npm/node_modules/pi-web-access/README.md`）。安装器可选用 Exa、Brave、Tavily 的 Key，可跳过，也可完全不配（插件自带免费 Exa）；有 Key 不等于强制启用，实际是否使用由回退链决定，显式选择项不会因有 Key 自动进入 auto。追加其他供应商按插件文档修改 `web-search.json`：只增加 `*ApiKey` 或 `proxy` 不触发策略重建，改动能力或路由配置后需 Rebuild 并重启。抓取保留原生 HTTP、正文提取、Fetch 回退与内容缓存，第三方托管抓取服务默认关闭。
 
 `toolActivation: "auto"` 由插件按模型能力决定：支持会话中追加工具且保留提示缓存的模型先提供原生 `web_enable`，启用后追加三个工具；其他模型首轮直接声明三个工具。恢复会话沿用已有工具声明。没有统一 Web 包装工具。`/search` 查看原生缓存。
 
@@ -332,17 +336,17 @@ Web 工具由固定版社区扩展注册，不在本地整合层增加包装或�
 
 | 组件 | 固定版本 | 职责 |
 |---|---|---|
-| pi-web-access | 0.43.0 | 原生搜索、抓取与缓存 |
+| pi-web-access | 0.44.0 | 原生搜索、抓取与缓存 |
 | pi-ask-user | 0.17.0 | 关键问题澄清、推荐选项与自由回答 |
-| pi-cc-extensions | 1.0.5 | Claude 风格消息、diff、启动页 |
-| pi-hermes-memory | 0.9.10 | 长期记忆、复盘与经验技能 |
-| pi-hashline-edit-pro | 6.4.6 | 锚点读取、编辑、过期检测与撤销 |
-| Pi 原生 MCP | 随 Pi 1.3.0 | 原生连接、延迟发现及统一权限执行管线 |
+| pi-cc-extensions | 1.0.8 | Claude 风格消息、diff、启动页 |
+| pi-hermes-memory | 0.9.11 | 长期记忆、复盘与经验技能 |
+| pi-hashline-edit-pro | 6.5.1 | 锚点读取、编辑、过期检测与撤销 |
+| Pi 原生 MCP | 随 Pi 1.4.0 | 原生连接、延迟发现及统一权限执行管线 |
 | pi-permission-suite | 0.2.3 | 权限规则与内部审批 |
-| pi-subagents | 0.78.0 | 原生管理、FleetView / Inspector 与获授权的任务委派 |
+| pi-subagents | 0.80.0 | 原生管理、FleetView / Inspector 与获授权的任务委派 |
 | principal-pi-skills | 4.14.0 | 单个索引下的 9 项工程技能 |
 | @anishthite/pi-themes | 0.1.9 | Ayu、Catppuccin、GitHub 等主题 |
-| @narumitw/pi-btw | 0.61.2 | 独立旁聊 |
+| @narumitw/pi-btw | 0.62.0 | 独立旁聊 |
 
 本地 `timrt-suite` 整合界面、权限与维护。启动器使用本机 Node；Windows 使用 PowerShell 7，Linux 使用 Bash。四个本地预编译启动入口，suite 在启动时加载第五个任务代理产物以恢复原生管理与 Fleet；任务工具声明仍由上游 dynamic 策略按需激活，显示与执行授权分别处理。pi-web-access 直接使用上游预构建包的单一原生入口，共享宿主 SDK；不修改插件、宿主或其编译产物来实现 Web。
 

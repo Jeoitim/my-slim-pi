@@ -187,7 +187,8 @@ test('/btw runs independently while the main task is busy, declares no tools and
 test('Windows Terminal bell and native BTW package/configuration are valid', () => {
   // Terminal preferences belong to the user; installation does not mutate them.
   const settings = JSON.parse(readFileSync(join(root, 'settings.json'), 'utf8'));
-  assert.ok(settings.packages.some(p => (typeof p === 'string' ? p : p.source) === 'npm:@narumitw/pi-btw@0.61.2'));
+  const installed = JSON.parse(readFileSync(join(root, 'npm/node_modules/@narumitw/pi-btw/package.json'), 'utf8')).version;
+  assert.ok(settings.packages.some(p => (typeof p === 'string' ? p : p.source) === `npm:@narumitw/pi-btw@${installed}`));
   const btw = JSON.parse(readFileSync(join(root, 'pi-btw.json'), 'utf8'));
   assert.ok(['fullscreen', 'left-pane', 'right-pane'].includes(btw.layout));
   assert.ok(btw.sidePaneRatio >= 0.2 && btw.sidePaneRatio <= 0.8, 'dragging the divider remains a supported user preference');

@@ -8,6 +8,24 @@ import {backup,restorePlan,restore,child,configPath,cleanupPlan,cleanup} from '.
 import {configurePlatform} from '../../runtime/platform-config.mjs';
 const fixture=()=>{const base=resolve(process.env.PI_TEST_ROOT||join(process.cwd(),'.local'));fs.mkdirSync(base,{recursive:true});return fs.mkdtempSync(join(base,'pi-maintenance-core-'));};
 const put=(root,p,data)=>{fs.mkdirSync(dirname(join(root,p)),{recursive:true});fs.writeFileSync(join(root,p),data);};
+
+test('upgrade defaults preserve undo history and read-only recall without replacing personal choices',()=>{
+  const root=fixture();
+  put(root,'settings.json','{}');put(root,'APPEND_SYSTEM.linux.md','Linux instructions');
+  put(root,'hermes-memory-config.json',JSON.stringify({llmModelOverride:'personal/model'}));
+  configurePlatform(root,'linux');
+  const read=p=>JSON.parse(fs.readFileSync(join(root,p),'utf8'));
+  assert.equal(read('pi-hashline-edit-pro/config.json').undoRetentionDays,0);
+  assert.deepEqual(read('hermes-memory-config.json'),{llmModelOverride:'personal/model',usageHitTrackingEnabled:false});
+  assert.equal(read('install/managed-install.json').layout,'releases-v1');
+  put(root,'pi-hashline-edit-pro/config.json',JSON.stringify({undoRetentionDays:7,autoRead:false}));
+  put(root,'install/managed-install.json',JSON.stringify({customMarker:true}));
+  configurePlatform(root,'linux');
+  assert.deepEqual(read('pi-hashline-edit-pro/config.json'),{undoRetentionDays:7,autoRead:false});
+  assert.deepEqual(read('install/managed-install.json'),{customMarker:true});
+  const snapshot=backup(root);
+  assert.ok(fs.existsSync(join(snapshot,'pi-hashline-edit-pro/config.json')));
+});
 test('backup defaults exclude credentials and personal databases; explicit secret backup stays private',()=>{
   const root=fixture();
   for(const p of ['settings.json','APPEND_SYSTEM.windows.md','APPEND_SYSTEM.linux.md','customization/runtime/maintenance.mjs','models.json','auth.json','secrets/web-keys.json','sessions/test.json','pi-hermes-memory/memory.db'])put(root,p,'original');

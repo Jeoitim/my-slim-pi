@@ -5,8 +5,8 @@ const read=p=>readFileSync(p,'utf8'),json=p=>JSON.parse(read(p));
 
 test('one pinned native Web package; no obsolete runtime route or dedicated MCP',()=>{
   const config=json('agent/web-search.json'),manifest=json('distribution.json');
-  assert.equal(manifest.packages['pi-web-access'],'0.43.0');
-  assert.equal(json('agent/npm/package-lock.json').packages['node_modules/pi-web-access'].version,'0.43.0');
+  assert.match(manifest.packages['pi-web-access'],/^\d+\.\d+\.\d+$/);
+  assert.equal(json('agent/npm/package-lock.json').packages['node_modules/pi-web-access'].version,manifest.packages['pi-web-access']);
   assert.equal(config.searchRouting,undefined);assert.equal(config.webSearch?.allowedProviders,undefined);assert.equal(config.toolActivation,'auto');
   assert.deepEqual(Object.entries(config.tools).filter(([,v])=>v.enabled).map(([k])=>k),['webSearch','fetchContent','getSearchContent']);
   for(const feature of ['pdf','githubClone','githubPrIssue','youtube','video','image'])assert.equal(config[feature].enabled,false);

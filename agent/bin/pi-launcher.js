@@ -33,7 +33,10 @@ if (cliRelative.startsWith("..") || path.isAbsolute(cliRelative) || !fs.statSync
 
 // Precompile only after a Pi upgrade or a local extension source change.
 const extensionBuilder = path.join(agentDir, "customization", "runtime", "build-extensions.cjs");
-if (fs.existsSync(extensionBuilder) && fs.existsSync(path.join(agentDir, "extensions", "timrt-suite", "index.ts")) && !fs.existsSync(path.join(agentDir, "customization", "precompile.disabled")) && !require(extensionBuilder).valid()) {
+// Native package management must remain available even when an extension needs
+// repair. These CLI commands do not start an agent session or execute its tools.
+const packageCommand = ['update', 'install', 'remove', 'uninstall', 'list', '--version', '-v', '--help', '-h'].includes(process.argv[2]);
+if (!packageCommand && fs.existsSync(extensionBuilder) && fs.existsSync(path.join(agentDir, "extensions", "timrt-suite", "index.ts")) && !fs.existsSync(path.join(agentDir, "customization", "precompile.disabled")) && !require(extensionBuilder).valid()) {
 	const build = spawnSync(process.execPath, [extensionBuilder], { stdio: "inherit", windowsHide: true });
 	if (build.error) throw build.error;
 	if (build.status !== 0) process.exit(build.status ?? 1);

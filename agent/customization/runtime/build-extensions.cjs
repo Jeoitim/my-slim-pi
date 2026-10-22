@@ -22,6 +22,11 @@ local.push('npm/node_modules/pi-permission-suite/config-loader.ts');
 local.push(...['index.ts', 'settings.ts', 'single-select-layout.ts', 'tern.ts'].map(n => `npm/node_modules/pi-ask-user/${n}`));
 local.push('npm/node_modules/pi-subagents/src/api/capability-ceiling.js', 'npm/node_modules/pi-subagents/src/runs/shared/capability-ceiling.js');
 const packageRoots = ['pi-hermes-memory', 'pi-hashline-edit-pro', 'pi-cc-extensions', 'pi-subagents', 'pi-permission-suite', 'pi-ask-user'];
+// npm owns installed versions. Track its manifests too, including packages whose
+// native entries are not bundled, so a direct npm upgrade cannot leave a stale seal.
+for (const file of ['npm/package.json', 'npm/package-lock.json']) if (fs.existsSync(path.join(root, file))) local.push(file);
+const dependencies = fs.existsSync(path.join(root, 'npm/package.json')) ? JSON.parse(fs.readFileSync(path.join(root, 'npm/package.json'), 'utf8')).dependencies || {} : {};
+for (const name of Object.keys(dependencies)) if (!packageRoots.includes(name)) local.push(`npm/node_modules/${name}/package.json`);
 const files = [...new Set([...sources, ...local, ...packageRoots.map(p => `npm/node_modules/${p}/package.json`), 'customization/runtime/build-extensions.cjs', 'customization/runtime/patch-background-models.cjs', 'customization/runtime/patch-interactive-defaults.cjs', `install/releases/${version}/node_modules/@earendil-works/pi-coding-agent/dist/modes/interactive/interactive-mode.js`])];
 const outputs = sources.map(s => s.replace(/index\.(?:ts|js)$/, 'timrt-fast.mjs'));
 files.push(`install/releases/${version}/node_modules/@earendil-works/pi-coding-agent/package.json`);
@@ -89,8 +94,16 @@ if (require.main === module) (async () => {
   }
   const settingsFile = path.join(root, 'settings.json');
   const settings = JSON.parse(fs.readFileSync(settingsFile, 'utf8'));
+  const lock = fs.existsSync(path.join(root, 'npm/package-lock.json')) ? JSON.parse(fs.readFileSync(path.join(root, 'npm/package-lock.json'), 'utf8')) : undefined;
   settings.packages = settings.packages.map(p => {
-    const source = typeof p === 'string' ? p : p.source;
+    let source = typeof p === 'string' ? p : p.source;
+    const match = source.match(/^npm:(@[^/]+\/[^@]+|[^@]+)(?:@.+)?$/);
+    if (match && Object.hasOwn(dependencies, match[1])) {
+      const name = match[1], installed = JSON.parse(fs.readFileSync(path.join(root, `npm/node_modules/${name}/package.json`), 'utf8')).version;
+      if (lock?.packages?.['']?.dependencies?.[name] !== dependencies[name] || lock?.packages?.[`node_modules/${name}`]?.version !== installed) throw Error('npm manifests and installed package disagree: ' + name + '. Complete npm installation before rebuilding.');
+      source = `npm:${name}@${installed}`;
+      p = typeof p === 'string' ? source : { ...p, source };
+    }
     if (/^npm:(?:pi-hermes-memory|pi-hashline-edit-pro|pi-cc-extensions)(?:@|$)/.test(source)) return { ...(typeof p === 'object' ? p : { source }), extensions: [] };
     return p;
   });
@@ -98,6 +111,11 @@ if (require.main === module) (async () => {
   fs.writeFileSync(settingsFile, JSON.stringify(settings, null, 2) + '\n');
   fs.writeFileSync(manifestFile, JSON.stringify({ version, buildId, files: Object.fromEntries(files.map(p => [p, fs.statSync(path.join(root, p)).mtimeMs])), hashes:Object.fromEntries(files.map(p=>[p,digest(path.join(root,p))])), outputs, chunks, compiledAt: buildId }, null, 2) + '\n');
   fs.writeFileSync(path.join(root, 'customization/runtime/policy-seal.json'), JSON.stringify(require('./policy-files.cjs').seal(root), null, 2) + '\n');
+  const startupCheck = path.join(root, 'customization/checks/check-startup.mjs');
+  if (fs.existsSync(startupCheck)) {
+    const check = require('node:child_process').spawnSync(process.execPath, [startupCheck], { env: { ...process.env, PI_CODING_AGENT_DIR: root, PI_MAINTENANCE_TARGET: root, PI_OFFLINE: '1' }, stdio: 'inherit', windowsHide: true });
+    if (check.status !== 0) throw Error('Updated extensions failed offline startup validation; build outputs and settings were restored.');
+  }
   console.log('Compiled four startup entries and one manual subagent entry for Pi ' + version);
   console.log('已更新策略 SHA256 校验清单：customization/runtime/policy-seal.json。外部核对后，请重载或重启 Pi。');
   } catch (error) {

@@ -2,6 +2,7 @@
   "memoryMode": "policy-only",
   "memoryPolicyStyle": "custom",
   "lazyInitialization": true,
+  "usageHitTrackingEnabled": false,
   "reviewEnabled": true,
   "reviewTransport": "direct",
   "nudgeInterval": 12,

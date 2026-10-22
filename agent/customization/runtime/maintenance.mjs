@@ -24,7 +24,7 @@ export function child(base, relative) {
   return full;
 }
 export const {skillSourcePath}=createRequire(import.meta.url)('./policy-files.cjs');
-export const configPath = p => skillSourcePath(p.replaceAll('\\','/')) || /^(?:npm\/(?:package|package-lock)\.json|install\/node-path|settings\.json|trust\.json|models\.json|auth\.json|web-search\.json|mcp\.json|keybindings\.json|pi-cc-extensions\.json|pi-btw\.json|hermes-memory-config\.json|APPEND_SYSTEM(?:\.(?:windows|linux))?\.md|pi-hermes-memory\/STANDING\.md|secrets\/web-keys\.json|extensions\/(?:pi-permission-suite|subagent)\/config\.json|skills\/(?:pi-maintenance|principal)\/SKILL\.md|customization\/(?:README\.md|Pi Agent 本机配置维护手册\.md|Maintain-Pi\.ps1|Pi-Maintenance\.bat|maintain-pi\.sh)|customization\/runtime\/[^/]+\.(?:cjs|mjs)|customization\/checks\/(?:tests\/)?[^/]+\.(?:mjs|ps1)|bin\/(?:pi|pi-launcher\.js|pi\.cmd|pi\.ps1)|agents\/[^/]+\.md|themes\/[^/]+\.json|extensions\/timrt-suite\/[^/]+\.(?:ts|ps1))$/.test(p.replaceAll('\\','/'));
+export const configPath = p => skillSourcePath(p.replaceAll('\\','/')) || /^(?:npm\/(?:package|package-lock)\.json|pi-hashline-edit-pro\/config\.json|install\/node-path|settings\.json|trust\.json|models\.json|auth\.json|web-search\.json|mcp\.json|keybindings\.json|pi-cc-extensions\.json|pi-btw\.json|hermes-memory-config\.json|APPEND_SYSTEM(?:\.(?:windows|linux))?\.md|pi-hermes-memory\/STANDING\.md|secrets\/web-keys\.json|extensions\/(?:pi-permission-suite|subagent)\/config\.json|skills\/(?:pi-maintenance|principal)\/SKILL\.md|customization\/(?:README\.md|Pi Agent 本机配置维护手册\.md|Maintain-Pi\.ps1|Pi-Maintenance\.bat|maintain-pi\.sh)|customization\/runtime\/[^/]+\.(?:cjs|mjs)|customization\/checks\/(?:tests\/)?[^/]+\.(?:mjs|ps1)|bin\/(?:pi|pi-launcher\.js|pi\.cmd|pi\.ps1)|agents\/[^/]+\.md|themes\/[^/]+\.json|extensions\/timrt-suite\/[^/]+\.(?:ts|ps1))$/.test(p.replaceAll('\\','/'));
 const credential = p => /^(?:models\.json|auth\.json|web-search\.json|secrets\/)/.test(p);
 export function protect(file, directory = false) {
   if (process.platform === 'linux') fs.chmodSync(file, directory ? 0o700 : 0o600);
@@ -43,7 +43,7 @@ export function configFiles(root) {
     const base = child(root,dir);
     if (fs.existsSync(base)) for (const name of fs.readdirSync(base)) if (configPath(dir+'/'+name)) files.push(dir+'/'+name);
   }
-  files.push('npm/package.json','npm/package-lock.json');
+  files.push('npm/package.json','npm/package-lock.json','pi-hashline-edit-pro/config.json');
   const walk=dir=>{if(!fs.existsSync(child(root,dir)))return;for(const entry of fs.readdirSync(child(root,dir),{withFileTypes:true})){const name=dir+'/'+entry.name;if(entry.isSymbolicLink())throw Error('Skill backup refuses links');if(entry.isDirectory())walk(name);else if(skillSourcePath(name))files.push(name);}};
   walk('skills');
   return [...new Set(files)];

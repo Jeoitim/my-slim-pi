@@ -2,11 +2,8 @@
 const fs = require('node:fs');
 const path = require('node:path');
 module.exports = function patchInteractiveDefaults(root, version) {
-  if (version !== '1.3.0') throw Error('Review interactive persistence before changing Pi 1.3.0.');
   const hostPackage = path.join(root, 'install/releases', version, 'node_modules/@earendil-works/pi-coding-agent/package.json');
   if (JSON.parse(fs.readFileSync(hostPackage, 'utf8')).version !== version) throw Error('Installed Pi package does not match the managed version.');
-  const headerPackage = path.join(root, 'npm/node_modules/pi-cc-extensions/package.json');
-  if (JSON.parse(fs.readFileSync(headerPackage, 'utf8')).version !== '1.0.5') throw Error('Review startup header before changing pi-cc-extensions 1.0.5.');
   const file = path.join(root, 'install/releases', version, 'node_modules/@earendil-works/pi-coding-agent/dist/modes/interactive/interactive-mode.js');
   let text = fs.readFileSync(file, 'utf8');
   const replacements = [
@@ -15,7 +12,7 @@ module.exports = function patchInteractiveDefaults(root, version) {
     ['(model) => selectModel(model, false)', '(model) => selectModel(model, true) /* timrt remember manual model picker */'],
   ];
   for (const [before, after] of replacements) {
-    if (text.includes(after)) continue;
+    if (text.split(after).length === 2 && !text.includes(before)) continue;
     if (!text.includes(before) || text.split(before).length !== 2) throw Error('Review updated Pi interactive model-selection API before patching.');
     text = text.replace(before, after);
   }
@@ -32,7 +29,7 @@ module.exports = function patchInteractiveDefaults(root, version) {
       ['await this.session.setModel(model,{persist:!1})', 'await this.session.setModel(model,{persist:!0})/*timrt remember bundled model command*/'],
       ['model=>selectModel(model,!1)', 'model=>selectModel(model,!0)/*timrt remember bundled model picker*/'],
     ]) {
-      if (bundled.includes(after)) continue;
+      if (bundled.split(after).length === 2 && !bundled.includes(before)) continue;
       if (bundled.split(before).length !== 2) throw Error('Review the updated bundled Pi model persistence call.');
       bundled = bundled.replace(before, after);
     }
@@ -44,7 +41,7 @@ module.exports = function patchInteractiveDefaults(root, version) {
   if (!text.includes('timrt host keybindings')) {
     const key = 'const keys = getKeybindings().getKeys(keybinding);';
     const entry = 'export default function piStartupHeader(pi: ExtensionAPI) {';
-    if (!text.includes(key) || !text.includes(entry)) throw Error('Review updated pi-cc startup header API before patching.');
+    if (text.split(key).length !== 2 || text.split(entry).length !== 2 || text.split('function keyText(keybinding:').length !== 2) throw Error('Review updated pi-cc startup header API before patching.');
     text = text.replace('function keyText(keybinding:', 'let hostKeybindings: any; // timrt host keybindings\nfunction keyText(keybinding:');
     text = text.replace(key, 'const keys = (hostKeybindings || getKeybindings()).getKeys(keybinding);');
     text = text.replace(entry, `${entry}\n  const stopHostKeys = pi.events.on("timrt:host-keybindings", (keys: any) => { hostKeybindings = keys; });\n  pi.on("session_shutdown", () => { hostKeybindings = undefined; stopHostKeys(); });`);

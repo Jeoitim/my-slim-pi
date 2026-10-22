@@ -13,15 +13,15 @@
   "quietStartup": false,
   "packages": [
     {
-      "source": "npm:pi-cc-extensions@1.0.5",
+      "source": "npm:pi-cc-extensions@1.0.8",
       "extensions": []
     },
     {
-      "source": "npm:pi-hermes-memory@0.9.10",
+      "source": "npm:pi-hermes-memory@0.9.11",
       "extensions": []
     },
     {
-      "source": "npm:pi-hashline-edit-pro@6.4.6",
+      "source": "npm:pi-hashline-edit-pro@6.5.1",
       "extensions": []
     },
     {
@@ -29,7 +29,7 @@
       "extensions": []
     },
     {
-      "source": "npm:pi-subagents@0.78.0",
+      "source": "npm:pi-subagents@0.80.0",
       "extensions": [],
       "skills": [],
       "prompts": []
@@ -48,8 +48,8 @@
         "themes/github-*.json"
       ]
     },
-    "npm:@narumitw/pi-btw@0.61.2",
-    "npm:pi-web-access@0.43.0",
+    "npm:@narumitw/pi-btw@0.62.0",
+    "npm:pi-web-access@0.44.0",
     {
       "source": "npm:pi-ask-user@0.17.0",
       "extensions": [],

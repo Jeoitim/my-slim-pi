@@ -26,7 +26,7 @@ export function approvalReason(title: string): string {
 
 export function deletionPreparation(name: string, input: Record<string, any>): boolean {
   return /^(?:write|edit|replace|insert|replace_match)$/.test(name)
-    && deletionRisk([input.content, input.text, input.newText, input.new_string, input.patch].filter(value => typeof value === "string").join("\n"));
+    && deletionRisk([input.content, input.text, input.newText, input.new_string, input.replacement, input.patch].filter(value => typeof value === "string").join("\n"));
 }
 
 /** Source records are evidence, never task boundaries or enduring grants. */
