@@ -46,7 +46,7 @@ try {
   const policy = readFileSync(join(root, 'APPEND_SYSTEM.md'), 'utf8');
   const before = await session.extensionRunner.emitBeforeAgentStart({ messageType: 'user', prompt: '普通开发验证，不调用模型' }, { cwd: homedir(), selectedTools: session.getActiveToolNames(), appendSystemPrompt: policy });
   assert.ok(!before.systemPromptOptions.forceSystemPrompt, 'preserve structured system prompt caching');
-  assert.match(before.systemPromptOptions.sections['timrt-permissions'], /默认当前会话/);
+  assert.match(before.systemPromptOptions.sections['timrt-permissions'], /stay in this session by default/);
   assert.doesNotMatch(policy, /界面中的模型名称|name.*id/);
   console.log('Structured behavioral policy contains no TUI naming rule: OK');
   const deletionModeCommand = session.extensionRunner.getCommand('approval-mode');

@@ -35,7 +35,7 @@ export function createShellAnalyzer(options: {run?:(...args:any[])=>any;resolveE
     try {
     const parser = fileURLToPath(new URL("./read-only-parser.ps1", import.meta.url));
     executable ??= (options.resolveExecutable || resolvePowerShellExecutable)();
-    if (!executable) return fault("未找到 PowerShell，保留字面量只读快路径");
+    if (!executable) return fault("PowerShell not found; literal read-only fast path remains available");
     const started = clock();
     const result = run(executable, ["-NoLogo", "-NoProfile", "-NonInteractive", "-File", parser], {
       input: command, encoding: "utf8", windowsHide: true, timeout: timeoutMs, maxBuffer: 2_000_000,
@@ -45,10 +45,10 @@ export function createShellAnalyzer(options: {run?:(...args:any[])=>any;resolveE
     const elapsed = Math.max(0, clock() - started);
     if (result.error || result.status !== 0) {
       if (result.error?.code === "ENOENT") executable = undefined;
-      return fault(result.error?.code === "ETIMEDOUT" ? `解析器超时（${elapsed}ms，预算 ${timeoutMs}ms）` : "解析器启动失败");
+      return fault(result.error?.code === "ETIMEDOUT" ? `Parser timed out (${elapsed}ms; budget ${timeoutMs}ms)` : "Parser failed to start");
     }
     const value = JSON.parse(result.stdout.replace(/^\uFEFF/, ""));
-    if (typeof value.valid !== "boolean" || typeof value.readOnly !== "boolean" || !Array.isArray(value.commands)) return fault("解析器响应无效");
+    if (typeof value.valid !== "boolean" || typeof value.readOnly !== "boolean" || !Array.isArray(value.commands)) return fault("Invalid parser response");
     const parsed = {...value,readOnly:value.valid && value.readOnly} as ShellAnalysis;
     state="ready";reason="";retryAt=0;
     // Syntax errors and transient process failures must not become permanent negative cache entries.
@@ -56,7 +56,7 @@ export function createShellAnalyzer(options: {run?:(...args:any[])=>any;resolveE
     if (cache.size >= 128) cache.delete(cache.keys().next().value as string);
     cache.set(command, parsed);
     return parsed;
-    } catch { return fault("解析器暂不可用"); }
+    } catch { return fault("Parser temporarily unavailable"); }
   };
   return {analyze,status:()=>({state,reason,retryInMs:Math.max(0,retryAt-clock())})};
 }

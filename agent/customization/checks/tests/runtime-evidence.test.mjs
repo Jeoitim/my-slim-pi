@@ -24,10 +24,10 @@ test('loaded build identity stays pinned across source edits, rebuilds and reloa
   const running=createRuntimeStatus(dir,{buildId:'build-a',loadedAt:'2026-10-19T00:00:00Z'});
   assert.equal(running().reloadRequired,false);
   writeFileSync(join(dir,source),'changed');
-  assert.equal(running().sourceDirty,true);assert.match(running().warning,/待重建/);
+  assert.equal(running().sourceDirty,true);assert.match(running().warning,/rebuild/);
   utimesSync(bundle,Date.now()/1000+10,Date.now()/1000+10);save('build-b');
   assert.equal(running().sourceDirty,false);assert.equal(running().loadedBuild,'build-a');
-  assert.equal(running().diskBuild,'build-b');assert.match(running().warning,/本会话未重载/);
+  assert.equal(running().diskBuild,'build-b');assert.match(running().warning,/session still needs/);
   assert.equal(createRuntimeStatus(dir,{buildId:'build-b'})().reloadRequired,false);
 });
 test('script evidence expands only when called, stays bounded and hashes the full program',()=>{

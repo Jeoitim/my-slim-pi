@@ -11,14 +11,14 @@ const {validateMaintenance,maintenanceScope,skillSourcePath,applyMaintenance,fil
 const request='请维护 Pi 的主题和界面配置';
 test('self-maintenance rejects hardlinked targets',()=>{
   const f=fixture(),alias=join(f.dir,'alias');linkSync(f.file,alias);
-  assert.throws(()=>validateMaintenance(f.dir,request,[f.change]),/硬链接/);
+  assert.throws(()=>validateMaintenance(f.dir,request,[f.change]),/hard links/);
 });
 test('rollback refuses a symlink swapped in after the approved write', {skip:process.platform!=='linux'},async()=>{
   const f=fixture(),external=join(f.dir,'external.json');writeFileSync(external,f.change.content);
   await assert.rejects(applyMaintenance(f.dir,request,[f.change],{
     approved:async()=>true,current:()=>true,
     run:async(_cmd,args)=>{if(args.at(-1)==='Check'){unlinkSync(f.file);symlinkSync(external,f.file);return {code:1,stdout:'',stderr:'candidate failed'};}return {code:0,stdout:'backup-path',stderr:''};},
-  }),/外部并发修改/);
+  }),/external concurrent changes/);
   assert.equal(readFileSync(external,'utf8'),f.change.content);
 });
 test('active platform prompt and runtime edits require one identical reviewed patch',()=>{
@@ -26,8 +26,8 @@ test('active platform prompt and runtime edits require one identical reviewed pa
   const active='APPEND_SYSTEM.'+(process.platform==='win32'?'windows':'linux')+'.md';
   writeFileSync(join(root,active),'old');writeFileSync(join(root,'APPEND_SYSTEM.md'),'old');
   const a={path:active,sha256:fileHash('old'),content:'new'},b={...a,path:'APPEND_SYSTEM.md'};
-  assert.throws(()=>validateMaintenance(root,'请维护 Pi 权限规则',[a]),/同时提交/);
-  assert.throws(()=>validateMaintenance(root,'请维护 Pi 权限规则',[b]),/同时提交/);
+  assert.throws(()=>validateMaintenance(root,'请维护 Pi 权限规则',[a]),/Submit identical patches/);
+  assert.throws(()=>validateMaintenance(root,'请维护 Pi 权限规则',[b]),/Submit identical patches/);
   assert.equal(validateMaintenance(root,'请维护 Pi 权限规则',[a,b]).length,2);
 });
 function fixture(){
@@ -38,11 +38,11 @@ function fixture(){
 }
 test('structure checks enforce scope and hashes without pretending to decide semantic consent',()=>{
   const f=fixture();
-  assert.throws(()=>validateMaintenance(f.dir,'',[f.change]),/真实用户/);
+  assert.throws(()=>validateMaintenance(f.dir,'',[f.change]),/real user instruction/);
   assert.deepEqual(maintenanceScope(['extensions/timrt-suite/permissions.ts','APPEND_SYSTEM.md','themes/a.json'].map(path=>({path,content:'',before:null}))),{core:['extensions/timrt-suite/permissions.ts'],permissions:['APPEND_SYSTEM.md']});
   for(const path of ['../outside.json','C:/outside.json','auth.json','secrets/web-keys.json'])assert.throws(()=>validateMaintenance(f.dir,request,[{path,sha256:null,content:'x'}]),undefined,path);
-  assert.throws(()=>validateMaintenance(f.dir,request,[{...f.change,sha256:'0'.repeat(64)}]),/已变化/);
-  assert.throws(()=>validateMaintenance(f.dir,request,[f.change,f.change]),/重复/);
+  assert.throws(()=>validateMaintenance(f.dir,request,[{...f.change,sha256:'0'.repeat(64)}]),/file changed/);
+  assert.throws(()=>validateMaintenance(f.dir,request,[f.change,f.change]),/duplicate file/);
   assert.equal(validateMaintenance(f.dir,request,[{path:'APPEND_SYSTEM.md',sha256:null,content:'policy'}]).length,1,'structure is not a semantic grant');
   assert.equal(validateMaintenance(f.dir,'请维护 Pi 权限配置',[{path:'APPEND_SYSTEM.md',sha256:null,content:'Keep safeguards.'}]).length,1);
   for(const path of ['extensions/timrt-suite/permissions.ts','extensions/timrt-suite/self-maintenance.ts','extensions/timrt-suite/index.ts','customization/runtime/policy-files.cjs','customization/runtime/build-extensions.cjs','customization/Maintain-Pi.ps1','bin/pi-launcher.js']) {
@@ -94,14 +94,14 @@ test('core maintenance refuses incomplete backups before applying files',async()
   const f=coreFixture();
   await assert.rejects(applyMaintenance(f.dir,'请维护 Pi 构建内核',[f.change],{approved:async()=>true,current:()=>true,run:async(...args)=>{
     const result=await f.run(...args);writeFileSync(join(f.backup,'configuration-snapshot.json'),'{"files":[]}');return result;
-  }}),/备份未覆盖/);
+  }}),/backup missing/);
   assert.equal(readFileSync(join(f.dir,f.path),'utf8'),'// old builder');
 });
 test('failed core validation restores the old builder without generating a new build identity',async()=>{
   const f=coreFixture();
   await assert.rejects(applyMaintenance(f.dir,'请维护 Pi 构建内核',[f.change],{approved:async()=>true,current:()=>true,run:async(...args)=>{
     const result=await f.run(...args);return args[1].at(-1)==='Check'?{...result,code:1,stderr:'candidate failed'}:result;
-  }}),/原文件已恢复/);
+  }}),/source files.*restored/);
   assert.deepEqual(f.actions,['Backup','Rebuild','Check']);
   assert.equal(readFileSync(join(f.dir,f.path),'utf8'),'// old builder');
 });
@@ -111,7 +111,7 @@ test('tampering with the frozen runner stops further commands and preserves a re
     const result=await f.run(...args);
     if(args[1].at(-1)==='Rebuild')writeFileSync(join(f.backup,'transaction-runner/customization/Maintain-Pi.ps1'),'tampered');
     return result;
-  }}),/快照发生变化/);
+  }}),/snapshot changed/);
   assert.deepEqual(f.actions,['Backup','Rebuild']);
   assert.equal(readFileSync(join(f.dir,f.path),'utf8'),'// old builder');
 });
@@ -136,7 +136,7 @@ test('failed checks restore original files and remove only files created in this
   await assert.rejects(applyMaintenance(f.dir,request,[f.change,added],{
     approved:async()=>true,current:()=>true,
     run:async(_cmd,args)=>{const action=args.at(-1);actions.push(action);return {code:action==='Check'?1:0,stdout:'fixture-backup',stderr:action==='Check'?'fixture failure':''};},
-  }),/原文件已恢复/);
+  }),/source files.*restored/);
   assert.deepEqual(actions,['Backup','Rebuild','Check']);
   assert.equal(readFileSync(f.file,'utf8'),f.before);assert.equal(existsSync(join(f.dir,added.path)),false);
 });
@@ -145,7 +145,7 @@ test('rollback preserves external concurrent edits and reports the backup instea
   await assert.rejects(applyMaintenance(f.dir,request,[f.change],{
     approved:async()=>true,current:()=>true,
     run:async(_cmd,args)=>{if(args.at(-1)==='Check'){writeFileSync(f.file,'external-edit');return {code:1,stdout:'fixture',stderr:'failure'};}return {code:0,stdout:'fixture-backup',stderr:''};},
-  }),/外部并发修改/);
+  }),/external concurrent changes/);
   assert.equal(readFileSync(f.file,'utf8'),'external-edit');
 });
 
@@ -156,7 +156,7 @@ test('a changed maintenance kernel is never executed after approval',async()=>{
   await assert.rejects(applyMaintenance(f.dir,request,[f.change],{
     approved:async()=>{writeFileSync(maintainer,'external-change');return true;},current:()=>true,
     run:async()=>{runs++;return {code:0,stdout:'',stderr:''};},
-  }),/内核.*变化/);
+  }),/core changed/);
   assert.equal(runs,0);assert.equal(readFileSync(f.file,'utf8'),f.before);
 });
 
@@ -184,7 +184,7 @@ test('failed validation restores byte-identical build outputs and seal; concurre
       if(action==='Rebuild'){writeFileSync(join(f.dir,seal),'new-seal');writeFileSync(join(f.dir,output),'new-output');}
       if(action==='Check'){if(conflict)writeFileSync(join(f.dir,output),'external-edit');return {code:1,stdout:'',stderr:'forced validation failure'};}
       return {code:0,stdout:directory,stderr:''};
-    }}),conflict?/构建状态有并发冲突/:/保护基线已精确恢复/);
+    }}),conflict?/build state has concurrent conflicts/:/protected baseline restored exactly/);
     assert.deepEqual(actions,['Backup','Rebuild','Check']);assert.equal(readFileSync(f.file,'utf8'),f.before);
     assert.equal(readFileSync(join(f.dir,seal),'utf8'),'old-seal');
     assert.equal(existsSync(join(f.dir,output)),conflict);if(conflict)assert.equal(readFileSync(join(f.dir,output),'utf8'),'external-edit');

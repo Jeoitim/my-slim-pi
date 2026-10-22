@@ -1,6 +1,6 @@
 import { getDocsPath, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 export const PRINCIPAL_SUMMARIES: Record<string, string> = {
-  decide: "工程取舍与决策", architect: "架构与接口设计", plan: "需求拆解与实施计划", build: "编写、修改和重构代码", review: "代码审查", "test-review": "测试质量审查", debug: "定位未知故障", investigate: "技术调查与证据核验", "git-ops": "Git 分支、提交与冲突处理",
+  decide: "Engineering tradeoffs and decisions", architect: "Architecture and interface design", plan: "Requirements and implementation plans", build: "Write, edit, and refactor code", review: "Code review", "test-review": "Test quality review", debug: "Diagnose unknown failures", investigate: "Technical investigation and evidence", "git-ops": "Git branches, commits, and conflicts",
 };
 export const isGreeting = (text: string) => /^\s*(?:hello|hi|hey|你好|您好|嗨|早上好|晚上好)[\s!！。.，,?？]*$/i.test(text);
 export function stripForeignMemory(content: string): string {
@@ -9,14 +9,14 @@ export function stripForeignMemory(content: string): string {
 export function installPromptPolicy(pi: ExtensionAPI) {
   pi.on("before_agent_start", (event, ctx) => {
     const options = event.systemPromptOptions;
-    options.sections["local-date"] = `本机日期：${new Date().toLocaleDateString("en-CA")}（${Intl.DateTimeFormat().resolvedOptions().timeZone}）。`;
+    options.sections["local-date"] = `Local date: ${new Date().toLocaleDateString("en-CA")} (${Intl.DateTimeFormat().resolvedOptions().timeZone}).`;
     const prompt = event.messageType === "user" ? event.prompt : "";
     const greeting = isGreeting(prompt);
     options.contextFiles = options.contextFiles.map(f => ({ ...f, content: stripForeignMemory(f.content) })).filter(f => f.content);
     // One stable engineering index, not nine keyword-selected entries. The model
     // decides whether to read it; cache inventory never triggers an engineering route.
     options.skills = greeting ? [] : options.skills.filter(s => !s.filePath.includes("principal-pi-skills")).map(s => ({ ...s, description:s.description.slice(0,180) }));
-    options.sections.docs = `仅当任务涉及 Pi 自身时读取本机文档：${getDocsPath()}。`;
+    options.sections.docs = `Read local Pi documentation only when the task concerns Pi itself: ${getDocsPath()}.`;
     delete options.sections["principal-routing"];
   });
   pi.on("tool_result", event => {
@@ -32,7 +32,7 @@ export function installPromptPolicy(pi: ExtensionAPI) {
       for (const row of rows.slice(0, 61)) { if (row.length > budget) break; preview.push(row); budget -= row.length + 1; }
       if (preview.length === rows.length) return part;
       changed = true;
-      return {...part,text:head + preview.join("\n") + "\n[写入后的预览已截断；需要其他行或锚点时使用 read。文件内容未截断。]"};
+      return {...part,text:head + preview.join("\n") + "\n[Post-write preview truncated; use read for other lines or anchors. File content was not truncated.]"};
     });
     return changed ? {content} : undefined;
   });

@@ -27,31 +27,31 @@ function coreSnapshot(root:string) {
 export function validateMaintenance(root:string,request:string,changes:MaintenanceChange[],validatePairs=true) {
   // This validates structure, never natural-language consent. The pre-change
   // reviewer (or ASK human) must authorize the exact patch against human evidence.
-  if(!request.trim())throw Error("缺少当前真实用户指示，不能启动 Pi 自维护。");
-  if(!changes.length || changes.length>8)throw Error("每次维护提交 1～8 个文件，不接受批量未知目标。");
-  if(changes.reduce((n,c)=>n+Buffer.byteLength(c.content,"utf8"),0)>128000)throw Error("维护补丁超过 128 KB，请按可审阅的任务拆分。");
+  if(!request.trim())throw Error("A current real user instruction is required before Pi self-maintenance can start.");
+  if(!changes.length || changes.length>8)throw Error("Submit 1–8 explicit files per maintenance call; unknown bulk targets are not accepted.");
+  if(changes.reduce((n,c)=>n+Buffer.byteLength(c.content,"utf8"),0)>128000)throw Error("Maintenance patch exceeds 128 KB; split it into reviewable tasks.");
   changes=changes.map(c=>({...c,path:c.path.replaceAll('\\','/')}));
   const activePrompt='APPEND_SYSTEM.'+(process.platform==='win32'?'windows':'linux')+'.md';
   if(validatePairs && existsSync(join(root,activePrompt))) {
     const runtime=changes.find(c=>pathKey(c.path)===pathKey('APPEND_SYSTEM.md')),source=changes.find(c=>pathKey(c.path)===pathKey(activePrompt));
-    if((runtime || source) && (!runtime || !source || runtime.content!==source.content))throw Error('长期规则须同时提交当前平台源文件与 APPEND_SYSTEM.md 的相同补丁，纳入同一次审批和备份。');
+    if((runtime || source) && (!runtime || !source || runtime.content!==source.content))throw Error('Submit identical patches for the current platform source and APPEND_SYSTEM.md in the same approval and backup.');
   }
   const seen=new Set<string>();
   return changes.map(change=>{
     const path=change.path.replaceAll("\\","/");
-    if(!path || /[:\x00-\x1f]/.test(path) || path.startsWith("/") || path.split("/").some(p=>!p || p===".." || p==="."))throw Error("维护路径必须是配置目录内的明确相对文件路径。");
-    const key=pathKey(path);if(seen.has(key))throw Error("维护补丁包含重复文件。");seen.add(key);
+    if(!path || /[:\x00-\x1f]/.test(path) || path.startsWith("/") || path.split("/").some(p=>!p || p===".." || p==="."))throw Error("Maintenance paths must be explicit relative file paths inside the configuration directory.");
+    const key=pathKey(path);if(seen.has(key))throw Error("Maintenance patch contains a duplicate file.");seen.add(key);
     const allowed=/^(?:settings\.json|trust\.json|APPEND_SYSTEM(?:\.(?:windows|linux))?\.md|agents\/approver\.md|extensions\/pi-permission-suite\/config\.json|extensions\/timrt-suite\/[^/]+\.(?:ts|ps1)|themes\/[^/]+\.json|skills\/(?:pi-maintenance|principal)\/SKILL\.md|customization\/(?:README\.md|Pi Agent 本机配置维护手册\.md|Maintain-Pi\.ps1|Pi-Maintenance\.bat|maintain-pi\.sh)|customization\/runtime\/[^/]+\.(?:cjs|mjs)|customization\/checks\/(?:tests\/)?[^/]+\.(?:mjs|ps1)|bin\/(?:pi|pi-launcher\.js|pi\.cmd|pi\.ps1)|(?:keybindings|pi-cc-extensions|pi-btw|mcp|hermes-memory-config)\.json)$/i.test(path);
-    if((!allowed && !skillSourcePath(path)) || /(?:^|\/)(?:policy-seal|compiled-extensions)\.json$/i.test(path))throw Error("该路径不属于自维护源码范围；不接受凭据、依赖、生成物或任意命令："+path);
+    if((!allowed && !skillSourcePath(path)) || /(?:^|\/)(?:policy-seal|compiled-extensions)\.json$/i.test(path))throw Error("Path is outside self-maintenance source scope; credentials, dependencies, generated files, and arbitrary commands are not accepted: "+path);
     const full=resolve(root,path);
-    if(relative(root,full).startsWith(".."))throw Error("维护目标越界。");
+    if(relative(root,full).startsWith(".."))throw Error("Maintenance target escapes the configuration directory.");
     for(let part=full;part!==dirname(root);part=dirname(part)) {
-      if(existsSync(part) && lstatSync(part).isSymbolicLink())throw Error("维护路径包含符号链接或目录联接。");
+      if(existsSync(part) && lstatSync(part).isSymbolicLink())throw Error("Maintenance path contains a symbolic link or junction.");
       if(part===root)break;
     }
-    if(existsSync(full) && (!lstatSync(full).isFile() || lstatSync(full).nlink!==1))throw Error("维护目标须为无硬链接的普通文件。");
+    if(existsSync(full) && (!lstatSync(full).isFile() || lstatSync(full).nlink!==1))throw Error("Maintenance target must be a regular file without hard links.");
     const before=existsSync(full)?readFileSync(full):null;
-    if((before===null?null:fileHash(before))!==change.sha256)throw Error("维护文件已变化，请重新读取并核对 SHA256："+path);
+    if((before===null?null:fileHash(before))!==change.sha256)throw Error("Maintenance file changed; reread and verify SHA256: "+path);
     if(/\.json$/i.test(path))JSON.parse(change.content);
     const stat=before===null?null:lstatSync(full);
     return {...change,path,full,before,stat};
@@ -73,10 +73,10 @@ export async function applyMaintenance(root:string,request:string,changes:Mainte
     core=JSON.stringify([...previous.filter(([path])=>!allowed.has(pathKey(path))),...current.filter(([path])=>allowed.has(pathKey(path)))].sort(([a],[b])=>a<b?-1:a>b?1:0));
   };
   let buildEffects:string[]=[];
-  const checkCore=()=>{if(coreSnapshot(root)!==core)throw Error("授权或构建内核在维护期间发生未批准变化，停止执行并要求核对。");};
+  const checkCore=()=>{if(coreSnapshot(root)!==core)throw Error("Authorization or build core changed without approval during maintenance; stop and inspect.");};
   const decision=await deps.approved();
-  if(!(typeof decision==='boolean'?decision:decision.approved))throw Error("本次自维护未获批准，未修改文件。"+(typeof decision==='object'&&decision.reason?decision.reason+'。':'')+"请说明阻塞，不使用其他工具改写保护文件。");
-  const fresh=()=>{if(deps.signal?.aborted || !deps.current())throw Error("维护期间用户指示或任务状态已变化，本次不继续。");if(deps.policyIntact && !deps.policyIntact())throw Error("维护批准后保护基线发生变化，当前事务停止。");checkCore();validateMaintenance(root,request,changes);};
+  if(!(typeof decision==='boolean'?decision:decision.approved))throw Error("This self-maintenance call was not approved; no files were changed. "+(typeof decision==='object'&&decision.reason?decision.reason+'. ':'')+"Explain the block; do not change protected files with another tool.");
+  const fresh=()=>{if(deps.signal?.aborted || !deps.current())throw Error("User instructions or task state changed during maintenance; this call will stop.");if(deps.policyIntact && !deps.policyIntact())throw Error("Protected baseline changed after approval; this transaction will stop.");checkCore();validateMaintenance(root,request,changes);};
   fresh();
   const require=createRequire(join(root,"customization/runtime/maintenance.mjs"));
   const esbuild=join(root,"customization/runtime/build-runtime/node_modules/esbuild");
@@ -84,36 +84,36 @@ export async function applyMaintenance(root:string,request:string,changes:Mainte
     const {transformSync}=require(esbuild);
     for(const file of plan)if(/\.(?:ts|[cm]?js)$/.test(file.path)) {
       try{transformSync(file.content,{loader:file.path.endsWith('.ts')?'ts':'js',sourcefile:file.path,target:'node24'});}
-      catch(error){throw Error("候选源码语法预检失败，未修改文件："+String(error));}
+      catch(error){throw Error("Candidate source failed syntax preflight; no files changed: "+String(error));}
     }
   }
   let runner=join(root,"customization/runtime/maintenance.mjs");
   let frozen:Map<string,string>|undefined;
-  const checkFrozen=()=>{if(frozen)for(const [path,hash] of frozen)if(!existsSync(path)||fileHash(readFileSync(path))!==hash)throw Error("修改前的维护/验证快照发生变化，停止执行："+path);};
+  const checkFrozen=()=>{if(frozen)for(const [path,hash] of frozen)if(!existsSync(path)||fileHash(readFileSync(path))!==hash)throw Error("Frozen pre-change maintenance/verification snapshot changed; stop: "+path);};
   const run=async(action:string)=>{
     checkCore();
     checkFrozen();
     const result=await deps.run(process.execPath,[runner,"--agent-root",root,action],{cwd:root,timeout:180000,signal:deps.signal});
-    if(result.code!==0)throw Error(action+" 未通过："+(result.stderr||result.stdout).slice(-3000));
+    if(result.code!==0)throw Error(action+" failed: "+(result.stderr||result.stdout).slice(-3000));
     if(action==="Rebuild")updateCore(buildEffects);
     checkCore();
     checkFrozen();
     return result.stdout;
   };
-  deps.progress?.("备份 Pi 配置…");const backup=await run("Backup");fresh();
+  deps.progress?.("Backing up Pi configuration…");const backup=await run("Backup");fresh();
   const major=plan.some(p=>coreMaintenancePath(p.path) || pathKey(p.path)==="settings.json");
   if(major){
     const directory=resolve(backup.trim());
-    if(pathKey(dirname(directory))!==pathKey(join(resolve(root),"backups")) || !existsSync(directory) || lstatSync(directory).isSymbolicLink())throw Error("重大修改必须先获得独立维护脚本创建的有效备份目录。");
+    if(pathKey(dirname(directory))!==pathKey(join(resolve(root),"backups")) || !existsSync(directory) || lstatSync(directory).isSymbolicLink())throw Error("Major changes require a valid backup directory created by the independent maintenance script.");
     const manifest=JSON.parse(readFileSync(join(directory,"configuration-snapshot.json"),"utf8"));
     for(const file of plan.filter(p=>p.before!==null)) {
       const saved=join(directory,file.path);
-      if(!manifest.files.some((p:string)=>pathKey(p.replaceAll("\\","/"))===pathKey(file.path)) || !existsSync(saved) || fileHash(readFileSync(saved))!==fileHash(file.before!))throw Error("重大修改备份未覆盖或校验失败："+file.path);
+      if(!manifest.files.some((p:string)=>pathKey(p.replaceAll("\\","/"))===pathKey(file.path)) || !existsSync(saved) || fileHash(readFileSync(saved))!==fileHash(file.before!))throw Error("Major-change backup missing or failed verification: "+file.path);
     }
     frozen=new Map();
     const savedRoot=join(directory,"transaction-runner");
     const capture=(source:string,dest:string)=>{
-      if(lstatSync(source).isSymbolicLink())throw Error("维护快照不接受链接。");
+      if(lstatSync(source).isSymbolicLink())throw Error("Maintenance snapshots cannot contain links.");
       mkdirSync(dirname(dest),{recursive:true,mode:0o700});copyFileSync(source,dest);frozen!.set(dest,fileHash(readFileSync(source)));
     };
     capture(join(root,"customization/Maintain-Pi.ps1"),join(savedRoot,"customization/Maintain-Pi.ps1"));
@@ -131,25 +131,25 @@ export async function applyMaintenance(root:string,request:string,changes:Mainte
   buildEffects=stateFiles;
   const artifacts=stateFiles.map(path=>{
     const full=resolve(root,path);
-    if(relative(root,full).startsWith('..'))throw Error('构建状态路径越界。');
+    if(relative(root,full).startsWith('..'))throw Error('Build-state path escapes the configuration directory.');
     for(let cursor=full;;cursor=dirname(cursor)) {
-      if(existsSync(cursor) && lstatSync(cursor).isSymbolicLink())throw Error('构建状态路径包含链接。');
+      if(existsSync(cursor) && lstatSync(cursor).isSymbolicLink())throw Error('Build-state path contains a link.');
       if(cursor===root || dirname(cursor)===cursor)break;
     }
     const stat=existsSync(full)?lstatSync(full):null;
-    if(stat && (!stat.isFile() || stat.nlink!==1))throw Error('构建状态须为无硬链接的普通文件。');
+    if(stat && (!stat.isFile() || stat.nlink!==1))throw Error('Build state must be a regular file without hard links.');
     const before=stat?readFileSync(full):null;
     return {path,full,stat,before,after:before===null?null:fileHash(before)};
   });
   const directory=resolve(backup.trim());
   if(artifacts.length) {
-    if(pathKey(dirname(directory))!==pathKey(join(resolve(root),'backups')))throw Error('构建快照需要有效独立备份目录。');
+    if(pathKey(dirname(directory))!==pathKey(join(resolve(root),'backups')))throw Error('Build snapshot requires a valid independent backup directory.');
     for(const file of artifacts)if(file.before!==null){const dest=join(directory,'build-state',file.path);mkdirSync(dirname(dest),{recursive:true,mode:0o700});writeFileSync(dest,file.before,{mode:0o600});}
     writeFileSync(join(directory,'build-state.json'),JSON.stringify(artifacts.map(f=>({path:f.path,sha256:f.before===null?null:fileHash(f.before),mode:f.stat?.mode,mtime:f.stat?.mtime,atime:f.stat?.atime}))),{mode:0o600});
   }
   const written:typeof plan=[];
   try {
-    deps.progress?.("应用已批准文件…");
+    deps.progress?.("Applying approved files…");
     for(const file of plan){
       checkCore();checkFrozen();
       validateMaintenance(root,request,[{path:file.path,sha256:file.sha256,content:file.content}],false);
@@ -157,12 +157,12 @@ export async function applyMaintenance(root:string,request:string,changes:Mainte
       updateCore([file.path]);
     }
     checkCore();
-    if(!deps.current() || deps.signal?.aborted)throw Error("应用后收到新指示，恢复本次修改。");
-    deps.progress?.("重建扩展与策略清单…");await run("Rebuild");
+    if(!deps.current() || deps.signal?.aborted)throw Error("A new instruction arrived after applying files; restore this change.");
+    deps.progress?.("Rebuilding extensions and policy manifest…");await run("Rebuild");
     for(const file of artifacts)file.after=existsSync(file.full)?fileHash(readFileSync(file.full)):null;
-    deps.progress?.("执行离线检查…");await run("Check");
-    if(!deps.current() || deps.signal?.aborted)throw Error("验证期间收到新指示，恢复本次修改。");
-    return {files:plan.map(p=>p.path),backup:backup.trim(),coreMaintenance:major,reloadRequired:true,message:"维护完成，修改前规则已审批，备份、重建和离线检查通过。请 /reload 或重启以加载新代码；当前进程不会自行接受新的保护基线。"};
+    deps.progress?.("Running offline checks…");await run("Check");
+    if(!deps.current() || deps.signal?.aborted)throw Error("A new instruction arrived during verification; restore this change.");
+    return {files:plan.map(p=>p.path),backup:backup.trim(),coreMaintenance:major,reloadRequired:true,message:"Maintenance completed under the pre-change rules. Backup, rebuild, and offline checks passed. Use /reload or restart to load the new code; this process will not accept a new protected baseline on its own."};
   } catch(error) {
     if(!written.length)throw error;
     const conflicts:string[]=[];
@@ -182,7 +182,7 @@ export async function applyMaintenance(root:string,request:string,changes:Mainte
       if(file.before!==null)writeFileSync(file.full,file.before);else unlinkSync(file.full);
       if(file.stat)utimesSync(file.full,file.stat.atime,file.stat.mtime);
     }
-    if(conflicts.length)throw Error(String(error)+"；检测到外部并发修改，未覆盖冲突文件："+conflicts.join(", ")+"。请从备份核对恢复："+backup.trim());
+    if(conflicts.length)throw Error(String(error)+"; external concurrent changes detected; conflicting files were not overwritten: "+conflicts.join(", ")+". Inspect the backup for recovery: "+backup.trim());
     for(const file of artifacts) {
       try {
         for(let cursor=file.full;;cursor=dirname(cursor)){if(existsSync(cursor) && lstatSync(cursor).isSymbolicLink())throw Error('link');if(cursor===root || dirname(cursor)===cursor)break;}
@@ -193,8 +193,8 @@ export async function applyMaintenance(root:string,request:string,changes:Mainte
         if(file.before===null){if(stat)unlinkSync(file.full);}else{writeFileSync(file.full,file.before);if(process.platform!=='win32')chmodSync(file.full,file.stat!.mode);utimesSync(file.full,file.stat!.atime,file.stat!.mtime);}
       }catch{conflicts.push(file.path);}
     }
-    if(conflicts.length)throw Error(String(error)+"；源码已恢复，构建状态有并发冲突，须外部核对："+conflicts.join(', ')+"；备份："+backup.trim());
-    if(deps.policyIntact && !deps.policyIntact())throw Error(String(error)+"；原文件已恢复，但保护基线未恢复，须外部核对；备份："+backup.trim());
-    throw Error(String(error)+"；原文件已恢复，构建产物与保护基线已精确恢复，本次修改未生效；备份："+backup.trim());
+    if(conflicts.length)throw Error(String(error)+"; source restored, but build state has concurrent conflicts requiring external review: "+conflicts.join(', ')+"; backup: "+backup.trim());
+    if(deps.policyIntact && !deps.policyIntact())throw Error(String(error)+"; source files restored, but protected baseline was not restored; inspect externally. Backup: "+backup.trim());
+    throw Error(String(error)+"; source files, build outputs, and protected baseline restored exactly; this change did not take effect. Backup: "+backup.trim());
   }
 }

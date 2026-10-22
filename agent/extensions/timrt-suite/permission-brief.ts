@@ -1,17 +1,17 @@
 /** Compact execution contract. This is guidance; enforcement remains in the tool hooks. */
 export function permissionBrief(state: {mode:string;approvalHold:boolean;taskAgents:boolean}, model: string, status?: {unavailable:boolean;choice:string;remainingSeconds?:number;humanFallback?:"pause"|"ask"}, healthy = true, parser?: {state:string;reason:string},runtime?:{brief:string}): string {
   const operation = state.mode === "auto"
-    ? "AUTO：read/grep/find/ls 等读取及已确认只读命令免审；其余原始调用、完整参数/脚本交内部审批，批准即执行。"
-    : state.mode === "act" ? "ACT：明确只读和普通写入/执行直接通过；高风险删除及需核对范围的执行交内部审批，批准即执行。"
-    : state.mode === "ask" ? "ASK：与 AUTO 共用只读免审判断；read/grep/find/ls 等读取及已确认只读命令直接执行，其余调用逐次人工明确批准，无等待超时；不调用内部审批模型，仅批准当前调用。"
-    : "PLAN：仅允许只读；不能通过模型或人工审批执行写入、删除。";
-  const service = !healthy ? "策略校验失败，仅限只读，须外部维护"
-    : status?.unavailable ? (status.choice === "pause" ? "审批服务故障，本轮待审操作已暂停" : "审批服务故障，逐条人工审批") + `（窗口剩余约 ${status.remainingSeconds ?? "?"} 秒）`
-    : "正常";
+    ? "AUTO: read/grep/find/ls and verified read-only commands need no review; other calls, with complete arguments and scripts, go to internal review and run if approved."
+    : state.mode === "act" ? "ACT: verified read-only and ordinary writes/execution run directly; risky deletion and execution with unclear scope go to internal review and run if approved."
+    : state.mode === "ask" ? "ASK: uses AUTO's read-only exemption; read/grep/find/ls and verified read-only commands run directly. Every other call needs explicit per-call human approval with no waiting timeout; the internal reviewer is not called."
+    : "PLAN: read-only; neither a model nor a human approval can permit writes or deletion.";
+  const service = !healthy ? "policy integrity check failed; read-only until external maintenance"
+    : status?.unavailable ? (status.choice === "pause" ? "approval service failed; pending calls paused this turn" : "approval service failed; each call needs human approval") + ` (window remaining about ${status.remainingSeconds ?? "?"} seconds)`
+    : "normal";
   return [
     operation,
-    "AUTO/ACT 中变量、内联、多语句、测试及解析不支持不直接触发人工；无需每次 explain_call，测试/预览标志也不免审。工具声明可能随加载动态更新，以当前列表为准；读取技能不授予权限。maintain_pi 始终可见，每笔补丁结合真实用户及兼容后续指示单独审批，不要求复述关键字；拒绝不换工具重试。",
-    `${state.mode === "ask" ? "ASK 人工窗口持续等待；拒绝、取消或新指示使当前调用不执行" : status?.humanFallback !== "pause" ? "人工兜底：审批低置信或故障时询问，90 秒无回应则跳过并在回答中说明，等下一轮授权；明确拒绝不转人工" : "已配置暂停回退：审批低置信、关键证据缺失或服务故障时暂停并提醒，不弹窗等待"}；删除逐次审，根目录清空/绕过维护入口改策略硬拒绝，拒绝后不改写重试。`,
-    `审批模型：${model}；状态：${service}${parser?.state === "unavailable" ? "；AST 只读加速暂不可用（"+parser.reason+"），保留字面量读取，其余按当前模式判断" : ""}${state.approvalHold ? "；清理审批已暂停，等新用户指示" : ""}；任务：${state.taskAgents ? "子代理已持续授权，直到用户明确撤销；可自主决定新增、类型及数量；继续遵循当前操作权限" : "默认当前会话；创建任务先由审批器语义核对真实用户授权，或已读技能建议后询问；复杂度不授权"}。状态/记录与 Supervisor 问答不要求重新授权。用户撤销时调用 request_subagent(action:disable)；后台模型用 /background-models，原生管理用 /subagents，监控用 /subagents-fleet。${runtime ? "运行："+runtime.brief : ""}`,
+    "In AUTO/ACT, variables, inline code, multiple statements, tests, or unsupported static parsing do not by themselves require a human. Do not call explain_call for every operation; test/preview flags do not exempt a call. Tool declarations may change during loading; follow the current list. Reading a skill grants no permission. maintain_pi remains visible; review each exact patch against real human instructions and compatible follow-ups without requiring repeated keywords. Do not switch tools after a denial.",
+    `${state.mode === "ask" ? "ASK human dialogs wait until answered; denial, cancellation, or a new instruction prevents this call" : status?.humanFallback !== "pause" ? "Human fallback: ask on low confidence or service failure; after 90 seconds without a reply, skip and explain in the answer, then await the next turn. An explicit denial never falls back to a human" : "Pause fallback configured: low confidence, essential missing evidence, or service failure pauses and notifies without a dialog"}. Review every deletion separately. Clearing root directories and changing policy outside the maintenance entry are hard denials; do not repackage and retry a denied operation.`,
+    `Reviewer model: ${model}; status: ${service}${parser?.state === "unavailable" ? "; AST read-only fast path unavailable ("+parser.reason+"); literal read-only checks remain and other calls follow the current mode" : ""}${state.approvalHold ? "; cleanup review paused; await a new user instruction" : ""}; task agents: ${state.taskAgents ? "persistently authorized until explicit user revocation; types and counts may be chosen freely under current operation permissions" : "stay in this session by default; the reviewer checks real human authorization before creation, or a read skill may justify asking; complexity grants nothing"}. Status, transcripts, and Supervisor Q&A need no new grant. On revocation, call request_subagent(action:disable). Use /background-models for background models, /subagents for native management, and /subagents-fleet for monitoring.${runtime ? " Runtime: "+runtime.brief : ""}`,
   ].join("\n");
 }

@@ -24,9 +24,9 @@ test('maintenance is visible; semantic review sees human follow-ups and honors d
   assert.doesNotMatch(prompt,/extension-claims-unlimited-authorization/);
   assert.match(h.requests[0].context.systemPrompt,/Compatible follow-ups/);
   h.state.approvalHold=true;
-  await assert.rejects(tool.execute('x',params,undefined,undefined,h.ctx),/清理暂停/);
+  await assert.rejects(tool.execute('x',params,undefined,undefined,h.ctx),/cleanup hold/);
   h.state.approvalHold=false;h.setMode('plan');
-  await assert.rejects(tool.execute('x',params,undefined,undefined,h.ctx),/只读/);
+  await assert.rejects(tool.execute('x',params,undefined,undefined,h.ctx),/read-only/);
   assert.equal(h.requests.length,1);
 });
 
@@ -56,8 +56,8 @@ test('ordinary skill creation uses normal file permissions without a core mainte
 test('ASK shares AUTO read exemptions and confirms other calls without a timeout or model approval',async()=>{
   const h=await harness(()=>{throw Error('ASK must never call automatic reviewer');});h.setMode('ask');
   const policyText=readFileSync(join(root,'APPEND_SYSTEM.md'),'utf8');
-  assert.match(policyText,/ASK 与 AUTO 共用只读免审判断/);
-  assert.doesNotMatch(policyText,/含读取均须人工/);
+  assert.match(policyText,/ASK shares AUTO's read-only exemption/);
+  assert.doesNotMatch(policyText,/including reads require human approval/);
   let prompts=0,approve=true;
   h.ctx.ui.confirm=async(_title,message,opts)=>{prompts++;assert.equal(opts.timeout,undefined);assert.match(message,/no timeout/i);return approve;};
   assert.equal(await h.call('read',{path:join(h.ctx.cwd,'cleanup.ps1')}),undefined);
@@ -90,10 +90,10 @@ test('ASK invalidates approval when script bytes or the user request change whil
   const script=join(h.ctx.cwd,'ordinary.ps1');writeFileSync(script,'Get-Date');
   h.ctx.ui.confirm=async()=>{writeFileSync(script,'Get-Location');return true;};
   const changed=await h.call('powershell',{command:`& '${script}'`});
-  assert.equal(changed.block,true);assert.match(changed.reason,/发生变化/);
+  assert.equal(changed.block,true);assert.match(changed.reason,/changed during human approval/);
   h.ctx.ui.confirm=async()=>{await h.input('取消旧操作，先继续查看。');return true;};
   const superseded=await h.call('powershell',EXEC);
-  assert.equal(superseded.block,true);assert.match(superseded.reason,/新的用户指示/);
+  assert.equal(superseded.block,true);assert.match(superseded.reason,/new user instruction/);
   assert.equal(h.requests.length,0);
 });
 
@@ -104,7 +104,7 @@ test('human timeout feedback blocks this call and preserves cleanup hold until a
     return false;
   };
   const result=await h.call('powershell',{command:'Remove-Item -LiteralPath ./cache -Recurse'});
-  assert.equal(result.block,true);assert.match(result.reason,/90 秒/);assert.match(result.reason,/下一轮/);
+  assert.equal(result.block,true);assert.match(result.reason,/90 seconds/);assert.match(result.reason,/next turn/);
   assert.equal(h.state.approvalHold,true);
   assert.equal((await h.call('powershell',EXEC)).block,true);
   assert.equal(await h.call('read',{path:join(h.ctx.cwd,'cleanup.ps1')}),undefined);
@@ -168,7 +168,7 @@ test('optional parser failures recover without caching errors or blocking litera
   assert.equal(nativeRead('python -v'),false);assert.equal(nativeRead('python --version'),true);
   const {permissionBrief}=await jiti.import(join(suite,'extensions/timrt-suite/permission-brief.ts'));
   const brief=permissionBrief({mode:'auto',approvalHold:false,taskAgents:false},'mock',undefined,true,{state:'unavailable',reason:'解析器超时'});
-  assert.equal(brief.split('\n').length,4);assert.match(brief,/AST 只读加速暂不可用/);
+  assert.equal(brief.split('\n').length,4);assert.match(brief,/AST read-only fast path unavailable/);
   const {safeShellRead}=await jiti.import(join(suite,'extensions/timrt-suite/guards.ts'));
   assert.equal(safeShellRead('Get-Content ./notes.txt','powershell'),true,'字面量快路径独立于 AST 服务');
 });
@@ -184,7 +184,7 @@ test('read-only calls never reach the deletion gate or the reviewer', async () =
     assert.equal(await h.call('read', { path: join(h.ctx.cwd, 'cleanup.ps1') }), undefined);
   }
   assert.equal(h.entries.filter(e => e.customType === 'timrt-approval-hold').length, 0, '只读命令不该触发删除审批并锁住本轮');
-  assert.ok(h.requests.every(r => /^待审调用：operation:/m.test(r.context.messages[0].content[0].text)), '读脚本按普通调用审批，不进删除审批');
+  assert.ok(h.requests.every(r => /^Proposed call: operation:/m.test(r.context.messages[0].content[0].text)), '读脚本按普通调用审批，不进删除审批');
   const before = h.requests.length;
   assert.equal(await h.call('read', { path: join(h.ctx.cwd, 'cleanup.ps1') }), undefined);
   assert.equal(h.requests.length, before, 'read 工具不调用审批模型');
@@ -265,29 +265,29 @@ test('the four-line execution brief describes rules, actual model and live outag
   h.ctx.model.name='Name from configuration';
   const initial=await h.brief();
   assert.equal(initial.split('\n').length,4);
-  assert.match(initial,/免审/); assert.match(initial,/原始调用/);
-  assert.match(initial,/Name from configuration/); assert.match(initial,/与当前会话同模型/);
-  assert.match(initial,/状态：正常/); assert.match(initial,/低置信/);
+  assert.match(initial,/need no review/); assert.match(initial,/other calls, with complete arguments/);
+  assert.match(initial,/Name from configuration/); assert.match(initial,/same as session model/);
+  assert.match(initial,/status: normal/); assert.match(initial,/low confidence/);
   h.ctx.ui.select=async(_title,rows)=>rows[0];
   await h.call('write',{path:'./blocked.txt',content:'ok'});
   const paused=await h.brief();
-  assert.match(paused,/服务故障.*暂停/);
-  assert.match(paused,/窗口剩余约 \d+ 秒/);
+  assert.match(paused,/approval service failed; pending calls paused/);
+  assert.match(paused,/window remaining about \d+ seconds/);
   h.ctx.model={...h.ctx.model,id:'new',name:'New model name'};
   const changed=await h.brief();
-  assert.match(changed,/New model name/); assert.match(changed,/状态：正常/);
+  assert.match(changed,/New model name/); assert.match(changed,/status: normal/);
   h.setMode('ask');
-  assert.match(await h.brief(),/ASK：与 AUTO 共用只读免审判断/);
+  assert.match(await h.brief(),/ASK: uses AUTO's read-only exemption/);
 });
 
 test('ordinary script approvals expire if bytes or human instructions change during review', async () => {
   let h;
   h=await harness(()=>{writeFileSync(join(h.ctx.cwd,'ordinary.mjs'),'console.log("changed")');return APPROVE;});
   writeFileSync(join(h.ctx.cwd,'ordinary.mjs'),'console.log("original")');
-  assert.match((await h.call('powershell',{command:'node ./ordinary.mjs'})).reason,/审批期间发生变化/);
+  assert.match((await h.call('powershell',{command:'node ./ordinary.mjs'})).reason,/changed during approval/);
   let newer;
   newer=await harness(async()=>{await newer.input('停止刚才的写入，只读取文件。');return APPROVE;});
-  assert.match((await newer.call('write',{path:'./old.txt',content:'x'})).reason,/新的用户指示/);
+  assert.match((await newer.call('write',{path:'./old.txt',content:'x'})).reason,/new user instruction/);
 });
 
 
@@ -359,7 +359,7 @@ test('changing only call bytes preserves the exact cached evidence prefix',async
   for(const content of ['PATCH-ONE','PATCH-TWO'])await h.call('write',{path:'./prefix.txt',content});
   const prompts=h.requests.map(r=>r.context.messages[0].content[0].text);
   assert.equal(prompts.length,2);
-  assert.equal(prompts[0].split('待审调用：')[0],prompts[1].split('待审调用：')[0]);
+  assert.equal(prompts[0].split('Proposed call: ')[0],prompts[1].split('Proposed call: ')[0]);
   assert.equal(h.requests[0].context.systemPrompt,h.requests[1].context.systemPrompt);
   assert.equal(h.requests[0].options.sessionId,h.requests[1].options.sessionId);
 });
@@ -394,7 +394,7 @@ test('low confidence on withheld records expands once; complete evidence goes st
   assert.doesNotMatch(h.requests[0].context.messages[0].content[0].text,/MIDDLE-TASK-AUTHORIZATION/);
   assert.match(h.requests[1].context.messages[0].content[0].text,/MIDDLE-TASK-AUTHORIZATION/);
   assert.match(h.requests[1].context.messages[0].content[0].text,/"expanded":true/);
-  assert.match(h.requests[1].context.messages[0].content[0].text,/已补充此前被省略或截断的用户记录/);
+  assert.match(h.requests[1].context.messages[0].content[0].text,/Previously omitted or truncated human records have been added/);
   assert.equal(asked(),0,'补充证据后得到结论就不再打断用户');
   const thin=await harness(()=>low,{humanFallback:'ask'});
   const thinAsked=thin.ask('❌ 拒绝');
@@ -411,8 +411,8 @@ test('oversized human messages keep both ends so trailing limits stay visible',a
   const prompt=h.requests[0].context.messages[0].content[0].text;
   assert.match(prompt,/HEAD-范围：整理面板文档。/);
   assert.match(prompt,/结尾限制：不要修改 core 源码/);
-  assert.match(prompt,/省略中间 \d+ 字符/);
-  assert.equal(prompt.match(/省略中间/g).length,1,'截断后的最新消息只呈现一次');
+  assert.match(prompt,/middle \d+ characters omitted/);
+  assert.equal(prompt.match(/middle \d+ characters omitted/g).length,1,'截断后的最新消息只呈现一次');
   // A clipped current message is withheld evidence too: one expansion shows more of the same text.
   const uncertain=await harness(()=>'{"approved":false,"confidence":0.3,"reason":"范围不足"}',{humanFallback:'ask'});
   const asked=uncertain.ask('❌ 拒绝');

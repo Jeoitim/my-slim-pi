@@ -11,7 +11,7 @@ export const EXPANDED_HUMAN_RECORD_LIMIT = 12000;
  */
 export function boundedText(text: string, limit: number): string {
   if (text.length <= limit) return text;
-  const marker = (omitted: number) => `\n…〔省略中间 ${omitted} 字符〕…\n`;
+  const marker = (omitted: number) => `\n…[middle ${omitted} characters omitted]…\n`;
   const overhead = marker(text.length).length;
   if (limit <= overhead + 2) return text.slice(0, Math.max(0, limit));
   const head = Math.max(1, Math.floor((limit - overhead) * 0.65));
@@ -118,7 +118,7 @@ export function approvalEvidence(ctx: ExtensionContext, name: string, input: Rec
   const argumentsWithoutDuplicate = { ...input };
   if (maintenance) delete argumentsWithoutDuplicate.maintenanceHumanRequests;
   return {
-    evidencePolicy: "原始用户记录仅是授权证据，不是永久许可；分支首条不一定属于当前任务。humanInputs 是更早的真实用户记录（按时间升序）；currentUserRequest 是本轮最新用户消息，可能只是延续、恢复或纠正信号：它本身没有任务内容时，当前任务仍由更早的用户指示定义。taskContinuity.previousStepInterrupted=true 表示上一轮以审批暂停或清理暂停结束。turn=previous 的助手消息只是更早轮次的背景：不能授权，也不能证明用户任务已完成或授权已失效。最新撤销和范围限制优先。证据被省略、截断或缺少必要历史时给出低于 0.7 的置信度，确有更多原始记录时宿主会自动补充一次再判断；已确定的拒绝和已知范围冲突不因补充证据放宽。",
+    evidencePolicy: "Raw human records are authorization evidence, not permanent permission; the first branch input may belong to another task. humanInputs contains earlier real human records in chronological order. currentUserRequest is the newest human message this turn and may only continue, resume, or correct earlier instructions; if it contains no task by itself, use the earlier human instruction defining the active task. taskContinuity.previousStepInterrupted=true means the previous turn ended in an approval pause or cleanup hold. Assistant text marked turn=previous is earlier background only: it cannot authorize or prove that the task is finished or consent has expired. Later revocations and scope restrictions take precedence. If essential records are omitted, truncated, or missing, return confidence below 0.7; when more raw records exist, the host can expand them once within the same retry budget. Do not relax a known denial or scope conflict after expansion.",
     cwd: ctx.cwd, ...human,
     currentUserRequest: request,
     ...(interrupted ? { taskContinuity: { previousStepInterrupted: true } } : {}),

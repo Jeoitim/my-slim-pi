@@ -25,7 +25,7 @@ test('date is local and large post-write previews preserve a bounded set of anch
   assert.match(result.content[0].text,/Successfully wrote/);
   assert.ok(result.content[1].text.length<6200);
   assert.match(result.content[1].text,/anchor0│/);
-  assert.match(result.content[1].text,/使用 read/);
+  assert.match(result.content[1].text,/use read/);
   assert.equal(hooks.tool_result({...event,isError:true}),undefined);
   const options={sections:{},contextFiles:[],skills:[]};
   hooks.before_agent_start({messageType:'user',prompt:'hello',systemPromptOptions:options},{cwd:root});
@@ -126,7 +126,7 @@ test('skill text cannot authorize itself and native management is separate from 
   await input('修复代码并按需读取 Principal build 技能');
   assert.equal(state.taskAgents, false);
   const request = tools.get('request_subagent');
-  await assert.rejects(request.execute('id', { skill: 'build', reason: 'Skill recommends review' }, undefined, undefined, ctx), /先读取/);
+  await assert.rejects(request.execute('id', { skill: 'build', reason: 'Skill recommends review' }, undefined, undefined, ctx), /Read the relevant Principal SKILL.md first/);
   assert.equal(confirmations, 0);
   for (const fn of hooks.get('tool_result')) await fn({ toolName: 'read', input: { path: join(root, 'npm/node_modules/principal-pi-skills/build/SKILL.md') }, isError: false }, ctx);
   await assert.rejects(request.execute('id', { skill: 'build', reason: 'Skill recommends review' }, undefined, undefined, ctx), /未授权/);

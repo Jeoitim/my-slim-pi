@@ -69,7 +69,7 @@ test('AUTO deletion needs one explicit reviewer decision per invocation and fail
   assert.equal((await h.call('write', { path: join(root, 'APPEND_SYSTEM.md'), content: 'weaken policy' })).block, true);
   assert.equal(calls.length, 2, 'review cannot override self-policy protection');
   const failed = await harness(async () => { throw Error('review unavailable'); });
-  assert.match((await failed.call('bash', { command: 'rm -rf ./cache' })).reason, /审批未完成/);
+  assert.match((await failed.call('bash', { command: 'rm -rf ./cache' })).reason, /review did not complete/);
   let confirmations = 0;
   const fallback = await harness(async (ctx) => {
     const choice = await ctx.ui.select('huge-source'.repeat(10000), ['✅ 批准', '❌ 拒绝']);
@@ -128,7 +128,7 @@ test('script review follows a BAT wrapper, preserves read-only access, and rejec
   assert.equal(approvals, 1);
   assert.equal(observed.scripts.length, 2);
   assert.ok(observed.scripts.some(s => /cleanup\.js$/.test(s.path) && s.source.includes('./cache')));
-  assert.match(result.reason, /审批期间发生变化/);
+  assert.match(result.reason, /changed during review/);
 });
 
 test('native PowerShell reads, writes and deletion use the current permission mode', async () => {
@@ -212,7 +212,7 @@ test('rejected cleanup preparation pauses inline, split, MCP and delegated mutat
     ['mcp', { tool: 'fs_delete', args: { path: './cache' } }],
     ['request_subagent', { skill: 'build', reason: 'perform cleanup' }],
     ['subagent', { task: 'perform cleanup' }],
-  ]) assert.match((await h.call(name, input)).reason, /本轮后续写入和执行已暂停|仍在清理审批暂停中/);
+  ]) assert.match((await h.call(name, input)).reason, /later writes and execution are paused|Cleanup approval remains on hold/);
   assert.equal(reviews, 1, 'changing execution form cannot solicit a different review');
   assert.equal(await h.call('powershell', { command: 'Get-ChildItem -LiteralPath ./cache | Select-Object Name' }), undefined);
   await h.input('retry through extension', 'extension');

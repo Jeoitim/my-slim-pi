@@ -23,6 +23,27 @@ test('AUTO reviews once in-process and reuses an identical approval', async () =
   assert.equal(h.requests.length, 1);
 });
 
+test('review reason follows the active human task language without translating authorization evidence', async () => {
+  for (const [task, continuation, reason] of [
+    ['请修好当前项目的构建。', 'continue', '当前写入超出任务范围'],
+    ['Fix the current project build.', '继续', 'The write is outside the task scope'],
+  ]) {
+    const h = await harness(() => JSON.stringify({approved:false,confidence:0.94,reason}));
+    h.setMode('auto');
+    await h.input(task);
+    await h.input(continuation);
+    const result = await h.call('write',{path:'./note.md',content:'test'});
+    assert.equal(result?.block,true);
+    assert.match(result.reason,new RegExp(reason));
+    const request=h.requests.at(-1).context;
+    assert.match(request.systemPrompt,/active user's conversational language/);
+    assert.match(request.systemPrompt,/short continuation/i);
+    assert.ok(request.messages[0].content[0].text.includes(task));
+    assert.ok(request.messages[0].content[0].text.includes(`"text":"${continuation}"`));
+    assert.match(request.messages[0].content[0].text,/Evidence policy:/);
+  }
+});
+
 test('unparsable answers retry once; missing confidence requires human approval', async () => {
   const omitted = await harness(() => '我看完了。结论：{"approved":true,"reason":"工作目录内单文件写入（{cache} 已核对）"}',{humanFallback:'ask'});
   omitted.setMode('auto');
@@ -36,7 +57,7 @@ test('unparsable answers retry once; missing confidence requires human approval'
   const counted = retried.ask('❌ 拒绝');
   assert.equal(await retried.call('powershell', EXEC), undefined, '重试拿到结论就不再打扰用户');
   assert.equal(retried.requests.length, 2);
-  assert.match(retried.requests[1].context.messages[0].content[0].text, /上一次没有收到可解析的结论/);
+  assert.match(retried.requests[1].context.messages[0].content[0].text, /previous response had no parseable decision/);
   assert.equal(counted(), 0, '没有弹人工确认');
 });
 
@@ -118,7 +139,7 @@ test('ACT skips ordinary review and approves each risky deletion internally with
   assert.equal(h.requests.length,0,'ACT 普通写入不调用模型');
   for(let i=0;i<2;i++)assert.equal(await h.call('powershell',{command:'Remove-Item -LiteralPath ./cache -Recurse -Force'}),undefined);
   assert.equal(h.requests.length,2,'同一删除每次都审批，不缓存授权');
-  assert.ok(h.requests.every(r=>/^待审调用：deletion:powershell$/m.test(r.context.messages[0].content[0].text)));
+  assert.ok(h.requests.every(r=>/^Proposed call: deletion:powershell$/m.test(r.context.messages[0].content[0].text)));
   assert.equal(dialogs,0);
   const explain=async(tool,args)=>JSON.parse((await h.tools.get('explain_call').execute('id',{tool,args},undefined,undefined,h.ctx)).content[0].text);
   assert.equal((await explain('write',{path:'./ordinary.txt',content:'ok'})).route,'allow');
@@ -201,7 +222,7 @@ test('deletion review follows executed scripts and stays per-invocation', async 
   h.setMode('auto');
   const run = { command: `powershell -NoProfile -File ${join(h.ctx.cwd, 'cleanup.ps1')}` };
   assert.equal(await h.call('powershell', run), undefined);
-  assert.match(seen[0], /^待审调用：deletion:powershell$/m, '被执行的脚本走删除审批');
+  assert.match(seen[0], /^Proposed call: deletion:powershell$/m, '被执行的脚本走删除审批');
   assert.match(seen[0], /Remove-Item/, '删除审批带上脚本源码证据');
   assert.equal((await h.call('powershell', run)).block, true, '上一次批准不授权下一次删除');
   assert.equal(h.requests.length, 2, '删除审批不复用结论缓存');

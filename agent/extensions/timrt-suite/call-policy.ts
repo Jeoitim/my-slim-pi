@@ -8,7 +8,7 @@ import { analyzePowerShell, type ShellAnalysis } from "./shell-analysis.ts";
 import { fileURLToPath } from "node:url";
 
 export { verify as verifyPolicy };
-export const POLICY_EXIT = "该操作会直接改写受保护的审批策略。只读审计允许；用户明确要求维护 Pi 对应机制时，配置及授权/审批/事务/校验/构建/加载源码均通过 maintain_pi 逐次审批、备份及验证；不得换 shell、内联或代理绕过。";
+export const POLICY_EXIT = "This operation would directly change protected approval policy. Read-only inspection is allowed. When the user explicitly requests maintenance of the corresponding Pi mechanism, configuration and authorization/review/transaction/integrity/build/loader sources must use maintain_pi with per-call approval, backup, and verification. Do not bypass through another shell, inline code, or agent.";
 // Only the pinned native tools receive these exemptions. Annotations alone do
 // not establish safety. Background page fetches obey the same feature limits.
 export function webReadOnly(name: string, input: Record<string, any>, root: string): boolean {
@@ -165,7 +165,7 @@ export function catastrophicCall(cwd: string, name: string, input: Record<string
     if (dirname(folder) === folder) break;
   }
   for (const text of texts) {
-    if (/^\s*(?:Format-(?:Volume|Disk)|Clear-Disk|Initialize-Disk|diskpart|mkfs(?:\.\w+)?|bcdedit)\b/im.test(text)) return "系统磁盘/启动配置破坏风险：当前工具调用不执行，请由用户在外部单独核对。";
+    if (/^\s*(?:Format-(?:Volume|Disk)|Clear-Disk|Initialize-Disk|diskpart|mkfs(?:\.\w+)?|bcdedit)\b/im.test(text)) return "Risk of damaging system disks or boot configuration: this call will not run; the user must review it separately outside Pi.";
     const literals: string[] = [];
     for (const match of text.matchAll(/(?:^|[;&|\n])\s*(?:(?:sudo|doas)\s+)?(?:Remove-Item|ri|rm|rd|rmdir|del|erase)\s+([^\r\n;&|]+)/gmi)) {
       literals.push(...(match[1].match(/"[^"]*"|'[^']*'|[^\s,'"]+/g) || []).map(p=>p.replace(/^['"]|['"]$/g,"")));
@@ -176,7 +176,7 @@ export function catastrophicCall(cwd: string, name: string, input: Record<string
       const stripped = literal.replace(/([\\/])[*?].*$/, "$1");
       if (/[$%{}]/.test(stripped.replace(/\$env:(?:USERPROFILE|LOCALAPPDATA|APPDATA|TEMP|TMP)\b|\$HOME\b|\$\{HOME\}/gi, ""))) continue;
       const target = fullPath(stripped, cwd);
-      if (target === parse(target).root || roots.some(root => (process.platform === "win32" ? root.toLowerCase() === target.toLowerCase() : root === target))) return "拒绝清空磁盘根目录、用户主目录或系统/应用数据根目录；AUTO 审批不能覆盖这项保护。";
+      if (target === parse(target).root || roots.some(root => (process.platform === "win32" ? root.toLowerCase() === target.toLowerCase() : root === target))) return "Clearing a disk root, home directory, or system/application-data root is denied; AUTO review cannot override this protection.";
     }
   }
 }
@@ -187,7 +187,7 @@ export function policyHealth(root: string) {
   if (!status.ok || status.unmanaged) return status;
   const digest = createHash("sha256").update(readFileSync(join(root,"customization/runtime/policy-seal.json"))).digest("hex");
   const expected = seals.get(root);
-  if (expected && expected !== digest) return {ok:false,changed:["policy-seal.json 在会话中发生变化；请外部核对后重载"]};
+  if (expected && expected !== digest) return {ok:false,changed:["policy-seal.json changed during this session; verify externally, then reload"]};
   seals.set(root,digest);
   return status;
 }

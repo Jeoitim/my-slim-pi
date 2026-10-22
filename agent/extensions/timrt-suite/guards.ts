@@ -3,7 +3,7 @@ import { resolve, isAbsolute, relative } from "node:path";
 import { createHash } from "node:crypto";
 import { analyzePowerShell, nativeRead } from "./shell-analysis.ts";
 
-export const DELETE_REASON = "删除操作未获本次审批；不得执行、改用脚本或委派绕过。";
+export const DELETE_REASON = "Deletion was not approved for this call; do not execute it or bypass review through a script or agent.";
 export const SCRIPT_EVIDENCE_LIMIT = {perFile:96_000,total:192_000};
 
 /** Deliberately conservative command guard; this is a tool policy, not an OS sandbox. */

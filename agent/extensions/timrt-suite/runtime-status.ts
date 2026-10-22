@@ -20,10 +20,10 @@ export function createRuntimeStatus(root:string,options:{buildId?:string;loadedA
       sourceDirty ||= sourceMtime>bundleMtime;
     } catch {sourceDirty=true;}
     const reloadRequired=sourceDirty || (loadedBuild!=="source" && loadedBuild!==diskBuild);
-    const warning=sourceDirty ? "权限源码已改，待重建并 /reload" : reloadRequired ? "权限代码已重建，本会话未重载，请 /reload" : "";
+    const warning=sourceDirty ? "Permission source changed; rebuild and /reload" : reloadRequired ? "Permission code rebuilt; this session still needs /reload" : "";
     // The status line is English; the warning above stays Chinese for the model-facing brief.
     const statusWarning=sourceDirty ? "permission sources changed; rebuild and run /reload" : reloadRequired ? "permission code was rebuilt; this session is not reloaded — run /reload" : "";
     return {loadedBuild,diskBuild,loadedAt,sourceMtime,bundleMtime,sourceDirty,reloadRequired,warning,statusWarning,
-      brief:`构建 ${loadedBuild}；加载 ${new Date(loadedAt).toLocaleTimeString("zh-CN",{hour12:false})}${warning ? "；"+warning : ""}`};
+      brief:`Build ${loadedBuild}; loaded ${new Date(loadedAt).toLocaleTimeString("en-GB",{hour12:false})}${warning ? "; "+warning : ""}`};
   };
 }

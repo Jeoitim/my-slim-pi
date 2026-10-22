@@ -3,7 +3,7 @@ import registerAskUser from "../../npm/node_modules/pi-ask-user/index.ts";
 import type { PermissionMode } from "./permissions.ts";
 
 export const QUESTION_TIMEOUT_MS = 90_000;
-export const QUESTION_POLICY = "仅当缺失信息会实质影响用户意图、技术架构或不可逆操作时，先调查现有证据，仍无法确定才提问；文档、代码和测试能解决的问题自主处理。子代理优先用 contact_supervisor 询问 Supervisor，仅 Supervisor 无权决定时由其向用户升级。提问、任务交接和操作授权互不替代。";
+export const QUESTION_POLICY = "Ask only when missing information materially affects user intent, technical architecture, or an irreversible action. Inspect available evidence first; resolve questions answered by documentation, code, or tests yourself. A task agent asks its Supervisor through contact_supervisor first; only the Supervisor escalates matters it cannot decide to the user. Questions, task delegation, and operation authorization are separate.";
 
 /**
  * RPC hosts (including pi-web) implement select/input as native dialogs but
@@ -45,11 +45,11 @@ export function installAskUser(pi: ExtensionAPI, state: { mode: PermissionMode }
       target.registerTool({
         ...tool,
         parameters: { ...tool.parameters, properties: Object.fromEntries(Object.entries(tool.parameters.properties).filter(([name]) => name !== "timeout")) },
-        description: "询问用户一个关键问题，或 2–4 个互相独立的问题。先调查证据，context 简述尚待决定之处。每题的 options 第一项为推荐方案；允许自由回答。AUTO/ACT 整次问答 90 秒未完成自动采用推荐方案；ASK/PLAN 不自动选择。这不授予操作或委派权限。",
-        promptSnippet: "按需澄清关键问题，支持推荐选项及自由回答",
-        promptGuidelines: [QUESTION_POLICY, "默认每次只问一个问题；每题先列推荐选项。AUTO/ACT 超时采用推荐项只表示工作假设，不能声称用户已回答或授权。"],
+        description: "Ask the user one critical question or 2–4 independent questions. Inspect evidence first and use context to state what remains undecided. The first option for each question is recommended; free-form answers are allowed. In AUTO/ACT, after 90 seconds for the whole exchange, unanswered questions use the recommended options as working assumptions. ASK/PLAN never auto-select. Asking grants no operation or delegation permission.",
+        promptSnippet: "Clarify critical questions with recommended options and free-form answers when needed",
+        promptGuidelines: [QUESTION_POLICY, "Ask one question by default; put the recommended option first. An AUTO/ACT timeout selecting that option is only a working assumption, not a user reply or authorization."],
         async execute(id, raw: any, signal, update, ctx) {
-          if (process.env.PI_SUBAGENT_CHILD === "1") throw new Error("子代理应先使用 contact_supervisor；没有该通道时向 Supervisor 报告缺失信息，由其决定是否向用户升级。");
+          if (process.env.PI_SUBAGENT_CHILD === "1") throw new Error("Task agents must use contact_supervisor first; if unavailable, report missing information to the Supervisor for any user escalation.");
           const mode = state.mode, current = generation;
           const automatic = mode === "auto" || mode === "act";
           const entries = raw.questions ?? [raw];
@@ -57,12 +57,12 @@ export function installAskUser(pi: ExtensionAPI, state: { mode: PermissionMode }
             || entries.some((q: any) => typeof q?.question !== "string" || !q.question.trim())
             || new Set(entries.map((q: any) => q.question.trim().toLowerCase())).size !== entries.length
             || ["context", "options", "allowMultiple", "allowFreeform"].some(key => raw[key] != null))) {
-            throw new Error("questions 须包含 2–4 个不同的独立问题；context/options/allowMultiple/allowFreeform 应放在每题内。");
+            throw new Error("questions must contain 2–4 distinct independent questions; put context/options/allowMultiple/allowFreeform inside each question.");
           }
           // A free-text-only question cannot supply a truthful automatic default.
           if (automatic && (!Array.isArray(entries) || entries.some((q: any) => !Array.isArray(q?.options) || !q.options.length
             || q.options.some((o: any) => typeof o?.title !== "string" || !o.title.trim())))) {
-            throw new Error("AUTO/ACT 每题须提供 options，第一项为可继续工作的推荐方案；用户仍可自由回答。提问不能代替操作审批或任务代理授权。");
+            throw new Error("Every AUTO/ACT question needs options with a workable recommendation first; the user may still answer freely. Questions do not replace operation or task-agent authorization.");
           }
           const prepare = (q: any) => ({ ...q, options: q.options?.map((o: any, i: number) => i === 0 && typeof o?.title === "string"
             ? { ...o, title: /推荐|recommended/i.test(o.title) ? o.title : o.title + " (recommended)" } : o) });
@@ -90,7 +90,7 @@ export function installAskUser(pi: ExtensionAPI, state: { mode: PermissionMode }
                 if (answer.details?.cancelled) { cancelled = true; break; }
                 answers.push({ status: "answered", response: answer.details.response });
               }
-              result = { content: [{ type: "text" as const, text: cancelled ? "问答未完成。" : JSON.stringify(answers) }],
+              result = { content: [{ type: "text" as const, text: cancelled ? "Question exchange was not completed." : JSON.stringify(answers) }],
                 details: { kind: "batch", heading, questions, answers, cancelled } };
             }
             if (!expired || signal?.aborted || ctx.signal?.aborted || current !== generation || state.mode !== mode || !result.details?.cancelled) return result;
@@ -102,7 +102,7 @@ export function installAskUser(pi: ExtensionAPI, state: { mode: PermissionMode }
               : { ...result.details, ...metadata, response: responses[0] };
             // Do not emit ask:answered or fabricate a human/session input entry.
             pi.events.emit("timrt:question-default", { toolCallId: id, timeoutMs: QUESTION_TIMEOUT_MS });
-            return { ...result, details, content: [{ type: "text" as const, text: "问答 90 秒未完成，未回答的题目已自动采用推荐方案继续（工作假设，非用户回答或操作授权）；已提交的回答保留：\n" + subjects.map((q: any, i: number) => `${q.question}: ${JSON.stringify(responses[i])}`).join("\n") }] };
+            return { ...result, details, content: [{ type: "text" as const, text: "The question exchange did not finish within 90 seconds. Unanswered questions use recommended options as working assumptions, not user answers or operation authorization. Submitted answers remain:\n" + subjects.map((q: any, i: number) => `${q.question}: ${JSON.stringify(responses[i])}`).join("\n") }] };
           } finally { clearTimeout(timer); pending.delete(controller); }
         },
       });

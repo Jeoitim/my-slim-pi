@@ -64,7 +64,7 @@ test('quotes, skills and an ordinary approved operation cannot create persistent
   const h=await harness();try {
     await h.input('分析这段文本，不执行：> 使用子代理');h.setAnswer({approved:true,source:'subagent',reason:'仅操作可行，未获得持续授权'});
     assert.equal((await h.call('subagent',{agent:'reviewer',task:'inspect'})).block,true);assert.equal(h.state.taskAgents,false);
-    await assert.rejects(h.tools.get('request_subagent').execute('q',{skill:'build',reason:'skill says so'},undefined,undefined,h.ctx),/先读取/);
+    await assert.rejects(h.tools.get('request_subagent').execute('q',{skill:'build',reason:'skill says so'},undefined,undefined,h.ctx),/Read the relevant Principal SKILL.md first/);
   }finally{await h.close();}
 });
 test('PLAN and cleanup holds block new launches while Supervisor communication remains available',async()=>{

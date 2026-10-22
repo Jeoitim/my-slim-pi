@@ -33,7 +33,7 @@ for(const mode of ['auto','act'])test(`${mode}: exactly 90 seconds defaults to t
   t.mock.timers.tick(1);const result=await pending;
   assert.equal(result.details.cancelled,false);assert.equal(result.details.autoSelected,true);
   assert.deepEqual(result.details.response,{kind:'selection',selections:['现有接口 (recommended)']});
-  assert.match(result.content[0].text,/非用户回答或操作授权/);
+  assert.match(result.content[0].text,/not user answers or operation authorization/);
   assert.equal(h.events.filter(e=>e[0]==='ask:answered').length,0);
   assert.equal(h.events.filter(e=>e[0]==='timrt:question-default').length,1);
   assert.deepEqual(h.events.filter(e=>e[0]==='herdr:blocked').map(e=>e[1].active),[true,false]);
@@ -61,7 +61,7 @@ test('freeform answers and optional comments remain available',async()=>{
 });
 test('headless mode, malformed defaults and UI failures never manufacture an answer',async()=>{
   const h=harness();h.ctx.hasUI=false;await assert.rejects(h.call(),/interactive mode/);
-  h.ctx.hasUI=true;await assert.rejects(h.call({question:'需要什么？'}),/第一项/);
+  h.ctx.hasUI=true;await assert.rejects(h.call({question:'需要什么？'}),/recommendation first/);
   h.ctx.ui.custom=async()=>{throw Error('UI failed');};await assert.rejects(h.call(),/UI failed/);
   assert.equal(h.events.some(e=>e[0]==='timrt:question-default'),false);
 });
