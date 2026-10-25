@@ -2,6 +2,14 @@
 
 当前基线为 Pi 1.4.0，Web 扩展为 [nicobailon/pi-web-access 0.44.0](https://github.com/nicobailon/pi-web-access)，任务代理为 pi-subagents 0.80.0，关键澄清为 pi-ask-user 0.17.0。核对日期 2026-10-22；固定版本与分发哈希以 distribution.json 为准。
 
+## 工具显示与 pi-tidy
+
+新增 [pi-tidy 0.4.11](https://github.com/Andy8647/pi-tidy)，通过固定 npm 包的原生 TypeScript 入口加载，复用宿主 SDK，不增加运行依赖、执行工具或常驻提示词。工具 renderer 注册使用公开 API；边框、分组和消息显示仍使用上游原型补丁，不能声称全程仅使用公开 API。没有修改上游源码或另造包装工具。
+
+按用户选择，pi-cc 的 `mode` 为 `off`，避免两套工具分组与 diff 渲染同时接管；启动页、别名、工作状态和上下文命令等独立功能继续安装。本地 composer、权限审批及工具执行逻辑保持原样。pi-tidy 的 `alwaysShowTools` 包含 `edit/write/replace/insert`，Hashline 编辑不会被折叠进普通调用摘要；默认关闭 Nerd Font 图标和用户消息边框，沿用原生点击与 Ctrl+O 展开。上游会自行显示 thinking 行，其可见性不再由宿主 hideThinkingBlock 控制。
+
+切回 pi-cc 工具界面时，先将 `settings.json` 的 `tidy.enabled` 设为 false，再将 `pi-cc-extensions.json` 的 mode 设为 on，并重启；两个配置的旧值保存在安装前私密快照中。普通配置 Restore 不会卸载 npm 包，需要完整卸载时另用包管理移除。
+
 ## 工具声明压缩
 
 沿用默认 memory 编排工具的公开 prepareLoadout hook，为已声明工具提供稳定的短描述，仅在确实更短时替换；隐藏底层记忆声明的原逻辑不变。保留完整参数、执行入口、exposure、reachesTools 和上游 promptGuidelines；不增加路由工具或补丁。read 的锚点规则、权限/维护工具说明和依配置生成的 fetch_content 能力说明不压缩，其他未知工具不改写。技能继续使用稳定描述和 Principal 分层索引。

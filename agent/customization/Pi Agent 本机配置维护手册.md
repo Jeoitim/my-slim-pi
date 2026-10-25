@@ -1,6 +1,6 @@
 # Pi 本机维护手册
 
-更新：2026-10-22 · Pi 1.4.0 · Node 24+ · Windows / PowerShell 7 · Linux / Bash
+更新：2026-10-25 · Pi 1.4.0 · Node 24+ · Windows / PowerShell 7 · Linux / Bash
 
 本安装目录自带锁定版本的 Pi，无需全局安装。Windows 使用 PowerShell 7，Linux 使用 Bash，均需要 Node.js 24+（含 npm）。
 
@@ -71,6 +71,8 @@ bash "$maint" EditConfig settings.json        # 先备份，再打开编辑器
 `Check` 使用模拟审批和搜索响应并验证真实 SDK 组件加载，不调用真实模型，日志每次覆盖。`Benchmark` 禁用 MCP 网络连接，测三次启动器到就绪耗时，不计终端绘制和模型首字时间；`Context` 是离线上下文字符数，不等于 token，也不含在线 MCP 状态。正常部署仅检查启动时，可用 Node 24+ 运行 `<AgentRoot>/customization/checks/check-startup.mjs`；完整安装测试应使用独立目录，不拿个人数据当测试夹具。
 
 ## 日常操作
+
+工具调用由 pi-tidy 0.4.11 折叠成摘要，点击或 Ctrl+O 展开；write、replace、insert 编辑结果保持可见。pi-cc 的重叠工具渲染关闭，启动页等独立功能保留。默认不用 Nerd Font 图标，也不另包用户消息边框。若要切回原工具界面，先设置 settings.json 的 tidy.enabled=false，再设置 pi-cc-extensions.json 的 mode=on，重启生效；避免同时启用两套分组。thinking 行由 pi-tidy 显示，不受宿主 hideThinkingBlock 控制。
 
 安装器会询问是否将本次安装设为默认 `pi` 命令，并可选隐藏输入搜索 Key。已有安装先备份再修复，保留模型、认证、长期规则与个人配置。
 
@@ -337,6 +339,7 @@ Web 工具由固定版社区扩展注册，不在本地整合层增加包装或�
 | 组件 | 固定版本 | 职责 |
 |---|---|---|
 | pi-web-access | 0.44.0 | 原生搜索、抓取与缓存 |
+| pi-tidy | 0.4.11 | 工具折叠、圆角透明边框与展开显示 |
 | pi-ask-user | 0.17.0 | 关键问题澄清、推荐选项与自由回答 |
 | pi-cc-extensions | 1.0.8 | Claude 风格消息、diff、启动页 |
 | pi-hermes-memory | 0.9.11 | 长期记忆、复盘与经验技能 |

@@ -11,6 +11,7 @@
     "@anishthite/pi-themes": "0.1.9",
     "@narumitw/pi-btw": "0.62.0",
     "pi-web-access": "0.44.0",
-    "pi-ask-user": "0.17.0"
+    "pi-ask-user": "0.17.0",
+    "pi-tidy": "0.4.11"
   }
 }

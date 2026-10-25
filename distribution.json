@@ -13,7 +13,8 @@
     "@anishthite/pi-themes": "0.1.9",
     "@narumitw/pi-btw": "0.62.0",
     "pi-web-access": "0.44.0",
-    "pi-ask-user": "0.17.0"
+    "pi-ask-user": "0.17.0",
+    "pi-tidy": "0.4.11"
   },
   "files": {
     "agents/approver.md": "9efe230d6482dc21d424ea493a190f7e637a87164f1eee8f676e65ec1298e7d5",
@@ -24,7 +25,7 @@
     "bin/pi.cmd": "41252e54274177bdb0d69f371801458f86c2220084411763a3647948ac028eea",
     "bin/pi.ps1": "e8b10b50ec2981e5bcfe052957dd64f1fe33ff1c88e440393aecaee1d909c9be",
     "customization/Maintain-Pi.ps1": "59b85b8869c76bde1d3173e289e0f0a96b45429f748f7fc9d252c7c7b25654a8",
-    "customization/Pi Agent 本机配置维护手册.md": "82bc36a20512dc0d9f23b90c0b3b73629f522d7a2d72c41bfb525ec594d289b5",
+    "customization/Pi Agent 本机配置维护手册.md": "87d5a7b1adaded6e325fbdfc3915fabb770adbc5b5c42652be44722708a6bc7d",
     "customization/Pi-Maintenance.bat": "e2bacf46ec94432f274691cbf96ff834c5b0b96130f3c21cff117ff0b74760e4",
     "customization/README.md": "a2f1797f984afa7badc63673ffb40831842f1d51b6e230dab98b53a7dc46b827",
     "customization/checks/benchmark-startup.mjs": "1c7aa4b0cfd4ea7f63e050e43d1a7fe11f7ab57c780f5566e5d9ad2c7662490d",
@@ -76,11 +77,11 @@
     "install/current-version": "78b591400c56b7b67b8cb3b2b8a8e65e9093897f02ce0878e6b5405c68620fa7",
     "keybindings.json": "4f13cad0de201bfdfa58be0b000c827dcb9f9a6921ec5aeb3eb80e443194df42",
     "mcp.json": "eaf9482c064c923bd21138116ddc86eb3ae80e7fda32c64c38fbf03006dc4474",
-    "npm/package-lock.json": "13c479e6826929cf170a6da6bca6dc9aad023fc78804bc7fa428267808f64a6c",
-    "npm/package.json": "d61e1bf05fa1349ee5dedfe1137547d15607c8d36f2aa4058efc6e035c4082bf",
+    "npm/package-lock.json": "269cfff2a7e2b4dc2e3bce5d0639ea0cb418f75aa406eecb62827a99ce625219",
+    "npm/package.json": "67b7706ad340b650c5eccf247fa73badf7a706d4ead1e33130ab88902299a241",
     "pi-btw.json": "6a3fd17a38eec8756eb5017fc8f4397a948b51e715b148e50a34be864704879d",
-    "pi-cc-extensions.json": "179d0a362372ca58b0ca1449859a37a28417769ba1376209ea33df7529bd0bbd",
-    "settings.json": "bec4cf773fdb875e2b8f48c657417bc0a667e29efd9d316f689734bacef92d80",
+    "pi-cc-extensions.json": "286d62d84613facfa29fc0e014323719e3436309645fe89a4c5bf4375d6a935d",
+    "settings.json": "5cefd60166c3ab9829207f5845bd821f48040da2f73b4daf7e62562a738e11dc",
     "skills/pi-maintenance/SKILL.md": "58d866e2e6db6b124b85f951b2782c25de655df16c9710ee0eeb27db823353db",
     "skills/principal/SKILL.md": "eb60a7722567f9e168683cca9c9d33817125d2ecde031ec013b4f1da172ebe4d",
     "themes/claude-warm.json": "c75f1e98c9eeb16e1167e5614de8d4bec4356343781ebcf408d58bd7adc1040a",
@@ -103,7 +104,8 @@
     "customization/checks/tests/task-agents-panel.test.mjs": "efc79723cee6af47339502d1dbed1925b80b9ec564e21d1f78e8b8126f751f1b",
     "extensions/timrt-suite/task-agents-panel.ts": "bbe211ea226daf1cd2fa49e8bae9f9b9c1e1f3e2080674ccf6fe69ccb32c149e",
     "install/releases/1.4.0/package.json": "9792b34aba5a94320fde5c68600eac4a5720d0d63ebc527d462bd125665b29ee",
-    "install/releases/1.4.0/package-lock.json": "eb2c76ac270f099f2af3cbc6ccd08c3d22bf562b914af3690d1abba985461ade"
+    "install/releases/1.4.0/package-lock.json": "eb2c76ac270f099f2af3cbc6ccd08c3d22bf562b914af3690d1abba985461ade",
+    "customization/checks/tests/tidy.test.mjs": "641ecadc9403f9158c65f99ee41ffa32ec616b116a480e358a599871989511e6"
   },
   "platforms": [
     "win32",

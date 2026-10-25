@@ -57,6 +57,7 @@ macOS 应走 Bash 版本的适配方向。目前安装器明确支持 Windows / 
 
 - **联网**：`pi-web-access@0.44.0` 原生 `web_search`、`fetch_content`、`get_search_content`；原生 auto 策略，保留全部免 Key 供应商和已有平台凭据，自动激活，保留内容缓存。
 - **模型**：用 `/login` 或自己的 `models.json` 配置供应商，`/model` 选择模型。
+- **工具显示**：`pi-tidy@0.4.11` 将连续工具调用折叠为可展开摘要，`Ctrl+O` 展开全部；Hashline 编辑与写入保持可见。pi-cc 保留启动页等功能，关闭重叠的工具渲染。
 - **关键澄清**：`pi-ask-user@0.17.0` 先调查再按需提问；AUTO / ACT 问答 90 秒未完成自动采用第一项推荐方案继续，ASK / PLAN 不自动选择。提问不代替审批或委派授权。
 - **权限**：提供 AUTO / ACT / ASK / PLAN；ASK 的非只读操作逐次人工确认，PLAN 保持只读。
 - **任务代理**：`/subagents` 原生管理、`/subagents-fleet` 原生 Inspector；编辑器下方 FleetView 可在空输入时按 `↓` / `←` 进入。创建任务需真实用户授权，启用后持续有效，直到明确撤销；`/task-agents` 打开开关面板（`Ctrl+Shift+A` 也可），`on|off` 仍可直接调整，后台模型设置移至 `/background-models`。
@@ -74,6 +75,6 @@ macOS 应走 Bash 版本的适配方向。目前安装器明确支持 Windows / 
 
 ## 关于此仓库
 
-当前固定版本为 **Pi 1.4.0**，包含十个社区组件；不包含个人模型、密钥、会话或记忆数据库。具体版本见 [distribution.json](distribution.json)。
+当前固定版本为 **Pi 1.4.0**，包含十一个社区组件；不包含个人模型、密钥、会话或记忆数据库。具体版本见 [distribution.json](distribution.json)。
 
 [维护仓库](docs/MAINTAINING.md) · [双平台验证报告](docs/CROSS-PLATFORM.md) · [架构审计](docs/extension-first-audit.md)

@@ -55,7 +55,8 @@
       "extensions": [],
       "skills": [],
       "prompts": []
-    }
+    },
+    "npm:pi-tidy@0.4.11"
   ],
   "markdown": {
     "mermaid": "final"
@@ -76,5 +77,16 @@
   "retry": {
     "enabled": true,
     "maxRetries": 3
+  },
+  "tidy": {
+    "enabled": true,
+    "icons": false,
+    "frameUserMessages": false,
+    "alwaysShowTools": [
+      "edit",
+      "write",
+      "replace",
+      "insert"
+    ]
   }
 }
