@@ -15,6 +15,7 @@
 **/compiled-extensions.json
 **/install/node-path
 **/timrt-fast.mjs
+**/*.compiled.mjs
 **/timrt-chunks/
 *.tgz
 *.log

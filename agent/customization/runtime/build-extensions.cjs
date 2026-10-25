@@ -7,13 +7,20 @@ const digest = file => require('node:crypto').createHash('sha256').update(fs.rea
 const root = path.resolve(process.env.PI_MAINTENANCE_TARGET || path.join(__dirname, '../..'));
 const version = fs.readFileSync(path.join(root, 'install/current-version'), 'utf8').trim();
 const host = path.join(root, 'install/releases', version, 'node_modules');
-const sources = [
-  'npm/node_modules/pi-hermes-memory/src/index.ts',
-  'npm/node_modules/pi-hashline-edit-pro/index.ts',
-  'npm/node_modules/pi-cc-extensions/extensions/index.ts',
-  'extensions/timrt-suite/index.ts',
-  'npm/node_modules/pi-subagents/index.js',
+// Named artifacts preserve package identity in Pi's extension inventory.
+const entries = [
+  { source: 'npm/node_modules/pi-hermes-memory/src/index.ts', output: 'npm/node_modules/pi-hermes-memory/src/pi-hermes-memory.compiled.mjs', startup: true },
+  { source: 'npm/node_modules/pi-hashline-edit-pro/index.ts', output: 'npm/node_modules/pi-hashline-edit-pro/pi-hashline-edit-pro.compiled.mjs', startup: true },
+  { source: 'npm/node_modules/pi-cc-extensions/extensions/index.ts', output: 'npm/node_modules/pi-cc-extensions/extensions/pi-cc-extensions.compiled.mjs', startup: true },
+  { source: 'extensions/timrt-suite/index.ts', output: 'extensions/timrt-suite/timrt-suite.compiled.mjs', startup: true },
+  { source: 'npm/node_modules/pi-subagents/index.js', output: 'npm/node_modules/pi-subagents/pi-subagents.compiled.mjs', startup: false },
+  { source: 'npm/node_modules/pi-tidy/index.ts', output: 'npm/node_modules/pi-tidy/pi-tidy.compiled.mjs', startup: true },
 ];
+const sources = entries.map(entry => entry.source);
+const outputs = entries.map(entry => entry.output);
+// Retired files remain inert rollback material; only their known references migrate.
+const retired = sources.slice(0, 5).map(source => source.replace(/index\.(?:ts|js)$/, 'timrt-fast.mjs'));
+const tidyDir = path.join(root, 'npm/node_modules/pi-tidy');
 const local = fs.readdirSync(path.join(root, 'extensions/timrt-suite')).filter(n => n.endsWith('.ts')).map(n => `extensions/timrt-suite/${n}`);
 local.push('extensions/timrt-suite/read-only-parser.ps1');
 local.push('customization/runtime/policy-files.cjs');
@@ -21,14 +28,14 @@ local.push('customization/runtime/patch-portable-paths.cjs');
 local.push('npm/node_modules/pi-permission-suite/config-loader.ts');
 local.push(...['index.ts', 'settings.ts', 'single-select-layout.ts', 'tern.ts'].map(n => `npm/node_modules/pi-ask-user/${n}`));
 local.push('npm/node_modules/pi-subagents/src/api/capability-ceiling.js', 'npm/node_modules/pi-subagents/src/runs/shared/capability-ceiling.js');
-const packageRoots = ['pi-hermes-memory', 'pi-hashline-edit-pro', 'pi-cc-extensions', 'pi-subagents', 'pi-permission-suite', 'pi-ask-user'];
+local.push(...fs.readdirSync(tidyDir).filter(name => name.endsWith('.ts')).map(name => 'npm/node_modules/pi-tidy/' + name));
+const packageRoots = ['pi-hermes-memory', 'pi-hashline-edit-pro', 'pi-cc-extensions', 'pi-subagents', 'pi-permission-suite', 'pi-ask-user', 'pi-tidy'];
 // npm owns installed versions. Track its manifests too, including packages whose
 // native entries are not bundled, so a direct npm upgrade cannot leave a stale seal.
 for (const file of ['npm/package.json', 'npm/package-lock.json']) if (fs.existsSync(path.join(root, file))) local.push(file);
 const dependencies = fs.existsSync(path.join(root, 'npm/package.json')) ? JSON.parse(fs.readFileSync(path.join(root, 'npm/package.json'), 'utf8')).dependencies || {} : {};
 for (const name of Object.keys(dependencies)) if (!packageRoots.includes(name)) local.push(`npm/node_modules/${name}/package.json`);
 const files = [...new Set([...sources, ...local, ...packageRoots.map(p => `npm/node_modules/${p}/package.json`), 'customization/runtime/build-extensions.cjs', 'customization/runtime/patch-background-models.cjs', 'customization/runtime/patch-interactive-defaults.cjs', `install/releases/${version}/node_modules/@earendil-works/pi-coding-agent/dist/modes/interactive/interactive-mode.js`])];
-const outputs = sources.map(s => s.replace(/index\.(?:ts|js)$/, 'timrt-fast.mjs'));
 files.push(`install/releases/${version}/node_modules/@earendil-works/pi-coding-agent/package.json`);
 files.push('npm/node_modules/pi-cc-extensions/extensions/feature/shell/startup-header.ts');
 const hostChunks = path.join(host, '@earendil-works/pi-coding-agent/dist/bundle/chunks');
@@ -37,13 +44,13 @@ const manifestFile = path.join(root, 'customization/runtime/compiled-extensions.
 const valid = () => {
   try {
     const old = JSON.parse(fs.readFileSync(manifestFile, 'utf8'));
-    return old.version === version && Array.isArray(old.chunks) && files.every(p => old.files[p] === fs.statSync(path.join(root, p)).mtimeMs || old.hashes?.[p] === digest(path.join(root,p))) && [...outputs, ...old.chunks].every(p => fs.existsSync(path.join(root, p)));
+    return old.version === version && Array.isArray(old.chunks) && Object.keys(old.files || {}).length === files.length && files.every(p => old.files[p] === fs.statSync(path.join(root, p)).mtimeMs || old.hashes?.[p] === digest(path.join(root,p))) && [...outputs, ...old.chunks].every(p => fs.existsSync(path.join(root, p)));
   } catch { return false; }
 };
 exports.valid = valid;
 // The transaction captures exactly the same build effects as the builder itself.
 exports.stateFiles = () => [...new Set([
-    ...outputs, 'settings.json', 'customization/runtime/compiled-extensions.json', 'customization/runtime/policy-seal.json',
+    ...outputs, ...retired, 'settings.json', 'customization/runtime/compiled-extensions.json', 'customization/runtime/policy-seal.json',
     'npm/node_modules/pi-permission-suite/config-loader.ts', 'npm/node_modules/pi-hermes-memory/src/index.ts',
     'npm/node_modules/pi-cc-extensions/extensions/feature/shell/startup-header.ts',
     ...files.filter(p => p.includes('/pi-coding-agent/dist/')),
@@ -62,7 +69,7 @@ if (require.main === module) (async () => {
   const plugin = {
     name: 'pi-host-and-resource-paths',
     setup(b) {
-      b.onResolve({ filter: /pi-subagents\/timrt-fast\.mjs$/ }, args => ({ path: pathToFileURL(path.resolve(args.resolveDir, args.path)).href, external: true }));
+      b.onResolve({ filter: /pi-subagents\/pi-subagents\.compiled\.mjs$/ }, args => ({ path: pathToFileURL(path.resolve(args.resolveDir, args.path)).href, external: true }));
       b.onResolve({ filter: /^(?:@earendil-works\/|@sinclair\/typebox(?:\/|$)|typebox(?:\/|$))/ }, args => {
         // Pi resolves these through its host aliases/virtual modules. Absolute
         // dist paths would load a second SDK beside the bundled CLI runtime.
@@ -104,10 +111,17 @@ if (require.main === module) (async () => {
       source = `npm:${name}@${installed}`;
       p = typeof p === 'string' ? source : { ...p, source };
     }
-    if (/^npm:(?:pi-hermes-memory|pi-hashline-edit-pro|pi-cc-extensions)(?:@|$)/.test(source)) return { ...(typeof p === 'object' ? p : { source }), extensions: [] };
+    if (/^npm:(?:pi-hermes-memory|pi-hashline-edit-pro|pi-cc-extensions|pi-tidy)(?:@|$)/.test(source)) return { ...(typeof p === 'object' ? p : { source }), extensions: [] };
     return p;
   });
-  settings.extensions = [...new Set([...(settings.extensions || []).filter(s => !s.includes('timrt-fast.mjs')), '-./extensions/timrt-suite/index.ts', ...outputs.slice(0, 4).map(s => `./${s}`)])];
+  const reference = value => value.replaceAll('\\', '/').replace(/^\.\//, '');
+  const managed = new Set([...retired, ...outputs]);
+  const existing = (settings.extensions || []).map(value => {
+    if (!value.startsWith('-')) return value;
+    const index = retired.indexOf(reference(value.slice(1)));
+    return index < 0 ? value : '-./' + outputs[index];
+  }).filter(value => !managed.has(reference(value)));
+  settings.extensions = [...new Set([...existing, '-./extensions/timrt-suite/index.ts', ...entries.filter(entry => entry.startup).map(entry => './' + entry.output)])];
   fs.writeFileSync(settingsFile, JSON.stringify(settings, null, 2) + '\n');
   fs.writeFileSync(manifestFile, JSON.stringify({ version, buildId, files: Object.fromEntries(files.map(p => [p, fs.statSync(path.join(root, p)).mtimeMs])), hashes:Object.fromEntries(files.map(p=>[p,digest(path.join(root,p))])), outputs, chunks, compiledAt: buildId }, null, 2) + '\n');
   fs.writeFileSync(path.join(root, 'customization/runtime/policy-seal.json'), JSON.stringify(require('./policy-files.cjs').seal(root), null, 2) + '\n');
@@ -116,7 +130,7 @@ if (require.main === module) (async () => {
     const check = require('node:child_process').spawnSync(process.execPath, [startupCheck], { env: { ...process.env, PI_CODING_AGENT_DIR: root, PI_MAINTENANCE_TARGET: root, PI_OFFLINE: '1' }, stdio: 'inherit', windowsHide: true });
     if (check.status !== 0) throw Error('Updated extensions failed offline startup validation; build outputs and settings were restored.');
   }
-  console.log('Compiled four startup entries and one manual subagent entry for Pi ' + version);
+  console.log('Compiled five named startup entries and one subagent runtime for Pi ' + version);
   console.log('已更新策略 SHA256 校验清单：customization/runtime/policy-seal.json。外部核对后，请重载或重启 Pi。');
   } catch (error) {
     for (const [file, data] of previous) {

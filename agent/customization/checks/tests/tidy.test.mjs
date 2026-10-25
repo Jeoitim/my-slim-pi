@@ -11,7 +11,7 @@ const themes=await import(pathToFileURL(join(base,'modes/interactive/theme/theme
 themes.initTheme('claude-warm');
 const tui=await import(pathToFileURL(join(root,'install/releases',version,'node_modules/@earendil-works/pi-tui/dist/index.js')));
 
-test('native pi-tidy coexists with the suite and shell chrome, folds reads and keeps edits visible',async()=>{
+test('compiled pi-tidy coexists with the suite and shell chrome, folds reads and keeps edits visible',async()=>{
   const settings=JSON.parse(readFileSync(join(root,'settings.json'),'utf8'));
   assert.equal(settings.packages.filter(p=>(typeof p==='string'?p:p.source).startsWith('npm:pi-tidy@')).length,1);
   assert.equal(JSON.parse(readFileSync(join(root,'pi-cc-extensions.json'),'utf8')).mode,'off');
@@ -20,7 +20,8 @@ test('native pi-tidy coexists with the suite and shell chrome, folds reads and k
   const loader=new sdk.DefaultResourceLoader({cwd:root,agentDir:root,noContextFiles:true,extensionFactories:[sdk.createMcpExtension({loadConfig:()=>({servers:[],errors:[]})})]});
   await loader.reload();assert.deepEqual(loader.getExtensions().errors,[]);
   const tidy=loader.getExtensions().extensions.filter(e=>e.path.replaceAll('\\','/').includes('/pi-tidy/'));
-  assert.equal(tidy.length,1,'one native entry, not a second bundled copy');
+  assert.equal(tidy.length,1,'one compiled entry with no native duplicate');
+  assert.ok(tidy[0].path.endsWith('/pi-tidy.compiled.mjs') || tidy[0].path.endsWith('\\pi-tidy.compiled.mjs'));
   assert.equal(tidy[0].tools.size,0,'rendering never replaces execution tools');
   const {session}=await sdk.createAgentSession({cwd:root,agentDir:root,resourceLoader:loader,sessionManager:sdk.SessionManager.inMemory(root)});
   const errors=[];session.extensionRunner.onError(error=>errors.push(error));

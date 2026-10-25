@@ -15,7 +15,7 @@ const {inspectDeletionCall}=await jiti.import(join(root,'extensions/timrt-suite/
 test('loaded build identity stays pinned across source edits, rebuilds and reloads',()=>{
   const dir=mkdtempSync(join(tmpdir(),'pi-runtime-state-'));
   for(const folder of ['extensions/timrt-suite','customization/runtime'])mkdirSync(join(dir,folder),{recursive:true});
-  const source='extensions/timrt-suite/permissions.ts',bundle=join(dir,'extensions/timrt-suite/timrt-fast.mjs');
+  const source='extensions/timrt-suite/permissions.ts',bundle=join(dir,'extensions/timrt-suite/timrt-suite.compiled.mjs');
   writeFileSync(join(dir,source),'original');writeFileSync(bundle,'compiled');
   utimesSync(join(dir,source),1000,1000);utimesSync(bundle,2000,2000);
   const manifest=join(dir,'customization/runtime/compiled-extensions.json');

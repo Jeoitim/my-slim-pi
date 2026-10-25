@@ -17,7 +17,7 @@ function privateConfig(value) {
   });
 }
 for(const [path,hash] of Object.entries(manifest.files)){
-  if(/(?:^|\/)(?:node_modules|secrets|sessions|backups|cache)(?:\/|$)|(?:^|\/)(?:auth|models|trust)\.json$|timrt-fast|policy-seal|compiled-extensions/.test(path))throw Error('Private/generated path: '+path);
+  if(/(?:^|\/)(?:node_modules|secrets|sessions|backups|cache)(?:\/|$)|(?:^|\/)(?:auth|models|trust)\.json$|timrt-fast|\.compiled\.mjs$|policy-seal|compiled-extensions/.test(path))throw Error('Private/generated path: '+path);
   if(path.includes('..') || /[:\\]/.test(path))throw Error('Invalid payload path');
   const file=join(root,'agent',path);
   if(lstatSync(file).isSymbolicLink())throw Error('Links are not distributable');

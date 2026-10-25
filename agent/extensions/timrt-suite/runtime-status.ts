@@ -16,7 +16,7 @@ export function createRuntimeStatus(root:string,options:{buildId?:string;loadedA
         sourceMtime=Math.max(sourceMtime,mtime);
         if(manifest.files?.[path]!==mtime)sourceDirty=true;
       }
-      bundleMtime=statSync(join(directory,"timrt-fast.mjs")).mtimeMs;
+      bundleMtime=statSync(join(directory,"timrt-suite.compiled.mjs")).mtimeMs;
       sourceDirty ||= sourceMtime>bundleMtime;
     } catch {sourceDirty=true;}
     const reloadRequired=sourceDirty || (loadedBuild!=="source" && loadedBuild!==diskBuild);

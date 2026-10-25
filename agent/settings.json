@@ -56,17 +56,21 @@
       "skills": [],
       "prompts": []
     },
-    "npm:pi-tidy@0.4.11"
+    {
+      "source": "npm:pi-tidy@0.4.11",
+      "extensions": []
+    }
   ],
   "markdown": {
     "mermaid": "final"
   },
   "extensions": [
     "-./extensions/timrt-suite/index.ts",
-    "./npm/node_modules/pi-hermes-memory/src/timrt-fast.mjs",
-    "./npm/node_modules/pi-hashline-edit-pro/timrt-fast.mjs",
-    "./npm/node_modules/pi-cc-extensions/extensions/timrt-fast.mjs",
-    "./extensions/timrt-suite/timrt-fast.mjs"
+    "./npm/node_modules/pi-hermes-memory/src/pi-hermes-memory.compiled.mjs",
+    "./npm/node_modules/pi-hashline-edit-pro/pi-hashline-edit-pro.compiled.mjs",
+    "./npm/node_modules/pi-cc-extensions/extensions/pi-cc-extensions.compiled.mjs",
+    "./extensions/timrt-suite/timrt-suite.compiled.mjs",
+    "./npm/node_modules/pi-tidy/pi-tidy.compiled.mjs"
   ],
   "defaultProjectTrust": "ask",
   "compaction": {

@@ -175,7 +175,7 @@ test('new skill text sources share transaction and backup scope without admittin
 
 test('failed validation restores byte-identical build outputs and seal; concurrent artifact edits are preserved',async()=>{
   for(const conflict of [false,true]) {
-    const f=fixture(),builder=join(f.dir,'customization/runtime/build-extensions.cjs'),seal='customization/runtime/policy-seal.json',output='extensions/timrt-suite/timrt-fast.mjs';
+    const f=fixture(),builder=join(f.dir,'customization/runtime/build-extensions.cjs'),seal='customization/runtime/policy-seal.json',output='extensions/timrt-suite/timrt-suite.compiled.mjs';
     mkdirSync(dirname(builder),{recursive:true});mkdirSync(dirname(join(f.dir,output)),{recursive:true});
     writeFileSync(builder,'exports.stateFiles=()=>'+JSON.stringify([seal,output])+';');writeFileSync(join(f.dir,seal),'old-seal');
     const directory=join(f.dir,'backups','artifact-test');mkdirSync(directory,{recursive:true});const actions=[];

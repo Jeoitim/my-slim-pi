@@ -4,11 +4,19 @@
 
 ## 工具显示与 pi-tidy
 
-新增 [pi-tidy 0.4.11](https://github.com/Andy8647/pi-tidy)，通过固定 npm 包的原生 TypeScript 入口加载，复用宿主 SDK，不增加运行依赖、执行工具或常驻提示词。工具 renderer 注册使用公开 API；边框、分组和消息显示仍使用上游原型补丁，不能声称全程仅使用公开 API。没有修改上游源码或另造包装工具。
+新增 [pi-tidy 0.4.11](https://github.com/Andy8647/pi-tidy)，通过固定 npm 包生成的单一预编译入口加载，复用宿主 SDK，不增加运行依赖、执行工具或常驻提示词。工具 renderer 注册使用公开 API；边框、分组和消息显示仍使用上游原型补丁，不能声称全程仅使用公开 API。没有修改上游源码或另造包装工具。
 
 按用户选择，pi-cc 的 `mode` 为 `off`，避免两套工具分组与 diff 渲染同时接管；启动页、别名、工作状态和上下文命令等独立功能继续安装。本地 composer、权限审批及工具执行逻辑保持原样。pi-tidy 的 `alwaysShowTools` 包含 `edit/write/replace/insert`，Hashline 编辑不会被折叠进普通调用摘要；默认关闭 Nerd Font 图标和用户消息边框，沿用原生点击与 Ctrl+O 展开。上游会自行显示 thinking 行，其可见性不再由宿主 hideThinkingBlock 控制。
 
 切回 pi-cc 工具界面时，先将 `settings.json` 的 `tidy.enabled` 设为 false，再将 `pi-cc-extensions.json` 的 mode 设为 on，并重启；两个配置的旧值保存在安装前私密快照中。普通配置 Restore 不会卸载 npm 包，需要完整卸载时另用包管理移除。
+
+## 预编译入口命名
+
+生成文件统一使用 `<插件名>.compiled.mjs`：pi-hermes-memory、pi-hashline-edit-pro、pi-cc-extensions、pi-tidy 和 timrt-suite 各有可辨认的启动入口；pi-subagents 使用独立的 pi-subagents.compiled.mjs 运行时。BTW 与 Web 保留上游原生 dist 入口，不改包名或包身份。SDK 与 TypeBox 保持 external，不复制宿主。
+
+构建时迁移已知旧 timrt-fast.mjs 引用，保留未启用的旧文件供回退；不会删除用户其他目录中的同名扩展。pi-tidy 的原生入口被资源过滤关闭，其所有发布 TypeScript 源码纳入缓存失效检查。构建、启动验证或锁一致性检查失败时，配置、生成入口和策略清单仍按原事务恢复。分发和白名单导出不包含任何 *.compiled.mjs。
+
+`@andy8647/pi-toolbox@0.4.1` 是 pi-tidy 的已弃用旧名；npm 元数据明确要求迁移到 pi-tidy。当前保留 pi-tidy 0.4.11，不并装旧名，不新增重复的工具边框或执行覆盖。2026-10-26 核对。
 
 ## 工具声明压缩
 
@@ -32,7 +40,7 @@ web-search.json 的能力配置进入策略校验；Key 和代理轮换不改变
 
 AUTO/ACT 整次问答 90 秒到期后，保留已提交回答，为未回答题目采用第一项推荐方案，标记 `source: timeout-default`，不写入人类输入、不发出 `ask:answered`。主动取消、调用中止、新人类输入、会话切换、界面错误及无 UI 不产生默认答案。ASK/PLAN 不自动选择；任务委派和操作审批维持原机制。`ask_user` 在健康策略下按信息收集免审，避免先审批“是否可以提问”。RPC/Web 模式使用 Pi 的 `select`/`input` 原生对话框，桌面和浏览器不再把终端自定义组件当作唯一交互路径；TUI 仍使用完整 picker。
 
-依赖源码未改动；SDK/TUI 和旧名 `@sinclair/typebox` 使用 Pi 1.4.0 现有宿主别名，共享宿主实例。构建有效性检查覆盖该包全部四个运行时源码及 package.json，保持四个预编译扩展入口和一个任务代理产物；任务代理运行时在启动时加载以提供原生管理和 Fleet，声明仍按需激活。双平台隔离安装、超时与取消、真实 picker 渲染和组件集成结果见 [跨平台验收](CROSS-PLATFORM.md#关键问题问答验收2026-10-21)。
+依赖源码未改动；SDK/TUI 和旧名 `@sinclair/typebox` 使用 Pi 1.4.0 现有宿主别名，共享宿主实例。构建有效性检查覆盖该包全部四个运行时源码及 package.json，保持五个命名的预编译启动入口和一个任务代理产物；任务代理运行时在启动时加载以提供原生管理和 Fleet，声明仍按需激活。双平台隔离安装、超时与取消、真实 picker 渲染和组件集成结果见 [跨平台验收](CROSS-PLATFORM.md#验证结果)。
 
 回退时恢复整组 suite 源码、构建器、子代理角色、settings、npm 包清单和锁文件，按旧锁重新安装并重建；从分发清单移除新增文件后刷新已有哈希并审计。普通 Restore 不会卸载新依赖。升级该插件时重新核对公开工具接口、UI AbortSignal 关闭行为及宿主 TypeBox 别名，不通过修改第三方源码兼容。
 
@@ -66,7 +74,7 @@ Hermes 搜索命中跟踪默认显式关闭，保持搜索的只读约定；首�
 | patch-interactive-defaults：手动 /model、选择器和循环持久化 | 保留，结构检查 | model_select.source 只有 set/cycle/restore，set 不能区分人类选择与后台 setModel；ExtensionAPI 没有等价的用户选择持久化入口。没有用私有会话对象替换补丁；源模块与 CLI bundle 均保留跨供应商行为测试 |
 | patch-interactive-defaults：pi-cc 启动页的宿主快捷键桥接 | 保留，结构检查 | 公开 editor 工厂提供宿主 key manager，但依赖启动页仍读旧 TUI 单例。公开 setHeader 能替换整页，尚不能证明可等价保留原有早期启动交换、布局及渲染；本次不复制或改写整套启动页 |
 | patch-portable-paths | 保留，结构检查 | RuleEngine 的公开构造函数没有配置路径注入参数；config-loader 硬编码默认用户目录。补丁维持独立 AgentRoot 与凭据路径规则 |
-| build-extensions | 保留四个扩展入口和一个原生任务代理产物，后者随 suite 启动初始化 | SDK/TypeBox 继续 external；原生工具声明按需激活，管理与 Fleet 可用性不等于委派授权，无新增编译依赖 |
+| build-extensions | 保留五个命名的预编译启动入口和一个任务代理产物，后者随 suite 启动初始化 | SDK/TypeBox 继续 external；原生工具声明按需激活，管理与 Fleet 可用性不等于委派授权，无新增编译依赖 |
 
 第三方 pi-cc 自身还使用 prototype / patchRegistry，包括 compact-thinking、default/compact renderer、startup-header、flush-docked-bash、fullscreen-detect、mouse interaction/scroll/sticky-prompt、tool grouping/message-display。这些是固定版本依赖内部的运行时实现，不是已迁移的公开 API。此次保留现有消息、diff、鼠标、启动页及界面能力，未声称实现“零 Monkey Patch”。上游升级仍需完整界面回归。
 

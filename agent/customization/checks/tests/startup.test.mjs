@@ -12,7 +12,7 @@ test('bundled runtime loads compiled and TypeScript entries with the same host S
   const cache = join(root, 'cache');
   mkdirSync(cache, { recursive: true });
   const fixture = mkdtempSync(join(cache, 'native-loader-check-'));
-  const native = join(fixture, 'timrt-fast.mjs');
+  const native = join(fixture, 'startup-check.compiled.mjs');
   const typescript = join(fixture, 'ordinary.ts');
   const hostKey = Symbol.for('pi.startup-check.host-sdk');
   globalThis[hostKey] = sdk.getAgentDir;

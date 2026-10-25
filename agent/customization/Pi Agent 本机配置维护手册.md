@@ -1,6 +1,6 @@
 # Pi 本机维护手册
 
-更新：2026-10-25 · Pi 1.4.0 · Node 24+ · Windows / PowerShell 7 · Linux / Bash
+更新：2026-10-26 · Pi 1.4.0 · Node 24+ · Windows / PowerShell 7 · Linux / Bash
 
 本安装目录自带锁定版本的 Pi，无需全局安装。Windows 使用 PowerShell 7，Linux 使用 Bash，均需要 Node.js 24+（含 npm）。
 
@@ -351,6 +351,6 @@ Web 工具由固定版社区扩展注册，不在本地整合层增加包装或�
 | @anishthite/pi-themes | 0.1.9 | Ayu、Catppuccin、GitHub 等主题 |
 | @narumitw/pi-btw | 0.62.0 | 独立旁聊 |
 
-本地 `timrt-suite` 整合界面、权限与维护。启动器使用本机 Node；Windows 使用 PowerShell 7，Linux 使用 Bash。四个本地预编译启动入口，suite 在启动时加载第五个任务代理产物以恢复原生管理与 Fleet；任务工具声明仍由上游 dynamic 策略按需激活，显示与执行授权分别处理。pi-web-access 直接使用上游预构建包的单一原生入口，共享宿主 SDK；不修改插件、宿主或其编译产物来实现 Web。
+本地 `timrt-suite` 整合界面、权限与维护。启动器使用本机 Node；Windows 使用 PowerShell 7，Linux 使用 Bash。五个命名的预编译启动入口，suite 在启动时加载第六个任务代理产物以恢复原生管理与 Fleet；任务工具声明仍由上游 dynamic 策略按需激活，显示与执行授权分别处理。pi-web-access 直接使用上游预构建包的单一原生入口，共享宿主 SDK；不修改插件、宿主或其编译产物来实现 Web。
 
-`cache/node-compile` 与 `cache/jiti` 日常保留。Hashline 默认数据放在当前 AgentRoot 的 `pi-hashline-edit-pro`；显式设置 PI_HASHLINE_DIR 时遵循该设置。启动器依据 `customization/runtime/compiled-extensions.json` 检测源码、SDK 和输出变化，必要时自动重建。
+`cache/node-compile` 与 `cache/jiti` 日常保留。Hashline 默认数据放在当前 AgentRoot 的 `pi-hashline-edit-pro`；显式设置 PI_HASHLINE_DIR 时遵循该设置。启动器依据 `customization/runtime/compiled-extensions.json` 检测源码、SDK 和输出变化，必要时自动重建。生成入口使用 `<插件名>.compiled.mjs`，分别显示记忆、Hashline、pi-cc、pi-tidy 和本地 timrt-suite；任务代理使用独立的命名运行时。BTW 和 Web 沿用原生 dist 入口。npm 上的 `@andy8647/pi-toolbox` 是 pi-tidy 的已弃用旧名，不应与当前 pi-tidy 同时安装。

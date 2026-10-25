@@ -46,7 +46,7 @@ const existingAgentCall = (name: string, input: Record<string, any>) => ["contac
   || name === "subagent" && ["status", "list", "read", "history", "logs", "guide", "wait", "inspect", "stop", "steer", "interrupt"].includes(input.action);
 
 export function installPermissions(pi: ExtensionAPI, review = createApprovalReviewer(pi), registerAgents = async (api: ExtensionAPI) => {
-  const module = await import("../../npm/node_modules/pi-subagents/timrt-fast.mjs");
+  const module = await import("../../npm/node_modules/pi-subagents/pi-subagents.compiled.mjs");
   await module.default(api);
 }) {
   const rules = new RuleEngine();
