@@ -14,7 +14,7 @@ const jiti=createJiti(import.meta.url,{alias:{
   '@earendil-works/pi-tui':join(modules,'@earendil-works/pi-tui/dist/index.js'),
   '@sinclair/typebox':join(modules,'typebox/build/index.mjs'),
 }});
-const {installAskUser,QUESTION_TIMEOUT_MS}=await jiti.import(join(root,'extensions/timrt-suite/ask-user.ts'));
+const {installAskUser,QUESTION_TIMEOUT_MS}=await jiti.import(join(root,'extensions/my-slim-pi-suite/ask-user.ts'));
 const question={question:'选择实现？',options:[{title:'现有接口'},{title:'新增接口'}]};
 test('compact declaration preserves upstream validation and UI controls',async()=>{
   const {default:register}=await jiti.import(join(root,'npm/node_modules/pi-ask-user/index.ts'));
@@ -74,6 +74,20 @@ test('explicit cancellation and user choice are never replaced',async()=>{
   h.ctx.ui.select=async()=> '新增接口';
   const result=await h.call();assert.equal(result.details.autoSelected,undefined);
   assert.deepEqual(result.details.response.selections,['新增接口']);
+});
+
+test('a submitted recommendation reaches the approval model through the recorded question exchange',async()=>{
+  const {harness:permissions}=await import('./auto-harness.mjs');
+  const h=harness(),approval=await permissions(()=>'{"approved":true,"confidence":0.95,"reason":"用户选择了推荐的改名方案"}');
+  h.ctx.ui.select=async(_title,rows)=>rows[0];
+  const result=await h.call();
+  approval.entries.push({id:'ui-question-call',message:{role:'assistant',content:[{type:'toolCall',name:'ask_user',id:'question',arguments:question}]}},
+    {id:'ui-question-answer',message:{role:'toolResult',toolName:'ask_user',toolCallId:'question',...result,isError:false}});
+  assert.equal(await approval.call('write',{path:'./selected.txt',content:'task data'}),undefined);
+  const prompt=approval.requests[0].context.messages[0].content[0].text;
+  assert.match(prompt,/"kind":"question-answer"/);
+  assert.match(prompt,/现有接口 \(recommended\)/);
+  assert.match(prompt,/选择实现/);
 });
 test('freeform answers and optional comments remain available',async()=>{
   const h=harness();h.ctx.ui.select=async(_title,rows)=>rows.at(-1);h.ctx.ui.input=async()=> '使用第三种方案';

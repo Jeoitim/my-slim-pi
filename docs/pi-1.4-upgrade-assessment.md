@@ -10,7 +10,7 @@
 
 | 组件 | 升级前 | 当前稳定版 |
 | --- | --- | --- |
-| pi-cc-extensions | 1.0.5 | 1.0.8 |
+| pi-cc-extensions | 1.0.5 | 已移除，启动功能由本地 suite 提供 |
 | pi-hermes-memory | 0.9.10 | 0.9.11 |
 | pi-hashline-edit-pro | 6.4.6 | 6.5.1 |
 | pi-subagents | 0.78.0 | 0.80.0 |
@@ -23,13 +23,13 @@
 
 六个组件完成更新，另四个已跟齐最新 npm 发布。版本来自逐包 registry 查询并核对发布包，而非把上游未发布分支当成稳定版。所有组件最新 peer 范围均允许目标宿主；双平台运行结果是本仓库自己的验证，不代表作者已正式认证每个组合。
 
-[界面插件](https://github.com/minuque/pi-cc-extensions/compare/v1.0.5...v1.0.8)更新改善编辑器共存、token 显示和滚动点击；[Hermes](https://github.com/chandra447/pi-hermes-memory/blob/71cf5ab7d909318a383bf52bb3ad3cf83a9efc03/CHANGELOG.md)收紧后台记忆子进程工具集合并改善供应商直连和启动同步；[子代理](https://github.com/nicobailon/pi-subagents/blob/80f8f79d51ee8075fd39baf7fe8ff36b43c3a790/CHANGELOG.md)减少未激活声明并修复通知恢复、steer、提示词继承与 Windows 启动；[Web](https://github.com/nicobailon/pi-web-access/blob/d0e323ac935e8753d11e1853b81c057e39dee4dc/CHANGELOG.md)增加供应商网关和重定向凭据保护；[BTW](https://github.com/narumiruna/pi-extensions/blob/main/packages/pi-btw/CHANGELOG.md)改善分栏输入和退出清理。
+[Hermes](https://github.com/chandra447/pi-hermes-memory/blob/71cf5ab7d909318a383bf52bb3ad3cf83a9efc03/CHANGELOG.md)收紧后台记忆子进程工具集合并改善供应商直连和启动同步；[子代理](https://github.com/nicobailon/pi-subagents/blob/80f8f79d51ee8075fd39baf7fe8ff36b43c3a790/CHANGELOG.md)减少未激活声明并修复通知恢复、steer、提示词继承与 Windows 启动；[Web](https://github.com/nicobailon/pi-web-access/blob/d0e323ac935e8753d11e1853b81c057e39dee4dc/CHANGELOG.md)增加供应商网关和重定向凭据保护；[BTW](https://github.com/narumiruna/pi-extensions/blob/main/packages/pi-btw/CHANGELOG.md)改善分栏输入和退出清理。
 
 [Hashline 6.5.1](https://github.com/YuGiMob/pi-hashline-edit-pro/compare/ff139fa983e974caaf84411f58c415f6162ec898...9b049d1e01c35dc885548371e0ee8800f74bb471)的锚点、diff 和结构化结果改进一并跟进。其 replace_match 改为 match/replacement 字段，本地删除准备证据已兼容 replacement；该工具继续默认不激活，没有顺带开放 copy/move 等工具。新版撤销记录默认 30 天，本次显式保持不自动过期，并在线备份旧库。
 
 ## 降低维护负担
 
-原来的具体版本白名单已删除，宿主版本与安装目录一致性、唯一替换位置、补丁幂等和离线启动验证继续保留。Pi、Hermes 和 pi-cc 仍缺少等价公开接口的部分保持最小补丁，不用私有绕行冒充去补丁。Pi 新旧扩展类型声明相同，子代理 capability-ceiling 接口也保持兼容。
+原来的具体版本白名单已删除，宿主版本与安装目录一致性、唯一替换位置、补丁幂等和离线启动验证继续保留。Pi 和 Hermes 仍缺少等价公开接口的部分保持最小补丁，不用私有绕行冒充去补丁。Pi 新旧扩展类型声明相同，子代理 capability-ceiling 接口也保持兼容。
 
 日常更新现在分为两步：
 

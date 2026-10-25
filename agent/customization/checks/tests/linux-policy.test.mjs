@@ -10,7 +10,7 @@ const root=process.env.PI_CODING_AGENT_DIR;
 const version=readFileSync(join(root,'install/current-version'),'utf8').trim();
 const {createJiti}=await import(pathToFileURL(join(root,'install/releases',version,'node_modules/jiti/lib/jiti.mjs')));
 const jiti=createJiti(import.meta.url);
-const {safeShellRead}=await jiti.import(join(root,'extensions/timrt-suite/guards.ts'));
+const {safeShellRead}=await jiti.import(join(root,'extensions/my-slim-pi-suite/guards.ts'));
 test('Bash read-only classification rejects execution flags, expansions, redirections and scripts',()=>{
   for(const command of ['pwd','ls -la','cat ./notes.txt','git status --short','find . -type f -print'])assert.equal(safeShellRead(command,'bash'),true,command);
   for(const command of ['find . -exec touch file +','find . "-exec" touch file +','find . -ok sh ;','find . -fprint output','find . -delete','cat $FILE','ls $(touch x)','cat <(node script)','pwd; touch x','cat a > b','sudo cat /etc/shadow','node -e "1"','bash script.sh','rg --pre command .','git diff --output=out'])assert.equal(safeShellRead(command,'bash'),false,command);

@@ -9,13 +9,13 @@ const version=readFileSync(join(root,'install/current-version'),'utf8').trim();
 const modules=join(root,'install/releases',version,'node_modules');
 const {createJiti}=await import(pathToFileURL(join(modules,'jiti/lib/jiti.mjs')));
 const jiti=createJiti(import.meta.url);
-const {createRuntimeStatus}=await jiti.import(join(root,'extensions/timrt-suite/runtime-status.ts'));
-const {inspectDeletionScripts,SCRIPT_EVIDENCE_LIMIT}=await jiti.import(join(root,'extensions/timrt-suite/guards.ts'));
-const {inspectDeletionCall}=await jiti.import(join(root,'extensions/timrt-suite/deletion-review.ts'));
+const {createRuntimeStatus}=await jiti.import(join(root,'extensions/my-slim-pi-suite/runtime-status.ts'));
+const {inspectDeletionScripts,SCRIPT_EVIDENCE_LIMIT}=await jiti.import(join(root,'extensions/my-slim-pi-suite/guards.ts'));
+const {inspectDeletionCall}=await jiti.import(join(root,'extensions/my-slim-pi-suite/deletion-review.ts'));
 test('loaded build identity stays pinned across source edits, rebuilds and reloads',()=>{
   const dir=mkdtempSync(join(tmpdir(),'pi-runtime-state-'));
-  for(const folder of ['extensions/timrt-suite','customization/runtime'])mkdirSync(join(dir,folder),{recursive:true});
-  const source='extensions/timrt-suite/permissions.ts',bundle=join(dir,'extensions/timrt-suite/timrt-suite.compiled.mjs');
+  for(const folder of ['extensions/my-slim-pi-suite','customization/runtime'])mkdirSync(join(dir,folder),{recursive:true});
+  const source='extensions/my-slim-pi-suite/permissions.ts',bundle=join(dir,'extensions/my-slim-pi-suite/my-slim-pi-suite.compiled.mjs');
   writeFileSync(join(dir,source),'original');writeFileSync(bundle,'compiled');
   utimesSync(join(dir,source),1000,1000);utimesSync(bundle,2000,2000);
   const manifest=join(dir,'customization/runtime/compiled-extensions.json');

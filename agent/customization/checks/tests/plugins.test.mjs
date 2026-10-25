@@ -17,7 +17,7 @@ const jiti = createJiti(import.meta.url, { alias: {
 } });
 
 test('rounded composer fits narrow and wide terminals without wrapping metrics', async () => {
-  const { frame, usageOf } = await jiti.import(join(agentDir, 'extensions/timrt-suite/composer.ts'));
+  const { frame, usageOf } = await jiti.import(join(agentDir, 'extensions/my-slim-pi-suite/composer.ts'));
   const { visibleWidth } = await jiti.import(join(modules, '@earendil-works/pi-tui/dist/index.js'));
   for (const width of [4, 20, 40, 60, 80, 120, 180]) {
     const line = frame(width, ' ◷ 5s · DeepSeek Pro · ✦ max ', ' ◈ AUTO ', s => s, true);
@@ -29,18 +29,19 @@ test('rounded composer fits narrow and wide terminals without wrapping metrics',
 });
 
 test('composer displays model name verbatim and permission colors stay distinct', async () => {
-  const { installComposer } = await jiti.import(join(agentDir, 'extensions/timrt-suite/composer.ts'));
-  const { permissionBadge } = await jiti.import(join(agentDir, 'extensions/timrt-suite/permissions.ts'));
+  const { installComposer } = await jiti.import(join(agentDir, 'extensions/my-slim-pi-suite/composer.ts'));
+  const { permissionBadge } = await jiti.import(join(agentDir, 'extensions/my-slim-pi-suite/permissions.ts'));
   const { visibleWidth } = await jiti.import(join(modules, '@earendil-works/pi-tui/dist/index.js'));
   for (const appearance of ['light', 'dark']) assert.equal(new Set(['auto', 'act', 'ask', 'plan'].map(m => permissionBadge(m, appearance).match(/\x1b\[38;2;[^m]+m/)[0])).size, 4);
-  const hooks = new Map(); let editor;
+  const hooks = new Map(); let editor,headerKeys;
   const theme = { name: 'test', appearance: 'dark', fg: (_c, s) => s };
   const tui = { terminal: { rows: 30, columns: 120, write() {} }, requestRender() {}, queryTerminalColors: async () => ({}) };
   const ctx = { cwd: homedir(), model: { id: 'wrong-id', name: 'DeepSeek V4.1 Flash', reasoning: true, contextWindow: 1000000, cost: {} }, getContextUsage: () => ({ percent: 2, contextWindow: 1000000 }), sessionManager: { getBranch: () => [] }, ui: { theme, getAllThemes: () => [], setHeader() {}, setFooter(factory) { factory(tui, theme, { onBranchChange: () => () => {}, getGitBranch: () => null }); }, setEditorComponent(factory) { editor = factory(tui, { borderColor: s => s }, { matches: () => false }); } } };
   const pi = { on(e, fn) { const list = hooks.get(e) || []; list.push(fn); hooks.set(e, list); }, registerCommand() {}, getThinkingLevel: () => 'high', events: { on: () => () => {}, emit() {} } };
-  installComposer(pi, { mode: 'auto', taskAgents: false });
+  installComposer(pi, { mode: 'auto', taskAgents: false }, keys=>{headerKeys=keys;});
   for (const fn of hooks.get('session_start')) await fn({}, ctx);
   await new Promise(r => setTimeout(r, 10));
+  assert.ok(headerKeys,'the public editor factory supplies header keybindings');
   editor.setText('中文输入 🙂');
   for (const width of [40, 80, 120]) {
     const lines = editor.render(width);
@@ -55,7 +56,7 @@ test('composer displays model name verbatim and permission colors stay distinct'
 });
 
 test('delegation consent is an explicit semantic reviewer result, not a text matcher', async () => {
-  const { parseDecision } = await jiti.import(join(agentDir, 'extensions/timrt-suite/approval-reviewer.ts'));
+  const { parseDecision } = await jiti.import(join(agentDir, 'extensions/my-slim-pi-suite/approval-reviewer.ts'));
   for(const taskAgentAuthorization of ['grant','revoke','unchanged']) {
     assert.equal(parseDecision(JSON.stringify({approved:true,confidence:1,reason:'fixture',taskAgentAuthorization})).taskAgentAuthorization,taskAgentAuthorization);
   }
@@ -63,7 +64,7 @@ test('delegation consent is an explicit semantic reviewer result, not a text mat
 });
 
 test('bulk deletion is detected across common shells, scripts and SQL for approval', async () => {
-  const { deletionRisk, scriptDeletionRisk } = await jiti.import(join(agentDir, 'extensions/timrt-suite/guards.ts'));
+  const { deletionRisk, scriptDeletionRisk } = await jiti.import(join(agentDir, 'extensions/my-slim-pi-suite/guards.ts'));
   for (const s of ['rm -rf cache', 'rm *.log', 'rm a.txt b.txt', 'rm a; rm b', 'Remove-Item -Recurse cache', 'Get-ChildItem | Remove-Item', 'shutil.rmtree(path)', 'fs.rmSync(path, {recursive:true})', 'fs.promises.rm(path,{recursive:true})', 'for p in paths: os.unlink(p)', 'git clean -fd', 'robocopy a b /MIR', 'DELETE FROM records', 'find . -delete']) assert.equal(deletionRisk(s), true, s);
   for (const s of ['git status --short', 'rg delete src', 'rm one.tmp', 'Remove-Item -LiteralPath one.tmp', 'npm test']) assert.equal(deletionRisk(s), false, s);
   const dir = mkdtempSync(join(tmpdir(), 'pi-deletion-policy-'));
@@ -73,7 +74,7 @@ test('bulk deletion is detected across common shells, scripts and SQL for approv
 });
 
 test('PowerShell literal reads cannot hide execution in expressions or pipeline stages', async () => {
-  const { safeShellRead } = await jiti.import(join(agentDir, 'extensions/timrt-suite/guards.ts'));
+  const { safeShellRead } = await jiti.import(join(agentDir, 'extensions/my-slim-pi-suite/guards.ts'));
   for (const command of [
     "Get-ChildItem -LiteralPath 'C:\\Users\\example' -Force",
     'Get-PSDrive | Select-Object Name,Used,Free | ConvertTo-Json',

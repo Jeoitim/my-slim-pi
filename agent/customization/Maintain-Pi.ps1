@@ -131,7 +131,7 @@ function Open-PiConfig {
             @{Name='Web 搜索与代理（私密）';Path='web-search.json'},
             @{Name='MCP 服务器';Path='mcp.json'},
             @{Name='权限规则';Path='extensions\pi-permission-suite\config.json'},@{Name='快捷键';Path='keybindings.json'},
-            @{Name='Claude 风格 UI';Path='pi-cc-extensions.json'},@{Name='任务子代理';Path='extensions\subagent\config.json'}
+            @{Name='任务子代理';Path='extensions\subagent\config.json'}
         )
         $item = Select-PiItem '编辑前自动建立私有备份' $items {param($entry) "$($entry.Name) — $($entry.Path)"}
         if (-not $item) { return }

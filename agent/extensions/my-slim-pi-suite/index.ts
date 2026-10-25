@@ -7,9 +7,11 @@ import { installPromptPolicy } from "./prompt-policy.ts";
 import { installTerminalNotifications } from "./terminal-notifications.ts";
 import { installAskUser } from "./ask-user.ts";
 import { withTaskAgentsPanel } from "./task-agents-panel.ts";
+import { installShellUi } from "./shell-ui.ts";
 
 export default function (pi: ExtensionAPI) {
   installUiState(pi);
+  const setShellKeys = installShellUi(pi);
   let permissions: ReturnType<typeof installPermissions> | undefined;
   let taskAgentsPanel: ((ctx: ExtensionContext) => Promise<void>) | undefined;
   const facade = new Proxy(pi, {
@@ -25,7 +27,7 @@ export default function (pi: ExtensionAPI) {
   }) as ExtensionAPI;
   permissions = installPermissions(facade);
   installAskUser(pi, permissions);
-  installComposer(pi, permissions);
+  installComposer(pi, permissions, setShellKeys);
   installMemoryGateway(pi);
   installPromptPolicy(pi);
   installTerminalNotifications(pi);

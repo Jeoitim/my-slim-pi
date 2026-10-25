@@ -14,7 +14,7 @@ const tui=await import(pathToFileURL(join(root,'install/releases',version,'node_
 test('compiled pi-tidy coexists with the suite and shell chrome, folds reads and keeps edits visible',async()=>{
   const settings=JSON.parse(readFileSync(join(root,'settings.json'),'utf8'));
   assert.equal(settings.packages.filter(p=>(typeof p==='string'?p:p.source).startsWith('npm:pi-tidy@')).length,1);
-  assert.equal(JSON.parse(readFileSync(join(root,'pi-cc-extensions.json'),'utf8')).mode,'off');
+  assert.equal(settings.packages.some(p=>(typeof p==='string'?p:p.source).startsWith('npm:pi-cc-extensions@')),false);
   assert.equal(settings.tidy.enabled,true);
   assert.ok(['replace','insert','write'].every(name=>settings.tidy.alwaysShowTools.includes(name)));
   const loader=new sdk.DefaultResourceLoader({cwd:root,agentDir:root,noContextFiles:true,extensionFactories:[sdk.createMcpExtension({loadConfig:()=>({servers:[],errors:[]})})]});
@@ -31,7 +31,8 @@ test('compiled pi-tidy coexists with the suite and shell chrome, folds reads and
     await session.bindExtensions({mode:'tui',uiContext:ui});
     await new Promise(r=>setTimeout(r,60));
     assert.deepEqual(errors,[]);
-    assert.ok(session.extensionRunner.getCommand('ccstyle'),'pi-cc shell features remain installed');
+    assert.equal(session.extensionRunner.getCommand('ccstyle'),undefined);
+    for(const name of ['clear','exit'])assert.ok(session.extensionRunner.getCommand(name));
     assert.ok(session.extensionRunner.getCommand('task-agents'));
     const display={requestRender(){},terminal:{columns:100}};
     const card=(name,id,text)=>{const c=new sdk.ToolExecutionComponent(name,id,{path:'fixture.txt'},undefined,undefined,display,root);c.setArgsComplete();c.updateResult({content:[{type:'text',text}],isError:false,durationMs:10});return c;};

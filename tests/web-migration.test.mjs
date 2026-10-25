@@ -14,9 +14,9 @@ test('one pinned native Web package; no obsolete runtime route or dedicated MCP'
   assert.deepEqual(json('examples/web-search.example.json'),config);
   assert.deepEqual(json('agent/mcp.json').mcpServers,{});
   assert.equal(json('agent/settings.json').packages.filter(p=>(typeof p==='string'?p:p.source).startsWith('npm:pi-web-access@')).length,1);
-  for(const name of ['web-route.ts','web-proxy.ts','native-exa.ts'])assert.equal(existsSync('agent/extensions/timrt-suite/'+name),false);
-  assert.doesNotMatch(read('agent/extensions/timrt-suite/index.ts'),/registerTool|web-route|native-exa|web-proxy/);
-  assert.doesNotMatch(read('agent/extensions/timrt-suite/index.ts'),/Pi-Maintenance\.bat/);
+  for(const name of ['web-route.ts','web-proxy.ts','native-exa.ts'])assert.equal(existsSync('agent/extensions/my-slim-pi-suite/'+name),false);
+  assert.doesNotMatch(read('agent/extensions/my-slim-pi-suite/index.ts'),/registerTool|web-route|native-exa|web-proxy/);
+  assert.doesNotMatch(read('agent/extensions/my-slim-pi-suite/index.ts'),/Pi-Maintenance\.bat/);
 });
 
 test('both installers migrate native config; private config is sealed and exported as a public template',()=>{

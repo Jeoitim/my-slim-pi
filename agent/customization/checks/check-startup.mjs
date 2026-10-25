@@ -20,8 +20,7 @@ else {
   const runtimeErrors=[];session.extensionRunner.onError(error=>runtimeErrors.push(error));
   try {
     await session.bindExtensions({mode:'json'});
-    // pi-cc registers its write renderer on the next event-loop turn. Keep the
-    // session alive until startup callbacks finish before checking or disposing it.
+    // Allow deferred extension startup callbacks to finish before disposal.
     await new Promise(resolve=>setTimeout(resolve,50));
     const tools=session.getActiveToolNames();
     const configured=JSON.parse(readFileSync(join(root,'settings.json'),'utf8')).defaultTools||[];

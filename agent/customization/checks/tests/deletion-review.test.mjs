@@ -16,7 +16,7 @@ const jiti = createJiti(import.meta.url, { alias: {
 } });
 
 async function harness(review) {
-  const { installPermissions } = await jiti.import(join(root, 'extensions/timrt-suite/permissions.ts'));
+  const { installPermissions } = await jiti.import(join(root, 'extensions/my-slim-pi-suite/permissions.ts'));
   const hooks = new Map(), events = new Map(), entries = [];
   const pi = {
     on(event, fn) { hooks.set(event, [...(hooks.get(event) || []), fn]); },
@@ -254,7 +254,7 @@ test('native MCP applies the same one-call deletion review', async () => {
 });
 
 test('active approver parser requires boolean approval and finite numeric confidence', async () => {
-  const { parseDecision } = await jiti.import(join(root, 'extensions/timrt-suite/approval-reviewer.ts'));
+  const { parseDecision } = await jiti.import(join(root, 'extensions/my-slim-pi-suite/approval-reviewer.ts'));
   for (const approved of ['false', 'true', 1, null]) assert.equal(parseDecision(JSON.stringify({ approved, confidence: .9 })), undefined);
   assert.equal(parseDecision('{"approved":true,"confidence":0.9,"reason":"ok"}').approved, true);
   for (const confidence of ['0.9', null]) assert.equal(parseDecision(JSON.stringify({ approved: true, confidence })), undefined);

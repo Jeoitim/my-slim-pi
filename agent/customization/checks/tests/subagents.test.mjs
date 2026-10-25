@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { jiti,root } from './auto-harness.mjs';
-const { installPermissions } = await jiti.import(join(root,'extensions/timrt-suite/permissions.ts'));
+const { installPermissions } = await jiti.import(join(root,'extensions/my-slim-pi-suite/permissions.ts'));
 const { resolveSubagentCapabilityCeiling } = await jiti.import(join(root,'npm/node_modules/pi-subagents/src/api/capability-ceiling.js'));
 async function harness(directory) {
   if(!directory){mkdirSync(join(root,'.local'),{recursive:true});directory=mkdtempSync(join(root,'.local/delegation-'));mkdirSync(join(directory,'extensions/pi-permission-suite'),{recursive:true});writeFileSync(join(directory,'extensions/pi-permission-suite/config.json'),'{"reviewer":{"humanFallback":"ask"}}');}

@@ -10,13 +10,13 @@ export function createRuntimeStatus(root:string,options:{buildId?:string;loadedA
     try {
       const manifest=JSON.parse(readFileSync(join(root,"customization/runtime/compiled-extensions.json"),"utf8"));
       diskBuild=manifest.buildId || manifest.compiledAt || "unknown";
-      const directory=join(root,"extensions/timrt-suite");
+      const directory=join(root,"extensions/my-slim-pi-suite");
       for(const name of readdirSync(directory).filter(name=>/\.(?:ts|ps1)$/.test(name))) {
-        const path="extensions/timrt-suite/"+name,mtime=statSync(join(root,path)).mtimeMs;
+        const path="extensions/my-slim-pi-suite/"+name,mtime=statSync(join(root,path)).mtimeMs;
         sourceMtime=Math.max(sourceMtime,mtime);
         if(manifest.files?.[path]!==mtime)sourceDirty=true;
       }
-      bundleMtime=statSync(join(directory,"timrt-suite.compiled.mjs")).mtimeMs;
+      bundleMtime=statSync(join(directory,"my-slim-pi-suite.compiled.mjs")).mtimeMs;
       sourceDirty ||= sourceMtime>bundleMtime;
     } catch {sourceDirty=true;}
     const reloadRequired=sourceDirty || (loadedBuild!=="source" && loadedBuild!==diskBuild);

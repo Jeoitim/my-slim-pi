@@ -14,7 +14,7 @@ const jiti = createJiti(import.meta.url, { alias: {
   '@earendil-works/pi-ai': join(modules, '@earendil-works/pi-ai/dist/compat.js'),
   '@earendil-works/pi-tui': join(modules, '@earendil-works/pi-tui/dist/index.js'),
 } });
-const { ThemePicker, chooseTheme, themePreviewRows } = await jiti.import(join(root, 'extensions/timrt-suite/theme-picker.ts'));
+const { ThemePicker, chooseTheme, themePreviewRows } = await jiti.import(join(root, 'extensions/my-slim-pi-suite/theme-picker.ts'));
 const { loadThemeFromPath } = await jiti.import(join(modules, '@earendil-works/pi-coding-agent/dist/modes/interactive/theme/theme.js'));
 const { visibleWidth } = await jiti.import(join(modules, '@earendil-works/pi-tui/dist/index.js'));
 const entries = [
@@ -77,7 +77,7 @@ test('preview uses actual candidate syntax, light background and diff colors', (
 });
 
 test('/theme applies exactly once on confirm and keeps direct theme aliases', async () => {
-  const { installComposer } = await jiti.import(join(root, 'extensions/timrt-suite/composer.ts'));
+  const { installComposer } = await jiti.import(join(root, 'extensions/my-slim-pi-suite/composer.ts'));
   const commands = new Map();
   installComposer({ on() {}, registerCommand: (name, command) => commands.set(name, command), events: { on: () => () => {} } }, { mode: 'auto', taskAgents: false });
   const applied = [];

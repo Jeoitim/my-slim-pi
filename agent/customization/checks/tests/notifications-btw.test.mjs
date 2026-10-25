@@ -16,7 +16,7 @@ const jiti = createJiti(import.meta.url, { alias: {
 } });
 
 test('approval dialogs ring once; settings, automatic approvals and non-TTY output stay silent', async () => {
-  const { installTerminalNotifications, confirmApprovalWithAlert } = await jiti.import(join(root, 'extensions/timrt-suite/terminal-notifications.ts'));
+  const { installTerminalNotifications, confirmApprovalWithAlert } = await jiti.import(join(root, 'extensions/my-slim-pi-suite/terminal-notifications.ts'));
   const hooks = new Map(), commands = new Map(), writes = [];
   const events = new Map();
   const pi = { on: (name, fn) => hooks.set(name, fn), registerCommand: (name, command) => commands.set(name, command),
@@ -53,7 +53,7 @@ test('approval dialogs ring once; settings, automatic approvals and non-TTY outp
 });
 
 test('approval timeout aborts the real modal and never accepts a late approval', async () => {
-  const { confirmApprovalWithAlert, selectApprovalWithAlert, APPROVAL_TIMEOUT_MS } = await jiti.import(join(root, 'extensions/timrt-suite/terminal-notifications.ts'));
+  const { confirmApprovalWithAlert, selectApprovalWithAlert, APPROVAL_TIMEOUT_MS } = await jiti.import(join(root, 'extensions/my-slim-pi-suite/terminal-notifications.ts'));
   assert.equal(APPROVAL_TIMEOUT_MS, 90_000);
   for (const kind of ['confirm', 'select']) {
     const events=[], entries=[], notices=[];
@@ -75,7 +75,7 @@ test('approval timeout aborts the real modal and never accepts a late approval',
 });
 
 test('approval cancellation closes its timer; pre-aborted requests never open a dialog', async () => {
-  const {confirmApprovalWithAlert}=await jiti.import(join(root,'extensions/timrt-suite/terminal-notifications.ts'));
+  const {confirmApprovalWithAlert}=await jiti.import(join(root,'extensions/my-slim-pi-suite/terminal-notifications.ts'));
   const events=[];let opened=0;
   const pi={events:{emit:(name)=>events.push(name)},appendEntry(){throw Error('unexpected timeout');}};
   const ctx={hasUI:true,ui:{notify(){throw Error('unexpected notification');},confirm:async()=>{opened++;return true;}}};
@@ -87,7 +87,7 @@ test('approval cancellation closes its timer; pre-aborted requests never open a 
 });
 
 test('ASK approval waits for an explicit choice and does not install a timeout',async()=>{
-  const {confirmApprovalWithAlert}=await jiti.import(join(root,'extensions/timrt-suite/terminal-notifications.ts'));
+  const {confirmApprovalWithAlert}=await jiti.import(join(root,'extensions/my-slim-pi-suite/terminal-notifications.ts'));
   let resolveDialog,options,message;
   const events=[];
   const pi={events:{emit:(name)=>events.push(name)},appendEntry(){throw Error('ASK must not expire');}};
@@ -102,18 +102,18 @@ test('ASK approval waits for an explicit choice and does not install a timeout',
 });
 
 test('human fallback is shared, takes effect without reload and never weakens ASK or the policy seal',async()=>{
-  const {configuredHumanFallback,saveApprovalFallback,confirmApprovalWithAlert,selectApprovalWithAlert}=await jiti.import(join(root,'extensions/timrt-suite/terminal-notifications.ts'));
-  const {createApprovalReviewer}=await jiti.import(join(root,'extensions/timrt-suite/approval-reviewer.ts'));
+  const {configuredHumanFallback,saveApprovalFallback,confirmApprovalWithAlert,selectApprovalWithAlert}=await jiti.import(join(root,'extensions/my-slim-pi-suite/terminal-notifications.ts'));
+  const {createApprovalReviewer}=await jiti.import(join(root,'extensions/my-slim-pi-suite/approval-reviewer.ts'));
   const {default:policy}=await import(pathToFileURL(join(root,'customization/runtime/policy-files.cjs')));
   const fixture=mkdtempSync(join(root,'approval-setting-test-'));
   const before=process.env.PI_CODING_AGENT_DIR;
   try {
     mkdirSync(join(fixture,'extensions/pi-permission-suite'),{recursive:true});
-    mkdirSync(join(fixture,'extensions/timrt-suite'),{recursive:true});
+    mkdirSync(join(fixture,'extensions/my-slim-pi-suite'),{recursive:true});
     mkdirSync(join(fixture,'customization/runtime'),{recursive:true});
     mkdirSync(join(fixture,'agents'),{recursive:true});
     writeFileSync(join(fixture,'agents/approver.md'),'---\nname: approver\n---\nReview.');
-    writeFileSync(join(fixture,'extensions/timrt-suite/index.ts'),'');
+    writeFileSync(join(fixture,'extensions/my-slim-pi-suite/index.ts'),'');
     const file=join(fixture,'extensions/pi-permission-suite/config.json');
     writeFileSync(file,JSON.stringify({path:{deny:{secret:'protected'}},reviewer:{humanFallback:'ask',other:'keep'}}));
     writeFileSync(join(fixture,'customization/runtime/policy-seal.json'),JSON.stringify(policy.seal(fixture)));

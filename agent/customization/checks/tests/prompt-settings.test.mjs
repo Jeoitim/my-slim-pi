@@ -14,7 +14,7 @@ const jiti = createJiti(import.meta.url, { alias: {
   '@earendil-works/pi-ai': join(modules, '@earendil-works/pi-ai/dist/compat.js'),
   '@earendil-works/pi-tui': join(modules, '@earendil-works/pi-tui/dist/index.js'),
 } });
-const source = name => join(root, 'extensions/timrt-suite', name + '.ts');
+const source = name => join(root, 'extensions/my-slim-pi-suite', name + '.ts');
 
 test('date is local and large post-write previews preserve a bounded set of anchors', async () => {
   const {installPromptPolicy}=await jiti.import(source('prompt-policy'));

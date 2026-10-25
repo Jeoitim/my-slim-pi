@@ -24,7 +24,7 @@ export function child(base, relative) {
   return full;
 }
 export const {skillSourcePath}=createRequire(import.meta.url)('./policy-files.cjs');
-export const configPath = p => skillSourcePath(p.replaceAll('\\','/')) || /^(?:npm\/(?:package|package-lock)\.json|pi-hashline-edit-pro\/config\.json|install\/node-path|settings\.json|trust\.json|models\.json|auth\.json|web-search\.json|mcp\.json|keybindings\.json|pi-cc-extensions\.json|pi-btw\.json|hermes-memory-config\.json|APPEND_SYSTEM(?:\.(?:windows|linux))?\.md|pi-hermes-memory\/STANDING\.md|secrets\/web-keys\.json|extensions\/(?:pi-permission-suite|subagent)\/config\.json|skills\/(?:pi-maintenance|principal)\/SKILL\.md|customization\/(?:README\.md|Pi Agent 本机配置维护手册\.md|Maintain-Pi\.ps1|Pi-Maintenance\.bat|maintain-pi\.sh)|customization\/runtime\/[^/]+\.(?:cjs|mjs)|customization\/checks\/(?:tests\/)?[^/]+\.(?:mjs|ps1)|bin\/(?:pi|pi-launcher\.js|pi\.cmd|pi\.ps1)|agents\/[^/]+\.md|themes\/[^/]+\.json|extensions\/timrt-suite\/[^/]+\.(?:ts|ps1))$/.test(p.replaceAll('\\','/'));
+export const configPath = p => skillSourcePath(p.replaceAll('\\','/')) || /^(?:npm\/(?:package|package-lock)\.json|pi-hashline-edit-pro\/config\.json|install\/node-path|settings\.json|trust\.json|models\.json|auth\.json|web-search\.json|mcp\.json|keybindings\.json|pi-cc-extensions\.json|pi-btw\.json|hermes-memory-config\.json|APPEND_SYSTEM(?:\.(?:windows|linux))?\.md|pi-hermes-memory\/STANDING\.md|secrets\/web-keys\.json|extensions\/(?:pi-permission-suite|subagent)\/config\.json|skills\/(?:pi-maintenance|principal)\/SKILL\.md|customization\/(?:README\.md|Pi Agent 本机配置维护手册\.md|Maintain-Pi\.ps1|Pi-Maintenance\.bat|maintain-pi\.sh)|customization\/runtime\/[^/]+\.(?:cjs|mjs)|customization\/checks\/(?:tests\/)?[^/]+\.(?:mjs|ps1)|bin\/(?:pi|pi-launcher\.js|pi\.cmd|pi\.ps1)|agents\/[^/]+\.md|themes\/[^/]+\.json|extensions\/(?:my-slim-pi-suite|timrt-suite)\/[^/]+\.(?:ts|ps1))$/.test(p.replaceAll('\\','/'));
 const credential = p => /^(?:models\.json|auth\.json|web-search\.json|secrets\/)/.test(p);
 export function protect(file, directory = false) {
   if (process.platform === 'linux') fs.chmodSync(file, directory ? 0o700 : 0o600);
@@ -39,7 +39,7 @@ function privateDir(dir) { fs.mkdirSync(dir,{recursive:true,mode:0o700}); protec
 const json = file => {try{return JSON.parse(fs.readFileSync(file,'utf8').replace(/^\uFEFF/,''));}catch{throw Error('Cannot read local JSON configuration: '+path.basename(file));}};
 export function configFiles(root) {
   const files = ['install/node-path','settings.json','trust.json','web-search.json','mcp.json','keybindings.json','pi-cc-extensions.json','pi-btw.json','hermes-memory-config.json','APPEND_SYSTEM.md','APPEND_SYSTEM.windows.md','APPEND_SYSTEM.linux.md','pi-hermes-memory/STANDING.md','extensions/pi-permission-suite/config.json','extensions/subagent/config.json','skills/pi-maintenance/SKILL.md','skills/principal/SKILL.md','customization/README.md','customization/Pi Agent 本机配置维护手册.md','customization/Maintain-Pi.ps1','customization/Pi-Maintenance.bat','customization/maintain-pi.sh','bin/pi-launcher.js','bin/pi.cmd','bin/pi.ps1','bin/pi'];
-  for (const dir of ['agents','themes','extensions/timrt-suite','customization/runtime','customization/checks','customization/checks/tests']) {
+  for (const dir of ['agents','themes','extensions/my-slim-pi-suite','extensions/timrt-suite','customization/runtime','customization/checks','customization/checks/tests']) {
     const base = child(root,dir);
     if (fs.existsSync(base)) for (const name of fs.readdirSync(base)) if (configPath(dir+'/'+name)) files.push(dir+'/'+name);
   }
@@ -75,7 +75,7 @@ export function migrateWebAccess(root, defaults) {
   const file=child(root,'web-search.json');
   fileState(file);
   const oldKey='secrets/web-keys.json';
-  const obsolete=['extensions/timrt-suite/web-route.ts','extensions/timrt-suite/web-proxy.ts','extensions/timrt-suite/native-exa.ts','customization/checks/tests/web-route.test.mjs','customization/checks/tests/web-proxy.test.mjs','customization/checks/tests/native-mcp.test.mjs'];
+  const obsolete=['extensions/my-slim-pi-suite/web-route.ts','extensions/my-slim-pi-suite/web-proxy.ts','extensions/my-slim-pi-suite/native-exa.ts','customization/checks/tests/web-route.test.mjs','customization/checks/tests/web-proxy.test.mjs','customization/checks/tests/native-mcp.test.mjs'];
   const present=[oldKey,...obsolete].filter(p=>fs.existsSync(child(root,p)));
   for(const p of present)fileState(child(root,p));
   let config=fs.existsSync(file)?json(file):{};
@@ -238,7 +238,7 @@ export async function main(args=process.argv.slice(2)) {
       runNode(root,[path.join(import.meta.dirname,'config-state.mjs'),action.toLowerCase(),...values]);break;
     case 'editconfig': {
       const file=values[0];
-      if(values.length!==1 || !/^(?:settings\.json|models\.json|web-search\.json|mcp\.json|keybindings\.json|hermes-memory-config\.json|pi-cc-extensions\.json|pi-btw\.json|APPEND_SYSTEM(?:\.(?:windows|linux))?\.md|pi-hermes-memory\/STANDING\.md|extensions\/(?:subagent|pi-permission-suite)\/config\.json|agents\/approver\.md)$/.test(file))throw Error('Choose an explicit editable configuration file');
+      if(values.length!==1 || !/^(?:settings\.json|models\.json|web-search\.json|mcp\.json|keybindings\.json|hermes-memory-config\.json|pi-btw\.json|APPEND_SYSTEM(?:\.(?:windows|linux))?\.md|pi-hermes-memory\/STANDING\.md|extensions\/(?:subagent|pi-permission-suite)\/config\.json|agents\/approver\.md)$/.test(file))throw Error('Choose an explicit editable configuration file');
       const target=child(root,file);fileState(target);backup(root,{label:'before-edit',files:[file]});
       const editor=process.env.VISUAL||process.env.EDITOR||(process.platform==='win32'?'notepad.exe':'vi');
       const result=spawnSync(editor,[target],{cwd:root,stdio:'inherit',windowsHide:true});

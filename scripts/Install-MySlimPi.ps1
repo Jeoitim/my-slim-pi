@@ -108,7 +108,7 @@ try {
         $known = @($newSettings.packages | ForEach-Object { if ($_ -is [string]) { $_ -replace '@[^@]+$','' } else { $_.source -replace '@[^@]+$','' } })
         foreach ($package in $oldSettings.packages) {
             $source = if ($package -is [string]) { $package } else { $package.source }
-            if ($source -match '^npm:pi-mcp-adapter@') { continue }
+            if ($source -match '^npm:(?:pi-mcp-adapter|pi-cc-extensions)@') { continue }
             if (($source -replace '@[^@]+$','') -notin $known) { $newSettings.packages += $package }
         }
     }

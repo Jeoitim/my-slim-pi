@@ -11,7 +11,7 @@ import { getAgentDir, type ExtensionAPI, type ExtensionContext } from "@earendil
 import { configuredBackgroundModel } from "./background-models.ts";
 import { deletionRisk } from "./guards.ts";
 import { selectApprovalWithAlert, configuredHumanFallback } from "./terminal-notifications.ts";
-import { expandApprovalEvidence, evidenceGrew, boundedText, HUMAN_RECORD_LIMIT, EXPANDED_HUMAN_RECORD_LIMIT } from "./approval-evidence.ts";
+import { expandApprovalEvidence, evidenceGrew, boundedText, humanEvidenceRecords, HUMAN_RECORD_LIMIT, EXPANDED_HUMAN_RECORD_LIMIT } from "./approval-evidence.ts";
 
 export interface ReviewDecision {
   approved: boolean;
@@ -205,7 +205,7 @@ export function createApprovalReviewer(pi: ExtensionAPI, options?: {humanFallbac
 
     const branch = ctx.sessionManager.getBranch?.() ?? ctx.sessionManager.getEntries();
     const historyKey = createHash('sha256').update(JSON.stringify([policyKey, input.currentUserRequest,
-      branch.filter((e: any) => e.customType === 'timrt-human-request').map((e: any) => [e.id, e.data])])).digest('hex');
+      humanEvidenceRecords(branch)])).digest('hex');
     const preferExpanded = historyKey === expandedHistory;
     const initialInput = preferExpanded ? expandApprovalEvidence(ctx, input) : input;
     const evidence = approvalPrompt(name, initialInput, ctx.cwd);

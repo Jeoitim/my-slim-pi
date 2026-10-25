@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const direct = ['settings.json', 'web-search.json', 'APPEND_SYSTEM.md', 'APPEND_SYSTEM.windows.md', 'APPEND_SYSTEM.linux.md', 'agents/approver.md', 'trust.json', 'extensions/pi-permission-suite/config.json', 'customization/Maintain-Pi.ps1', 'customization/Pi-Maintenance.bat', 'bin/pi-launcher.js', 'bin/pi.cmd', 'bin/pi', 'customization/maintain-pi.sh', 'install/node-path'];
-const trees = ['extensions/timrt-suite', 'customization/runtime', 'customization/checks', 'customization/checks/tests', 'npm/node_modules/pi-permission-suite'];
+const trees = ['extensions/my-slim-pi-suite', 'extensions/timrt-suite', 'customization/runtime', 'customization/checks', 'customization/checks/tests', 'npm/node_modules/pi-permission-suite'];
 const normalize = p => process.platform === 'win32' ? p.replaceAll('\\', '/').toLowerCase() : p.replaceAll('\\', '/');
 function protectedPath(root, target) {
   const relative = normalize(path.relative(root, path.resolve(target)));
@@ -53,7 +53,7 @@ function seal(root) {
   return {version:1, files:Object.fromEntries(files(root).map(file=>[file,digest(root,file)]))};
 }
 function verify(root) {
-  if (!fs.existsSync(path.join(root,'extensions/timrt-suite/index.ts'))) return {ok:true,unmanaged:true,changed:[]};
+  if (!['my-slim-pi-suite','timrt-suite'].some(name => fs.existsSync(path.join(root,'extensions',name,'index.ts')))) return {ok:true,unmanaged:true,changed:[]};
   try {
     const expected = JSON.parse(fs.readFileSync(path.join(root,'customization/runtime/policy-seal.json'),'utf8'));
     const current = seal(root);

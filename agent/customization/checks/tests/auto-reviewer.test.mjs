@@ -104,7 +104,7 @@ test('a failed cleanup-script preparation asks the human and latches the hold', 
 });
 
 test('decision schema rejects coercion while accepting fenced JSON and braces in strings', async () => {
-  const { parseDecision } = await jiti.import(join(suite, 'extensions/timrt-suite/approval-reviewer.ts'));
+  const { parseDecision } = await jiti.import(join(suite, 'extensions/my-slim-pi-suite/approval-reviewer.ts'));
   for (const input of [
     {approved: true}, {approved: true, confidence: null}, {approved: true, confidence: ''},
     {approved: 'true', confidence: .9}, {approved: true, confidence: true},
@@ -147,7 +147,7 @@ test('ACT skips ordinary review and approves each risky deletion internally with
 });
 
 test('both execution modes pause uncertain or unavailable deletion reviews without modal prompts', async () => {
-  const {configuredHumanFallback}=await jiti.import(join(suite,'extensions/timrt-suite/approval-reviewer.ts'));
+  const {configuredHumanFallback}=await jiti.import(join(suite,'extensions/my-slim-pi-suite/approval-reviewer.ts'));
   assert.equal(configuredHumanFallback(),'ask','两平台默认使用人工兜底');
   for(const mode of ['auto','act'])for(const response of ['{"approved":true,"confidence":0.3,"reason":"范围不足"}',{error:'HTTP 503'}]) {
     const h=await harness(()=>response,{humanFallback:'pause'});h.setMode(mode);

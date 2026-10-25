@@ -7,7 +7,7 @@ import {pathToFileURL} from 'node:url';
 const root=process.env.PI_CODING_AGENT_DIR || join(homedir(),'.pi/agent');
 const version=readFileSync(join(root,'install/current-version'),'utf8').trim();
 const {createJiti}=await import(pathToFileURL(join(root,'install/releases',version,'node_modules/jiti/lib/jiti.mjs')));
-const {validateMaintenance,maintenanceScope,skillSourcePath,applyMaintenance,fileHash}=await createJiti(import.meta.url).import(join(root,'extensions/timrt-suite/self-maintenance.ts'));
+const {validateMaintenance,maintenanceScope,skillSourcePath,applyMaintenance,fileHash}=await createJiti(import.meta.url).import(join(root,'extensions/my-slim-pi-suite/self-maintenance.ts'));
 const request='请维护 Pi 的主题和界面配置';
 test('self-maintenance rejects hardlinked targets',()=>{
   const f=fixture(),alias=join(f.dir,'alias');linkSync(f.file,alias);
@@ -32,20 +32,20 @@ test('active platform prompt and runtime edits require one identical reviewed pa
 });
 function fixture(){
   const dir=mkdtempSync(join(tmpdir(),'pi-self-maintenance-'));
-  const path='pi-cc-extensions.json',file=join(dir,path),before='{"enabled":true}\n';
+  const path='pi-btw.json',file=join(dir,path),before='{"enabled":true}\n';
   writeFileSync(file,before);
   return {dir,path,file,before,change:{path,sha256:fileHash(before),content:'{"enabled":false}\n'}};
 }
 test('structure checks enforce scope and hashes without pretending to decide semantic consent',()=>{
   const f=fixture();
   assert.throws(()=>validateMaintenance(f.dir,'',[f.change]),/real user instruction/);
-  assert.deepEqual(maintenanceScope(['extensions/timrt-suite/permissions.ts','APPEND_SYSTEM.md','themes/a.json'].map(path=>({path,content:'',before:null}))),{core:['extensions/timrt-suite/permissions.ts'],permissions:['APPEND_SYSTEM.md']});
+  assert.deepEqual(maintenanceScope(['extensions/my-slim-pi-suite/permissions.ts','APPEND_SYSTEM.md','themes/a.json'].map(path=>({path,content:'',before:null}))),{core:['extensions/my-slim-pi-suite/permissions.ts'],permissions:['APPEND_SYSTEM.md']});
   for(const path of ['../outside.json','C:/outside.json','auth.json','secrets/web-keys.json'])assert.throws(()=>validateMaintenance(f.dir,request,[{path,sha256:null,content:'x'}]),undefined,path);
   assert.throws(()=>validateMaintenance(f.dir,request,[{...f.change,sha256:'0'.repeat(64)}]),/file changed/);
   assert.throws(()=>validateMaintenance(f.dir,request,[f.change,f.change]),/duplicate file/);
   assert.equal(validateMaintenance(f.dir,request,[{path:'APPEND_SYSTEM.md',sha256:null,content:'policy'}]).length,1,'structure is not a semantic grant');
   assert.equal(validateMaintenance(f.dir,'请维护 Pi 权限配置',[{path:'APPEND_SYSTEM.md',sha256:null,content:'Keep safeguards.'}]).length,1);
-  for(const path of ['extensions/timrt-suite/permissions.ts','extensions/timrt-suite/self-maintenance.ts','extensions/timrt-suite/index.ts','customization/runtime/policy-files.cjs','customization/runtime/build-extensions.cjs','customization/Maintain-Pi.ps1','bin/pi-launcher.js']) {
+  for(const path of ['extensions/my-slim-pi-suite/permissions.ts','extensions/my-slim-pi-suite/self-maintenance.ts','extensions/my-slim-pi-suite/index.ts','customization/runtime/policy-files.cjs','customization/runtime/build-extensions.cjs','customization/Maintain-Pi.ps1','bin/pi-launcher.js']) {
     assert.equal(validateMaintenance(f.dir,'请维护 Pi 权限、事务、构建和加载内核',[{path,sha256:null,content:'// reviewed source'}]).length,1,path);
   }
   for(const path of ['customization/runtime/policy-seal.json','customization/runtime/compiled-extensions.json','npm/node_modules/unsafe.js'])assert.throws(()=>validateMaintenance(f.dir,'请维护 Pi 权限内核',[{path,sha256:null,content:'{}'}]));
@@ -175,7 +175,7 @@ test('new skill text sources share transaction and backup scope without admittin
 
 test('failed validation restores byte-identical build outputs and seal; concurrent artifact edits are preserved',async()=>{
   for(const conflict of [false,true]) {
-    const f=fixture(),builder=join(f.dir,'customization/runtime/build-extensions.cjs'),seal='customization/runtime/policy-seal.json',output='extensions/timrt-suite/timrt-suite.compiled.mjs';
+    const f=fixture(),builder=join(f.dir,'customization/runtime/build-extensions.cjs'),seal='customization/runtime/policy-seal.json',output='extensions/my-slim-pi-suite/my-slim-pi-suite.compiled.mjs';
     mkdirSync(dirname(builder),{recursive:true});mkdirSync(dirname(join(f.dir,output)),{recursive:true});
     writeFileSync(builder,'exports.stateFiles=()=>'+JSON.stringify([seal,output])+';');writeFileSync(join(f.dir,seal),'old-seal');
     const directory=join(f.dir,'backups','artifact-test');mkdirSync(directory,{recursive:true});const actions=[];

@@ -5,7 +5,7 @@ import {createRequire} from "node:module";
 
 export type MaintenanceChange={path:string;sha256:string|null;content:string};
 const pathKey=(p:string)=>process.platform==="win32"?p.toLowerCase():p;
-const kernel=/^(?:extensions\/timrt-suite\/(?:index|self-maintenance|permissions|permission-brief|prompt-policy|call-policy|guards|deletion-review|approval-reviewer|approval-evidence|shell-analysis|terminal-notifications)\.ts|extensions\/timrt-suite\/read-only-parser\.ps1|customization\/runtime\/|customization\/(?:Maintain-Pi\.ps1|Pi-Maintenance\.bat|maintain-pi\.sh)|bin\/(?:pi|pi-launcher\.js|pi\.cmd|pi\.ps1)|trust\.json)$/i;
+const kernel=/^(?:extensions\/my-slim-pi-suite\/(?:index|self-maintenance|permissions|permission-brief|prompt-policy|call-policy|guards|deletion-review|approval-reviewer|approval-evidence|shell-analysis|terminal-notifications)\.ts|extensions\/my-slim-pi-suite\/read-only-parser\.ps1|customization\/runtime\/|customization\/(?:Maintain-Pi\.ps1|Pi-Maintenance\.bat|maintain-pi\.sh)|bin\/(?:pi|pi-launcher\.js|pi\.cmd|pi\.ps1)|trust\.json)$/i;
 export const coreMaintenancePath=(path:string)=>kernel.test(path) || /^customization\/(?:runtime|checks)\//i.test(path);
 export const fileHash=(data:Buffer|string)=>createHash("sha256").update(data).digest("hex");
 export {skillSourcePath} from "../../customization/runtime/policy-files.cjs";
@@ -41,7 +41,7 @@ export function validateMaintenance(root:string,request:string,changes:Maintenan
     const path=change.path.replaceAll("\\","/");
     if(!path || /[:\x00-\x1f]/.test(path) || path.startsWith("/") || path.split("/").some(p=>!p || p===".." || p==="."))throw Error("Maintenance paths must be explicit relative file paths inside the configuration directory.");
     const key=pathKey(path);if(seen.has(key))throw Error("Maintenance patch contains a duplicate file.");seen.add(key);
-    const allowed=/^(?:settings\.json|trust\.json|APPEND_SYSTEM(?:\.(?:windows|linux))?\.md|agents\/approver\.md|extensions\/pi-permission-suite\/config\.json|extensions\/timrt-suite\/[^/]+\.(?:ts|ps1)|themes\/[^/]+\.json|skills\/(?:pi-maintenance|principal)\/SKILL\.md|customization\/(?:README\.md|Pi Agent 本机配置维护手册\.md|Maintain-Pi\.ps1|Pi-Maintenance\.bat|maintain-pi\.sh)|customization\/runtime\/[^/]+\.(?:cjs|mjs)|customization\/checks\/(?:tests\/)?[^/]+\.(?:mjs|ps1)|bin\/(?:pi|pi-launcher\.js|pi\.cmd|pi\.ps1)|(?:keybindings|pi-cc-extensions|pi-btw|mcp|hermes-memory-config)\.json)$/i.test(path);
+    const allowed=/^(?:settings\.json|trust\.json|APPEND_SYSTEM(?:\.(?:windows|linux))?\.md|agents\/approver\.md|extensions\/pi-permission-suite\/config\.json|extensions\/my-slim-pi-suite\/[^/]+\.(?:ts|ps1)|themes\/[^/]+\.json|skills\/(?:pi-maintenance|principal)\/SKILL\.md|customization\/(?:README\.md|Pi Agent 本机配置维护手册\.md|Maintain-Pi\.ps1|Pi-Maintenance\.bat|maintain-pi\.sh)|customization\/runtime\/[^/]+\.(?:cjs|mjs)|customization\/checks\/(?:tests\/)?[^/]+\.(?:mjs|ps1)|bin\/(?:pi|pi-launcher\.js|pi\.cmd|pi\.ps1)|(?:keybindings|pi-btw|mcp|hermes-memory-config)\.json)$/i.test(path);
     if((!allowed && !skillSourcePath(path)) || /(?:^|\/)(?:policy-seal|compiled-extensions)\.json$/i.test(path))throw Error("Path is outside self-maintenance source scope; credentials, dependencies, generated files, and arbitrary commands are not accepted: "+path);
     const full=resolve(root,path);
     if(relative(root,full).startsWith(".."))throw Error("Maintenance target escapes the configuration directory.");

@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { jiti, suite } from './auto-harness.mjs';
-const { withTaskAgentsPanel } = await jiti.import(join(suite, 'extensions/timrt-suite/task-agents-panel.ts'));
-const { isApprovalPrompt } = await jiti.import(join(suite, 'extensions/timrt-suite/terminal-notifications.ts'));
+const { withTaskAgentsPanel } = await jiti.import(join(suite, 'extensions/my-slim-pi-suite/task-agents-panel.ts'));
+const { isApprovalPrompt } = await jiti.import(join(suite, 'extensions/my-slim-pi-suite/terminal-notifications.ts'));
 
 function fixture() {
   let enabled = false;

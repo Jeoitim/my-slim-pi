@@ -9,11 +9,11 @@ const repo=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const source=resolve(process.argv.find(a=>a.startsWith('--source='))?.slice(9)||join(homedir(),'.pi/agent'));
 const apply=process.argv.includes('--apply');
 const payload=join(repo,'agent');
-const selected=['APPEND_SYSTEM.windows.md','APPEND_SYSTEM.linux.md','bin/pi','customization/maintain-pi.sh','settings.json','web-search.json','keybindings.json','pi-cc-extensions.json','pi-btw.json','hermes-memory-config.json','mcp.json','extensions/pi-permission-suite/config.json','extensions/subagent/config.json','skills/pi-maintenance/SKILL.md','skills/principal/SKILL.md','customization/Maintain-Pi.ps1','customization/Pi-Maintenance.bat','customization/README.md','customization/Pi Agent 本机配置维护手册.md','bin/pi-launcher.js','bin/pi.cmd','bin/pi.ps1','customization/runtime/build-runtime/package.json','customization/runtime/build-runtime/package-lock.json','install/current-version','npm/package.json','npm/package-lock.json'];
+const selected=['APPEND_SYSTEM.windows.md','APPEND_SYSTEM.linux.md','bin/pi','customization/maintain-pi.sh','settings.json','web-search.json','keybindings.json','pi-btw.json','hermes-memory-config.json','mcp.json','extensions/pi-permission-suite/config.json','extensions/subagent/config.json','skills/pi-maintenance/SKILL.md','skills/principal/SKILL.md','customization/Maintain-Pi.ps1','customization/Pi-Maintenance.bat','customization/README.md','customization/Pi Agent 本机配置维护手册.md','bin/pi-launcher.js','bin/pi.cmd','bin/pi.ps1','customization/runtime/build-runtime/package.json','customization/runtime/build-runtime/package-lock.json','install/current-version','npm/package.json','npm/package-lock.json'];
 const version=readFileSync(join(source,'install/current-version'),'utf8').trim();
 if(!/^\d+\.\d+\.\d+$/.test(version))throw Error('Unsupported Pi version format');
 selected.push(`install/releases/${version}/package.json`,`install/releases/${version}/package-lock.json`);
-for(const [dir,pattern] of [['extensions/timrt-suite',/\.(?:ts|ps1)$/],['customization/runtime',/\.(?:cjs|mjs)$/],['customization/checks',/\.mjs$/],['customization/checks/tests',/\.(?:mjs|ps1)$/],['themes',/\.json$/],['agents',/\.md$/]]) {
+for(const [dir,pattern] of [['extensions/my-slim-pi-suite',/\.(?:ts|ps1)$/],['customization/runtime',/\.(?:cjs|mjs)$/],['customization/checks',/\.mjs$/],['customization/checks/tests',/\.(?:mjs|ps1)$/],['themes',/\.json$/],['agents',/\.md$/]]) {
   for(const entry of readdirSync(join(source,dir),{withFileTypes:true}))if(entry.isFile() && pattern.test(entry.name))selected.push(dir+'/'+entry.name);
 }
 // Skill source export shares the same textual-file scope as backup and transactions.

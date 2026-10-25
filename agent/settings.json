@@ -10,12 +10,8 @@
     "edit",
     "write"
   ],
-  "quietStartup": false,
+  "quietStartup": true,
   "packages": [
-    {
-      "source": "npm:pi-cc-extensions@1.0.8",
-      "extensions": []
-    },
     {
       "source": "npm:pi-hermes-memory@0.9.11",
       "extensions": []
@@ -63,11 +59,10 @@
     "mermaid": "final"
   },
   "extensions": [
-    "-./extensions/timrt-suite/index.ts",
+    "-./extensions/my-slim-pi-suite/index.ts",
     "./npm/node_modules/pi-hermes-memory/src/pi-hermes-memory.compiled.mjs",
     "./npm/node_modules/pi-hashline-edit-pro/pi-hashline-edit-pro.compiled.mjs",
-    "./npm/node_modules/pi-cc-extensions/extensions/pi-cc-extensions.compiled.mjs",
-    "./extensions/timrt-suite/timrt-suite.compiled.mjs",
+    "./extensions/my-slim-pi-suite/my-slim-pi-suite.compiled.mjs",
     "./npm/node_modules/pi-tidy/pi-tidy.compiled.mjs"
   ],
   "defaultProjectTrust": "ask",

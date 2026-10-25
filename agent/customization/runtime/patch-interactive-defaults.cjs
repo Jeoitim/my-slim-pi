@@ -35,16 +35,4 @@ module.exports = function patchInteractiveDefaults(root, version) {
     }
     if (bundled !== fs.readFileSync(bundledFile, 'utf8')) fs.writeFileSync(bundledFile, bundled);
   }
-  // Use the actual host editor's key manager; the legacy TUI singleton can be separate.
-  const header = path.join(root, 'npm/node_modules/pi-cc-extensions/extensions/feature/shell/startup-header.ts');
-  text = fs.readFileSync(header, 'utf8');
-  if (!text.includes('timrt host keybindings')) {
-    const key = 'const keys = getKeybindings().getKeys(keybinding);';
-    const entry = 'export default function piStartupHeader(pi: ExtensionAPI) {';
-    if (text.split(key).length !== 2 || text.split(entry).length !== 2 || text.split('function keyText(keybinding:').length !== 2) throw Error('Review updated pi-cc startup header API before patching.');
-    text = text.replace('function keyText(keybinding:', 'let hostKeybindings: any; // timrt host keybindings\nfunction keyText(keybinding:');
-    text = text.replace(key, 'const keys = (hostKeybindings || getKeybindings()).getKeys(keybinding);');
-    text = text.replace(entry, `${entry}\n  const stopHostKeys = pi.events.on("timrt:host-keybindings", (keys: any) => { hostKeybindings = keys; });\n  pi.on("session_shutdown", () => { hostKeybindings = undefined; stopHostKeys(); });`);
-    fs.writeFileSync(header, text);
-  }
 };

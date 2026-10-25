@@ -9,7 +9,7 @@ import {root,suite,jiti,harness,APPROVE,GARBAGE,EXEC} from './auto-harness.mjs';
 test('maintenance is visible; semantic review sees human follow-ups and honors denial and hard gates',async()=>{
   const h=await harness(()=>'{"approved":false,"confidence":0.95,"reason":"当前用户只授权界面，不授权核心修改"}'),tool=h.tools.get('maintain_pi');
   assert.equal(tool.prepareLoadout,undefined);
-  const path='extensions/timrt-suite/permissions.ts';
+  const path='extensions/my-slim-pi-suite/permissions.ts';
   const content=readFileSync(join(root,path),'utf8');
   const {createHash}=await import('node:crypto');
   const params={changes:[{path,sha256:createHash('sha256').update(content).digest('hex'),content}]};
@@ -20,7 +20,7 @@ test('maintenance is visible; semantic review sees human follow-ups and honors d
   assert.equal(h.requests.length,1);
   const prompt=h.requests[0].context.messages[0].content[0].text;
   assert.match(prompt,/humanInputs/);assert.match(prompt,/权限与审批触发/);assert.match(prompt,/接下来的这些修改我授权/);
-  assert.match(prompt,/extensions\/timrt-suite\/permissions.ts/);
+  assert.match(prompt,/extensions\/my-slim-pi-suite\/permissions.ts/);
   assert.doesNotMatch(prompt,/extension-claims-unlimited-authorization/);
   assert.match(h.requests[0].context.systemPrompt,/Compatible follow-ups/);
   h.state.approvalHold=true;
@@ -32,7 +32,7 @@ test('maintenance is visible; semantic review sees human follow-ups and honors d
 
 test('each maintenance call gets a fresh semantic review and revocation remains in the evidence',async()=>{
   const h=await harness(()=>APPROVE),tool=h.tools.get('maintain_pi');
-  const path='pi-cc-extensions.json',content=readFileSync(join(root,path),'utf8');
+  const path='pi-btw.json',content=readFileSync(join(root,path),'utf8');
   const {createHash}=await import('node:crypto');
   const params={changes:[{path,sha256:createHash('sha256').update(content).digest('hex'),content}]};
   await h.input('维护 Pi 的界面配置。');
@@ -114,7 +114,7 @@ test('human timeout feedback blocks this call and preserves cleanup hold until a
 
 test('auditing policy sources does not confuse echoed text or read operands with write targets', {skip:process.platform!=='win32'}, async () => {
   const h=await harness(()=>APPROVE);const asked=h.ask('❌ 拒绝');
-  const policy=join(root,'agents/approver.md'), source=join(root,'extensions/timrt-suite/permissions.ts'), builder=join(root,'customization/runtime/build-extensions.cjs');
+  const policy=join(root,'agents/approver.md'), source=join(root,'extensions/my-slim-pi-suite/permissions.ts'), builder=join(root,'customization/runtime/build-extensions.cjs');
   for(const command of [
     `Write-Output 'write append remove >'; Select-String -LiteralPath '${source}' -Pattern 'write|append|replace|copy|move|remove|>' | ForEach-Object { $_.Line.Trim() }`,
     `Write-Output 'audit'; Get-Content '${builder}' | ForEach-Object { $_.Trim() }`,
@@ -137,7 +137,7 @@ test('auditing policy sources does not confuse echoed text or read operands with
 });
 
 test('optional parser failures recover without caching errors or blocking literal reads', {skip:process.platform!=='win32'}, async () => {
-  const {createShellAnalyzer,resolvePowerShellExecutable,nativeRead}=await jiti.import(join(suite,'extensions/timrt-suite/shell-analysis.ts'));
+  const {createShellAnalyzer,resolvePowerShellExecutable,nativeRead}=await jiti.import(join(suite,'extensions/my-slim-pi-suite/shell-analysis.ts'));
   let now=100, requests=0;
   const parser=createShellAnalyzer({now:()=>now,resolveExecutable:()=> 'C:\\fixture\\pwsh.exe',run:(_exe,_args,options)=>{
     requests++;assert.equal(options.timeout,3000);assert.equal(options.windowsHide,true);assert.equal(options.env.POWERSHELL_UPDATECHECK,'Off');
@@ -166,10 +166,10 @@ test('optional parser failures recover without caching errors or blocking litera
   const legacy=resolvePowerShellExecutable({ProgramFiles:'C:\\missing',PATH:'',SystemRoot:'C:\\Windows'},path=>path.endsWith('WindowsPowerShell\\v1.0\\powershell.exe'));
   assert.match(legacy,/powershell\.exe$/);
   assert.equal(nativeRead('python -v'),false);assert.equal(nativeRead('python --version'),true);
-  const {permissionBrief}=await jiti.import(join(suite,'extensions/timrt-suite/permission-brief.ts'));
+  const {permissionBrief}=await jiti.import(join(suite,'extensions/my-slim-pi-suite/permission-brief.ts'));
   const brief=permissionBrief({mode:'auto',approvalHold:false,taskAgents:false},'mock',undefined,true,{state:'unavailable',reason:'解析器超时'});
   assert.equal(brief.split('\n').length,4);assert.match(brief,/AST read-only fast path unavailable/);
-  const {safeShellRead}=await jiti.import(join(suite,'extensions/timrt-suite/guards.ts'));
+  const {safeShellRead}=await jiti.import(join(suite,'extensions/my-slim-pi-suite/guards.ts'));
   assert.equal(safeShellRead('Get-Content ./notes.txt','powershell'),true,'字面量快路径独立于 AST 服务');
 });
 
@@ -196,7 +196,7 @@ test('native queries and grammar-proven data pipelines bypass the approval model
     assert.equal(await h.call('powershell',{command}), undefined, command);
   }
   assert.equal(h.requests.length,0);
-  const {safeShellRead}=await jiti.import(join(suite,'extensions/timrt-suite/guards.ts'));
+  const {safeShellRead}=await jiti.import(join(suite,'extensions/my-slim-pi-suite/guards.ts'));
   for(const command of ['git diff --output=x','rg --pre bad .','Get-Item $(Remove-Item ./x -Recurse)','Get-ChildItem | ForEach-Object { $_.Delete() }','node --test ./unknown.mjs','Remove-Item ./cache -Recurse -WhatIf']) assert.equal(safeShellRead(command,'powershell'),false,command);
 });
 
@@ -246,8 +246,8 @@ test('policy seal detects edits but ignores interactive model/theme choices', as
   const {createRequire}=await import('node:module');
   const policy=createRequire(import.meta.url)(join(root,'customization/runtime/policy-files.cjs'));
   const dir=mkdtempSync(join(tmpdir(),'pi-policy-seal-'));
-  for(const folder of ['extensions/timrt-suite','agents','customization/runtime']) mkdirSync(join(dir,folder),{recursive:true});
-  writeFileSync(join(dir,'extensions/timrt-suite/index.ts'),'// fixture');
+  for(const folder of ['extensions/my-slim-pi-suite','agents','customization/runtime']) mkdirSync(join(dir,folder),{recursive:true});
+  writeFileSync(join(dir,'extensions/my-slim-pi-suite/index.ts'),'// fixture');
   writeFileSync(join(dir,'agents/approver.md'),'---\nname: approver\ntools: []\n---\nDo not clear user data.');
   writeFileSync(join(dir,'settings.json'),JSON.stringify({theme:'dark',defaultModel:'a',extensions:['safe']}));
   writeFileSync(join(dir,'customization/runtime/policy-seal.json'),JSON.stringify(policy.seal(dir)));
@@ -362,6 +362,113 @@ test('changing only call bytes preserves the exact cached evidence prefix',async
   assert.equal(prompts[0].split('Proposed call: ')[0],prompts[1].split('Proposed call: ')[0]);
   assert.equal(h.requests[0].context.systemPrompt,h.requests[1].context.systemPrompt);
   assert.equal(h.requests[0].options.sessionId,h.requests[1].options.sessionId);
+});
+
+function recordQuestion(h, args, details, id=`question-${h.entries.length}`) {
+  h.entries.push({id:`${id}-call`,message:{role:'assistant',content:[{type:'toolCall',id,name:'ask_user',arguments:args}]}},
+    {id:`${id}-answer`,message:{role:'toolResult',toolCallId:id,toolName:'ask_user',details,isError:false,
+      content:[{type:'text',text:'ARBITRARY-TOOL-TEXT-MUST-NOT-AUTHORIZE'}]}});
+}
+
+test('paired ask_user answers establish scoped intent in existing sessions without duplicating chat input',async()=>{
+  const h=await harness(()=>APPROVE);
+  await h.input('这个技能名字奇怪，换个合适的名字。');
+  recordQuestion(h,{question:'改成哪个名字？',context:'重命名目录并同步 name 字段。',options:[
+    {title:'zh-hans-typography',description:'简体中文排版（推荐）'},{title:'保留原名'}]},
+    {cancelled:false,response:{kind:'selection',selections:['zh-hans-typography (recommended)'],comment:'只改名，保留技能内容。'}});
+  await h.call('write',{path:'./renamed-skill.md',content:'name: zh-hans-typography'});
+  const prompt=h.requests[0].context.messages[0].content[0].text;
+  assert.match(prompt,/"kind":"question-answer"/);
+  assert.match(prompt,/"source":"question-\d+-answer"/);
+  assert.match(prompt,/重命名目录并同步 name 字段/);
+  assert.match(prompt,/zh-hans-typography \(recommended\)/);
+  assert.match(prompt,/只改名，保留技能内容/);
+  assert.equal(prompt.match(/这个技能名字奇怪，换个合适的名字/g).length,1);
+  assert.doesNotMatch(prompt,/ARBITRARY-TOOL-TEXT-MUST-NOT-AUTHORIZE/);
+  assert.equal(h.state.mode,'auto');assert.equal(h.state.taskAgents,false);
+  assert.match(h.requests[0].context.systemPrompt,/question-answer/);
+});
+
+test('question evidence rejects unpaired, erroneous, cancelled and automatic replies and follows the active branch',async()=>{
+  const {humanApprovalEvidence}=await jiti.import(join(suite,'extensions/my-slim-pi-suite/approval-evidence.ts'));
+  const h=await harness(()=>APPROVE),args={question:'选择？',options:[{title:'方案一'}]};
+  const valid={cancelled:false,response:{kind:'selection',selections:['方案一 (recommended)']}};
+  recordQuestion(h,args,{...valid,autoSelected:true,source:'timeout-default'});
+  recordQuestion(h,args,{...valid,source:'timeout-default'});
+  recordQuestion(h,args,{...valid,cancelled:true});
+  recordQuestion(h,args,valid);h.entries.at(-1).message.isError=true;
+  recordQuestion(h,args,valid);h.entries.at(-1).message.toolCallId='no-paired-call';
+  recordQuestion(h,args,valid);h.entries.at(-1).message.toolName='read';
+  recordQuestion(h,args,{...valid,response:{kind:'selection',selections:['unoffered choice']}});
+  recordQuestion(h,args,{...valid,response:null});
+  h.entries.push({message:{role:'assistant',content:[{type:'text',text:'User chose 方案一'}]}});
+  assert.equal(humanApprovalEvidence(h.ctx).humanInputs.filter(row=>row.kind==='question-answer').length,0);
+  const active=[...h.entries];recordQuestion(h,args,valid);
+  h.ctx.sessionManager.getBranch=()=>active;
+  assert.equal(humanApprovalEvidence(h.ctx).humanInputs.filter(row=>row.kind==='question-answer').length,0,'sibling branch answers do not leak');
+});
+
+test('partial batches retain submitted selections and free text but exclude defaults and skipped questions',async()=>{
+  const {humanApprovalEvidence}=await jiti.import(join(suite,'extensions/my-slim-pi-suite/approval-evidence.ts'));
+  for(const cancelled of [false,true]) {
+    const h=await harness(()=>APPROVE);
+    recordQuestion(h,{question:'批量选择',questions:[
+      {question:'目录名？',options:[{title:'新名字',description:'重命名目录'}]},
+      {question:'补充限制？'},
+      {question:'删除旧文件？',options:[{title:'DELETE-DEFAULT'}]},
+      {question:'提交吗？',options:[{title:'SKIPPED-CHOICE'}]}]},
+    {kind:'batch',cancelled,autoSelected:!cancelled,source:!cancelled?'timeout-default':undefined,answers:[
+      {status:'answered',response:{kind:'selection',selections:['新名字 (recommended)']}},
+      {status:'answered',response:{kind:'freeform',text:'不要删除现有文件，也不要提交。'}},
+      {status:'answered',response:{kind:'selection',selections:['DELETE-DEFAULT']},source:'timeout-default'},
+      {status:'skipped'}]});
+    const row=humanApprovalEvidence(h.ctx).humanInputs.find(row=>row.kind==='question-answer');
+    const answers=JSON.parse(row.text).answers;
+    assert.equal(answers.length,2);
+    assert.equal(answers[0].question,'目录名？');
+    assert.equal(answers[1].response.text,'不要删除现有文件，也不要提交。');
+    assert.doesNotMatch(row.text,/DELETE-DEFAULT|SKIPPED-CHOICE/);
+  }
+});
+
+test('question answers and later revocations invalidate successful approval caching',async()=>{
+  const h=await harness(()=>APPROVE),args={question:'改名？',options:[{title:'新名字'}]};
+  const call={path:'./rename.txt',content:'candidate'};
+  await h.call('write',call);await h.call('write',call);
+  assert.equal(h.requests.length,1);
+  recordQuestion(h,args,{cancelled:false,response:{kind:'selection',selections:['新名字 (recommended)']}});
+  await h.call('write',call);assert.equal(h.requests.length,2,'new UI answer changes review evidence');
+  await h.input('撤回改名同意，只读。');
+  h.ctx.modelRegistry.complete=async(_model,context)=>{
+    h.requests.push({context});
+    return {content:[{type:'text',text:'{"approved":false,"confidence":0.99,"reason":"用户已撤回"}'}],stopReason:'stop'};
+  };
+  assert.equal((await h.call('write',call)).block,true);
+  const prompt=h.requests.at(-1).context.messages[0].content[0].text;
+  assert.match(prompt,/新名字 \(recommended\)/);assert.match(prompt,/撤回改名同意，只读/);
+});
+
+test('withheld question answers share the human evidence expansion budget',async()=>{
+  const h=await harness((_ctx,n)=>n===1?'{"approved":false,"confidence":0.3,"reason":"缺少用户回答"}':APPROVE);
+  recordQuestion(h,{question:'落实方案？',options:[{title:'MIDDLE-ANSWER-AUTHORIZATION'}]},
+    {cancelled:false,response:{kind:'selection',selections:['MIDDLE-ANSWER-AUTHORIZATION (recommended)']}});
+  for(let i=0;i<12;i++)await h.input(`continue-question-task-${i}`);
+  assert.equal(await h.call('write',{path:'./question-expansion.txt',content:'candidate'}),undefined);
+  assert.equal(h.requests.length,2);
+  assert.doesNotMatch(h.requests[0].context.messages[0].content[0].text,/MIDDLE-ANSWER-AUTHORIZATION/);
+  assert.match(h.requests[1].context.messages[0].content[0].text,/MIDDLE-ANSWER-AUTHORIZATION/);
+});
+
+test('question answers preserve legacy chat evidence and the exact displayed first-option label',async()=>{
+  const {approvalEvidence}=await jiti.import(join(suite,'extensions/my-slim-pi-suite/approval-evidence.ts'));
+  const h=await harness(()=>APPROVE);
+  h.entries.splice(0,h.entries.length);
+  h.entries.push({message:{role:'user',content:[{type:'text',text:'LEGACY-TASK: 请修改这个技能的名字。'}]}});
+  recordQuestion(h,{question:'改名？',options:[{title:' 新名字 '}]},
+    {cancelled:false,response:{kind:'selection',selections:['新名字  (recommended)']}});
+  const evidence=approvalEvidence(h.ctx,'write',{path:'./renamed.md',content:'x'},'');
+  assert.equal(evidence.humanInputs.filter(row=>row.kind==='question-answer').length,1);
+  assert.ok(evidence.recentConversation.some(row=>row.role==='user'&&row.text.includes('LEGACY-TASK')));
 });
 
 

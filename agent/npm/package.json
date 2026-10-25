@@ -2,16 +2,15 @@
   "name": "pi-extensions",
   "private": true,
   "dependencies": {
-    "pi-cc-extensions": "1.0.8",
-    "pi-hermes-memory": "0.9.11",
-    "pi-hashline-edit-pro": "6.5.1",
-    "pi-permission-suite": "0.2.3",
-    "pi-subagents": "0.80.0",
-    "principal-pi-skills": "4.14.0",
     "@anishthite/pi-themes": "0.1.9",
     "@narumitw/pi-btw": "0.62.0",
-    "pi-web-access": "0.44.0",
     "pi-ask-user": "0.17.0",
-    "pi-tidy": "0.4.11"
+    "pi-hashline-edit-pro": "6.5.1",
+    "pi-hermes-memory": "0.9.11",
+    "pi-permission-suite": "0.2.3",
+    "pi-subagents": "0.80.0",
+    "pi-tidy": "0.4.11",
+    "pi-web-access": "0.44.0",
+    "principal-pi-skills": "4.14.0"
   }
 }

@@ -60,7 +60,7 @@ try {
     const name=p=>(typeof p==='string'?p:p.source).replace(/@[^@]+$/,'');
     const defaults=JSON.parse(fs.readFileSync(child(payload,'settings.json'),'utf8')).packages;
     const known=new Set(defaults.map(name));
-    const extras=(oldSettings.packages||[]).filter(p=>!known.has(name(p)) && !name(p).includes('pi-mcp-adapter'));
+    const extras=(oldSettings.packages||[]).filter(p=>!known.has(name(p)) && !name(p).includes('pi-mcp-adapter') && name(p)!=='npm:pi-cc-extensions');
     settings.packages=[...defaults.map(p=>{
       if(name(p)==='npm:pi-web-access')return p;
       const old=(oldSettings.packages||[]).find(o=>name(o)===name(p));

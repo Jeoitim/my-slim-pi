@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { basename } from "node:path";
-import { CustomEditor, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { CustomEditor, type ExtensionAPI, type ExtensionContext, type KeybindingsManager } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import { effortLabel } from "./ui-state.ts";
 import { permissionBadge, type PermissionMode } from "./permissions.ts";
@@ -28,12 +28,11 @@ export function frame(width: number, left: string, right: string, edge: (s: stri
   return edge(top ? "╭" : "╰") + l + edge("─".repeat(fill)) + r + edge(top ? "╮" : "╯");
 }
 
-export function installComposer(pi: ExtensionAPI, permissions: { mode: PermissionMode; taskAgents: boolean; policyOk?: boolean;reloadRequired?:boolean }) {
+export function installComposer(pi: ExtensionAPI, permissions: { mode: PermissionMode; taskAgents: boolean; policyOk?: boolean;reloadRequired?:boolean }, onKeybindings?: (keys: KeybindingsManager) => void) {
   let ctx: ExtensionContext;
   let footerData: any;
   let refresh: (() => void) | undefined;
   let timer: ReturnType<typeof setInterval> | undefined;
-  let setupTimer: ReturnType<typeof setTimeout> | undefined;
   let started = 0;
   let elapsed = 0;
   let messageStarted = 0;
@@ -133,17 +132,11 @@ export function installComposer(pi: ExtensionAPI, permissions: { mode: Permissio
       const unsubscribe = data.onBranchChange(refresh);
       return { render: () => [], invalidate() {}, dispose() { unsubscribe(); stopTimer(); } };
     });
-    // pi-cc restores its editor in session_start; apply our single owner after that hook.
-    if (setupTimer) clearTimeout(setupTimer);
-    setupTimer = setTimeout(() => {
-      setupTimer = undefined;
-      // The startup page belongs to pi-cc; customize only the editor and footer here.
-      ctx.ui.setEditorComponent((tui, theme, keys) => {
-        pi.events.emit("timrt:host-keybindings", keys);
-        return new Composer(tui, theme, keys, { paddingX: 2, embedWorkingStatus: false });
-      });
-      refresh?.();
-    }, 0);
+    ctx.ui.setEditorComponent((tui, theme, keys) => {
+      onKeybindings?.(keys);
+      return new Composer(tui, theme, keys, { paddingX: 2, embedWorkingStatus: false });
+    });
+    refresh?.();
   });
   for (const event of ["model_select", "thinking_level_select", "tool_execution_end", "message_end"] as const) pi.on(event, (_event, current) => { ctx = current; refresh?.(); });
   pi.on("agent_start", (_e, current) => { ctx = current; started = Date.now(); stopTimer(); timer = setInterval(() => refresh?.(), 1000); timer.unref?.(); });
@@ -151,7 +144,7 @@ export function installComposer(pi: ExtensionAPI, permissions: { mode: Permissio
   pi.on("message_start", (e: any) => { if (e.message?.role === "assistant") messageStarted = Date.now(); });
   pi.on("message_end", (e: any) => { if (e.message?.role === "assistant" && messageStarted) { tps = (e.message.usage?.output || 0) / Math.max(.001, (Date.now() - messageStarted) / 1000); messageStarted = 0; } });
   const off = pi.events.on("timrt:permissions", () => refresh?.());
-  pi.on("session_shutdown", () => { stopTimer(); if (setupTimer) clearTimeout(setupTimer); setupTimer = undefined; restoreTerminal(); off(); refresh = undefined; terminal = undefined; });
+  pi.on("session_shutdown", () => { stopTimer(); restoreTerminal(); off(); refresh = undefined; terminal = undefined; });
   pi.registerCommand("theme", {
     description: "Theme with code/diff preview: move to preview, Enter saves, Esc cancels. Also /theme ayu-dark, github-light.",
     getArgumentCompletions: p => (ctx?.ui.getAllThemes() || []).filter(t => t.name.startsWith(p)).map(t => ({ value: t.name, label: t.name })),

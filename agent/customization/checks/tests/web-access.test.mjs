@@ -5,7 +5,7 @@ import {join} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {root,jiti,harness,APPROVE} from './auto-harness.mjs';
 import {migrateWebAccess,backup,restore,restorePlan,literalCredential} from '../../runtime/maintenance.mjs';
-const {webReadOnly}=await jiti.import(join(root,'extensions/timrt-suite/call-policy.ts'));
+const {webReadOnly}=await jiti.import(join(root,'extensions/my-slim-pi-suite/call-policy.ts'));
 // Test defaults never inherit an installation's credentials or proxy.
 const defaults={provider:'auto',toolActivation:'auto',workflow:'none',allowBrowserCookies:false,pdf:{enabled:false},githubClone:{enabled:false},githubPrIssue:{enabled:false},youtube:{enabled:false}};
 delete defaults.proxy;
@@ -39,7 +39,7 @@ test('migration removes obsolete implementation, backs up keys, preserves native
   const put=(p,s)=>{mkdirSync(join(fixture,p,'..'),{recursive:true});writeFileSync(join(fixture,p),s);};
   put('secrets/web-keys.json',JSON.stringify({exa:'fixture-exa',brave:'!literal-brave',tavily:'fixture-tavily'}));
   put('web-search.json',JSON.stringify({proxy:'http://127.0.0.1:3128',exaApiKey:'existing-native',searchRouting:{providers:['exa','brave','tavily']},webSearch:{allowedProviders:['exa','brave','tavily']}}));
-  put('extensions/timrt-suite/web-route.ts','obsolete');
+  put('extensions/my-slim-pi-suite/web-route.ts','obsolete');
   put('npm/package.json','{"dependencies":{}}');put('npm/package-lock.json','{"lockfileVersion":3}');
   put('mcp.json',JSON.stringify({mcpServers:{exa:{url:'https://mcp.exa.ai/mcp?tools=web_search_exa,web_fetch_exa'},other:{command:'other'}}}));
   migrateWebAccess(fixture,defaults);
@@ -49,7 +49,7 @@ test('migration removes obsolete implementation, backs up keys, preserves native
   assert.equal(config.proxy,'http://127.0.0.1:3128');assert.equal(config.toolActivation,'auto');
   assert.equal(config.searchRouting,undefined);assert.equal(config.webSearch?.allowedProviders,undefined);
   assert.equal(existsSync(join(fixture,'secrets/web-keys.json')),false);
-  assert.equal(existsSync(join(fixture,'extensions/timrt-suite/web-route.ts')),false);
+  assert.equal(existsSync(join(fixture,'extensions/my-slim-pi-suite/web-route.ts')),false);
   assert.deepEqual(Object.keys(JSON.parse(readFileSync(join(fixture,'mcp.json'))).mcpServers),['other']);
   const snapshot=backup(fixture);assert.equal(JSON.parse(readFileSync(join(snapshot,'configuration-snapshot.json'))).credentialsIncluded,true);
   assert.equal(readFileSync(join(snapshot,'npm/package-lock.json'),'utf8'),'{"lockfileVersion":3}');

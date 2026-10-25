@@ -19,8 +19,8 @@ const jiti = createJiti(import.meta.url, { alias: {
 
 /** 默认注入进程内审批器；模型调用全部由 responder 模拟，不联网、不 spawn 子进程。 */
 async function harness(responder, reviewerOptions) {
-  const { installPermissions } = await jiti.import(join(suite, 'extensions/timrt-suite/permissions.ts'));
-  const { createApprovalReviewer } = await jiti.import(join(suite, 'extensions/timrt-suite/approval-reviewer.ts'));
+  const { installPermissions } = await jiti.import(join(suite, 'extensions/my-slim-pi-suite/permissions.ts'));
+  const { createApprovalReviewer } = await jiti.import(join(suite, 'extensions/my-slim-pi-suite/approval-reviewer.ts'));
   const hooks = new Map(), entries = [], requests = [], tools = new Map(), listeners = new Map();
   const pi = {
     on(event, fn) { hooks.set(event, [...(hooks.get(event) || []), fn]); },

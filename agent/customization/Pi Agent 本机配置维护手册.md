@@ -72,7 +72,7 @@ bash "$maint" EditConfig settings.json        # 先备份，再打开编辑器
 
 ## 日常操作
 
-工具调用由 pi-tidy 0.4.11 折叠成摘要，点击或 Ctrl+O 展开；write、replace、insert 编辑结果保持可见。pi-cc 的重叠工具渲染关闭，启动页等独立功能保留。默认不用 Nerd Font 图标，也不另包用户消息边框。若要切回原工具界面，先设置 settings.json 的 tidy.enabled=false，再设置 pi-cc-extensions.json 的 mode=on，重启生效；避免同时启用两套分组。thinking 行由 pi-tidy 显示，不受宿主 hideThinkingBlock 控制。
+工具调用由 pi-tidy 0.4.11 折叠成摘要，点击或 Ctrl+O 展开；write、replace、insert 编辑结果保持可见。my-slim-pi-suite 通过公开 setHeader 和 setWorkingMessage 提供原 Pi logo 启动页、工作耗时与供应商报告的输出 token 数，保留 /clear 与 /exit 别名。会话统计使用原生 /session，输入框仍显示上下文占比；不再提供 pi-cc 的 /context 与 /ccstyle 面板。启动页复用原主题渐变、48 列双栏断点及标语，快捷键由宿主编辑器提供。quietStartup=true 使普通启动先留白再挂载本地 logo，避免先显示原生标题；原生启动资源清单默认隐藏，可用 pi --verbose 查看，详细模式也会按宿主规则显示原生启动信息。默认不用 Nerd Font 图标，也不另包用户消息边框。thinking 行由 pi-tidy 显示，不受宿主 hideThinkingBlock 控制。
 
 安装器会询问是否将本次安装设为默认 `pi` 命令，并可选隐藏输入搜索 Key。已有安装先备份再修复，保留模型、认证、长期规则与个人配置。
 
@@ -167,7 +167,7 @@ flowchart TD
 ### 审批实现要点
 
 - 审批模型通过宿主接口在当前进程运行，取得原始调用、完整参数、用户请求及可读脚本源码/哈希。静态分析用于确认只读和提取证据；复杂语法、变量或内联不直接等于人工审批。
-- 用户证据分开呈现：本轮最新消息单列并带来源标识，更早的真实输入按时间升序列在 `humanInputs`。超长正文保留头尾并标注省略字符数；助手背景带轮次标记，早于最新用户记录的内容只作背景，不能授权，也不能证明任务已完成。
+- 用户证据分开呈现：本轮最新聊天消息单列并带来源标识，其余真实输入按时间升序列在 `humanInputs`。当前会话分支中配对的 `ask_user` 提问与结构化结果也会提取为 `question-answer` 证据，已有会话无需迁移；用户亲自选择的推荐项、自由回答与附言属于真实输入，题干、背景和选项说明只用于解释回答范围。批量问答只收录已提交回答，超时默认项、未答与取消项以及其他工具文本不构成用户同意；回答仍需按现行权限模式逐次审批，后续撤回与限制优先。所有用户证据共用有界记录与扩展额度；超长正文保留头尾并标注省略字符数。助手背景带轮次标记，早于最新用户聊天记录的内容只作背景，不能授权，也不能证明任务已完成。
 - 低置信度结论且证据确有省略或截断时，先用原有第二次请求额度扩展记录核对一次，再按当前配置转人工或暂停；置信度达标的拒绝不会因此重试。
 - 脚本正文按需附带，单文件最多 96,000 字符、总计 192,000 字符；超过预算明确标注截断，SHA256 始终覆盖完整文件。读取文件本身不触发脚本执行审查。
 - 首轮预算 30 秒，失败或无效结果最多再试一次、预算 20 秒；连续失败进入 60 秒故障窗口。结果要求真实 boolean 和有限数值置信度。
@@ -308,8 +308,8 @@ PruneBackups（Windows 菜单 5）先展示清单，再确认：
 | hermes-memory-config.json / extensions/subagent/config.json | 记忆策略 / 任务代理设置 |
 | web-search.json | 原生 Web 配置、私密 Key 和代理 |
 | mcp.json | 用户额外 MCP 配置；默认无服务器 |
-| pi-cc-extensions.json / pi-btw.json / keybindings.json | 消息渲染 / 旁聊 / 快捷键 |
-| themes/ / skills/ / extensions/timrt-suite/ | 本地主题 / 技能 / 整合源码 |
+| pi-btw.json / keybindings.json | 旁聊 / 快捷键 |
+| themes/ / skills/ / extensions/my-slim-pi-suite/ | 本地主题 / 技能 / 整合源码 |
 | customization/runtime/ | 构建、兼容补丁、配置接口、编译清单与构建依赖 |
 | customization/checks/ / customization/reports/last-check.log | 检查程序 / 最新检查日志 |
 
@@ -341,16 +341,15 @@ Web 工具由固定版社区扩展注册，不在本地整合层增加包装或�
 | pi-web-access | 0.44.0 | 原生搜索、抓取与缓存 |
 | pi-tidy | 0.4.11 | 工具折叠、圆角透明边框与展开显示 |
 | pi-ask-user | 0.17.0 | 关键问题澄清、推荐选项与自由回答 |
-| pi-cc-extensions | 1.0.8 | Claude 风格消息、diff、启动页 |
 | pi-hermes-memory | 0.9.11 | 长期记忆、复盘与经验技能 |
 | pi-hashline-edit-pro | 6.5.1 | 锚点读取、编辑、过期检测与撤销 |
 | Pi 原生 MCP | 随 Pi 1.4.0 | 原生连接、延迟发现及统一权限执行管线 |
-| pi-permission-suite | 0.2.3 | 权限规则与内部审批 |
+| pi-permission-suite | 0.2.3 | 上游权限规则引擎，由本地整合入口接入 |
 | pi-subagents | 0.80.0 | 原生管理、FleetView / Inspector 与获授权的任务委派 |
 | principal-pi-skills | 4.14.0 | 单个索引下的 9 项工程技能 |
 | @anishthite/pi-themes | 0.1.9 | Ayu、Catppuccin、GitHub 等主题 |
 | @narumitw/pi-btw | 0.62.0 | 独立旁聊 |
 
-本地 `timrt-suite` 整合界面、权限与维护。启动器使用本机 Node；Windows 使用 PowerShell 7，Linux 使用 Bash。五个命名的预编译启动入口，suite 在启动时加载第六个任务代理产物以恢复原生管理与 Fleet；任务工具声明仍由上游 dynamic 策略按需激活，显示与执行授权分别处理。pi-web-access 直接使用上游预构建包的单一原生入口，共享宿主 SDK；不修改插件、宿主或其编译产物来实现 Web。
+本地 `my-slim-pi-suite` 是唯一整合入口，按模块接入界面、权限、问答与维护。`pi-permission-suite` 是固定版本的上游规则引擎依赖，包自身入口禁用；其包名及 `extensions/pi-permission-suite/config.json` 配置路径保留，AUTO / ACT / ASK / PLAN、内部审批与防绕过策略由本地入口统一协调。更新已有安装时，旧 `timrt-suite` 目录可作为停用的回退材料保留；构建器会禁用其入口，仅加载新入口。启动器使用本机 Node；Windows 使用 PowerShell 7，Linux 使用 Bash。四个命名的预编译启动入口，suite 在启动时加载独立的任务代理产物以恢复原生管理与 Fleet；任务工具声明仍由上游 dynamic 策略按需激活，显示与执行授权分别处理。pi-web-access 直接使用上游预构建包的单一原生入口，共享宿主 SDK；不修改插件、宿主或其编译产物来实现 Web。
 
-`cache/node-compile` 与 `cache/jiti` 日常保留。Hashline 默认数据放在当前 AgentRoot 的 `pi-hashline-edit-pro`；显式设置 PI_HASHLINE_DIR 时遵循该设置。启动器依据 `customization/runtime/compiled-extensions.json` 检测源码、SDK 和输出变化，必要时自动重建。生成入口使用 `<插件名>.compiled.mjs`，分别显示记忆、Hashline、pi-cc、pi-tidy 和本地 timrt-suite；任务代理使用独立的命名运行时。BTW 和 Web 沿用原生 dist 入口。npm 上的 `@andy8647/pi-toolbox` 是 pi-tidy 的已弃用旧名，不应与当前 pi-tidy 同时安装。
+`cache/node-compile` 与 `cache/jiti` 日常保留。Hashline 默认数据放在当前 AgentRoot 的 `pi-hashline-edit-pro`；显式设置 PI_HASHLINE_DIR 时遵循该设置。启动器依据 `customization/runtime/compiled-extensions.json` 检测源码、SDK 和输出变化，必要时自动重建。生成入口使用 `<插件名>.compiled.mjs`，分别显示记忆、Hashline、pi-tidy 和本地 my-slim-pi-suite；任务代理使用独立的命名运行时。BTW 和 Web 沿用原生 dist 入口。npm 上的 `@andy8647/pi-toolbox` 是 pi-tidy 的已弃用旧名，不应与当前 pi-tidy 同时安装。
