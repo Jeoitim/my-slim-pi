@@ -5,6 +5,7 @@ import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import { effortLabel } from "./ui-state.ts";
 import { permissionBadge, type PermissionMode } from "./permissions.ts";
 import { chooseTheme } from "./theme-picker.ts";
+import { themeName } from "../../customization/runtime/theme-settings.mjs";
 
 export const compact = (n: number) => n >= 1e6 ? `${+(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${+(n / 1e3).toFixed(1)}k` : String(Math.round(n));
 export function usageOf(entries: any[]) {
@@ -156,11 +157,10 @@ export function installComposer(pi: ExtensionAPI, permissions: { mode: Permissio
     getArgumentCompletions: p => (ctx?.ui.getAllThemes() || []).filter(t => t.name.startsWith(p)).map(t => ({ value: t.name, label: t.name })),
     handler: async (args, current) => {
       ctx = current;
-      const aliases: Record<string, string> = { ayu: "ayu-dark", catppuccin: "catppuccin-dark", cappucin: "catppuccin-dark", github: "github-dark", claude: "claude-warm" };
       let name = args.trim();
       if (!name || name === "list") name = await chooseTheme(ctx) || "";
       if (!name) return;
-      name = aliases[name] || name;
+      name = themeName(name);
       const result = ctx.ui.setTheme(name);
       if (!result.success) { ctx.ui.notify(result.error || "Theme not found", "error"); return; }
       // Pi 1.3 persists named themes through its settings manager; preview never calls setTheme.

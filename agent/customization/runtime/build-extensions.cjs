@@ -24,6 +24,7 @@ const tidyDir = path.join(root, 'npm/node_modules/pi-tidy');
 const local = fs.readdirSync(path.join(root, 'extensions/timrt-suite')).filter(n => n.endsWith('.ts')).map(n => `extensions/timrt-suite/${n}`);
 local.push('extensions/timrt-suite/read-only-parser.ps1');
 local.push('customization/runtime/policy-files.cjs');
+local.push('customization/runtime/theme-settings.mjs');
 local.push('customization/runtime/patch-portable-paths.cjs');
 local.push('npm/node_modules/pi-permission-suite/config-loader.ts');
 local.push(...['index.ts', 'settings.ts', 'single-select-layout.ts', 'tern.ts'].map(n => `npm/node_modules/pi-ask-user/${n}`));

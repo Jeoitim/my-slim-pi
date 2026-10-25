@@ -43,8 +43,6 @@
       "source": "npm:@anishthite/pi-themes@0.1.9",
       "extensions": [],
       "themes": [
-        "themes/ayu-*.json",
-        "themes/catppuccin-*.json",
         "themes/github-*.json"
       ]
     },

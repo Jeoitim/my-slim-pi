@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 const root = process.env.PI_CODING_AGENT_DIR || join(homedir(), '.pi/agent');
 const version = readFileSync(join(root, 'install/current-version'), 'utf8').trim();
@@ -92,4 +92,49 @@ test('/theme applies exactly once on confirm and keeps direct theme aliases', as
   assert.deepEqual(applied, ['github-light']);
   await commands.get('theme').handler('github', { hasUI: true, mode: 'tui', ui });
   assert.deepEqual(applied, ['github-light', 'github-dark']);
+  for (const name of ['catppuccin', 'catppuccin-frappe-dark', 'catppuccin-macchiato-light', 'gruvbox']) await commands.get('theme').handler(name, { hasUI: true, mode: 'tui', ui });
+  assert.deepEqual(applied.slice(2), ['catppuccin-mocha', 'catppuccin-frappe', 'catppuccin-latte', 'gruvbox-dark']);
+});
+
+test('local palette catalog loads with correct appearance and distinct official backgrounds', () => {
+  const expected = {
+    'ayu-light': ['light', '#fcfcfc'], 'ayu-dark': ['dark', '#10141c'],
+    'catppuccin-latte': ['light', '#eff1f5'], 'catppuccin-frappe': ['dark', '#303446'],
+    'catppuccin-macchiato': ['dark', '#24273a'], 'catppuccin-mocha': ['dark', '#1e1e2e'],
+    'gruvbox-dark': ['dark', '#282828'], 'gruvbox-dark-soft': ['dark', '#32302f'], 'gruvbox-dark-hard': ['dark', '#1d2021'],
+    'gruvbox-light': ['light', '#fbf1c7'], 'gruvbox-light-soft': ['light', '#f2e5bc'], 'gruvbox-light-hard': ['light', '#f9f5d7'],
+  };
+  const previews = new Set();
+  for (const [name, [appearance, background]] of Object.entries(expected)) {
+    const file = join(root, 'themes', name + '.json'), data = JSON.parse(readFileSync(file, 'utf8'));
+    const theme = loadThemeFromPath(file, 'truecolor');
+    assert.equal(data.name, name);
+    assert.equal(theme.appearance, appearance, name);
+    assert.equal(data.vars[data.export.pageBg] || data.export.pageBg, background, name);
+    const picker = new ThemePicker(options({ entries: [{ name, path: file }], current: name, loadTheme: () => theme }));
+    const rendered = picker.render(120).join('\n');
+    const rgb = background.slice(1).match(/../g).map(x => parseInt(x, 16)).join(';');
+    assert.ok(rendered.includes('48;2;' + rgb), name + ': preview background');
+    assert.ok(rendered.includes(theme.fg('syntaxKeyword', 'export function ')), name + ': syntax preview');
+    assert.ok(rendered.includes(theme.fg('toolDiffAdded', '+  return active.length;')), name + ': diff preview');
+    previews.add(rendered);
+  }
+  assert.equal(previews.size, 12);
+  const settings = JSON.parse(readFileSync(join(root, 'settings.json'), 'utf8'));
+  const pkg = settings.packages.find(p => typeof p === 'object' && p.source.startsWith('npm:@anishthite/pi-themes@'));
+  assert.deepEqual(pkg.themes, ['themes/github-*.json'], 'upstream duplicate families must be excluded');
+  assert.ok(!readdirSync(join(root, 'themes')).some(name => /^catppuccin-(?:frappe|macchiato)-(?:light|dark)\.json$/.test(name)));
+});
+
+test('installation migrates retired theme names and automatic pairs while preserving user choices', async () => {
+  const { migrateThemeSettings } = await import(pathToFileURL(join(root, 'customization/runtime/theme-settings.mjs')));
+  const sample = { theme: 'catppuccin-light/catppuccin-frappe-dark', defaultModel: 'keep-me', packages: [{ source: 'npm:@anishthite/pi-themes@0.1.9', themes: ['themes/ayu-*.json', 'themes/catppuccin-*.json', 'themes/github-*.json'] }] };
+  migrateThemeSettings(sample);
+  assert.equal(sample.theme, 'catppuccin-latte/catppuccin-frappe');
+  assert.equal(sample.defaultModel, 'keep-me');
+  assert.deepEqual(sample.packages[0].themes, ['themes/github-*.json']);
+  for (const theme of ['claude-warm', 'personal-theme', 'github-light/gruvbox-dark', 'auto', undefined]) {
+    assert.equal(migrateThemeSettings({ theme }).theme, theme);
+  }
+  assert.deepEqual(migrateThemeSettings(structuredClone(sample)), sample, 'migration is idempotent');
 });

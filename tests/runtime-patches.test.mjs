@@ -22,7 +22,7 @@ function fixture(version='1.4.0'){
  put(host+'modes/interactive/interactive-mode.js','await this.session.cycleModel(direction);\nawait this.session.setModel(model, { persist: false });\n(model) => selectModel(model, false)');
  put(host+'bundle/chunks/interactive.js','await this.session.cycleModel(direction);\nawait this.session.setModel(model,{persist:!1})\nmodel=>selectModel(model,!1)');
  for(const p of ['npm/node_modules/pi-hashline-edit-pro/index.ts','npm/node_modules/pi-cc-extensions/extensions/index.ts','npm/node_modules/pi-subagents/index.js','npm/node_modules/pi-tidy/index.ts','extensions/timrt-suite/index.ts','extensions/timrt-suite/read-only-parser.ps1'])put(p,'// fixture');
- for(const file of ['build-extensions.cjs','patch-portable-paths.cjs','patch-background-models.cjs','patch-interactive-defaults.cjs','policy-files.cjs']){const p='customization/runtime/'+file;put(p,readFileSync(join(repo,'agent',p),'utf8'));}
+ for(const file of ['build-extensions.cjs','patch-portable-paths.cjs','patch-background-models.cjs','patch-interactive-defaults.cjs','policy-files.cjs','theme-settings.mjs']){const p='customization/runtime/'+file;put(p,readFileSync(join(repo,'agent',p),'utf8'));}
  put('customization/runtime/build-runtime/node_modules/esbuild/index.js',"exports.build=async()=>{throw Error('fixture build failure')};");
  put('settings.json',JSON.stringify({packages:[],extensions:[]}));
  put('extensions/timrt-suite/timrt-fast.mjs','previous compiled entry');

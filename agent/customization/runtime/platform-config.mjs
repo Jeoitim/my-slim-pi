@@ -2,6 +2,7 @@ import {existsSync, readFileSync, writeFileSync, mkdirSync} from 'node:fs';
 import {join, resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {child, hash} from './maintenance.mjs';
+import {migrateThemeSettings} from './theme-settings.mjs';
 
 // Called only during installation/configuration, never per turn or from the launcher.
 export function configurePlatform(root, platform=process.platform) {
@@ -12,6 +13,7 @@ export function configurePlatform(root, platform=process.platform) {
   // An existing runtime prompt belongs to the user. Installers preserve it during updates.
   if(!existsSync(target))writeFileSync(target,content,{mode:0o600});
   if(settings.defaultTools===undefined)settings.defaultTools=['read',platform==='win32'?'powershell':'bash','edit','write'];
+  migrateThemeSettings(settings);
   writeFileSync(settingsFile,JSON.stringify(settings,null,2)+'\n',{mode:0o600});
   // Native pi update uses the upstream managed releases layout and keeps the
   // previous running host. Do not replace an existing installer marker.
