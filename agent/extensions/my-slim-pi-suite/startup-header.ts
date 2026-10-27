@@ -78,7 +78,7 @@ export function renderHeaderLines(width: number, theme: HeaderTheme, keyText: (k
   }
   const hint = (key: string, description: string) => theme.fg("dim", key) + theme.fg("muted", ` ${description}`);
   const tips = [
-    theme.bold(theme.fg("accent", "pi")) + theme.fg("dim", ` v${VERSION}`),
+    theme.bold(theme.fg("accent", "My Slim Pi")) + theme.fg("dim", ` pi core: v${VERSION}`),
     [hint(keyText("app.interrupt"), "interrupt"), hint(`${keyText("app.clear")}/${keyText("app.exit")}`, "clear/exit"),
       hint("/", "commands"), hint("!", "bash"), hint(keyText("app.tools.expand"), "more")].join(theme.fg("muted", " · ")),
     theme.fg("dim", showStartupDetails

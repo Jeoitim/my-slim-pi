@@ -21,7 +21,7 @@ test('original Pi logo, hero, gradient and responsive layout fit the public head
   for(const width of [0,1,4,20,47,48,80,120])assert.ok(component.render(width).every(line=>visibleWidth(line)<=width));
   const wide=component.render(120),plain=wide.map(stripTerminalSequences);
   assert.equal(wide.length,6);assert.equal(component.render(47).length,9);
-  assert.equal(plain[0],'');assert.equal(plain[1],` ██████    pi v${version}`);
+  assert.equal(plain[0],'');assert.equal(plain[1],` ██████    My Slim Pi pi core: v${version}`);
   assert.match(plain[2],/escape interrupt · ctrl\+c\/ctrl\+d clear\/exit · \/ commands · ! bash · ctrl\+o more/);
   assert.equal(plain[3].slice(11),'Press ctrl+o to show full startup help and loaded resources.');
   assert.equal(plain[5].trim(),'There are many agent harnesses, but this one is yours.');

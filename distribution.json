@@ -118,8 +118,8 @@
     "themes/gruvbox-light.json": "b6f9e46314c8cc7c55d01d946735266b2034665d1507c2e676ff742c6770711c",
     "customization/runtime/theme-settings.mjs": "9c506b13cfe56c3c11f02a71e1005850f2bef25915a1f9c49e7c4d35d3318857",
     "extensions/my-slim-pi-suite/shell-ui.ts": "a5cbd2eac3902237b208d316186f03e95851137276a168cb1d374957f7d70fc2",
-    "customization/checks/tests/shell-ui.test.mjs": "790c360d81f442bfd4186c2794dcfead0fe70a6645a7a0ab7cbdb54f03ef3992",
-    "extensions/my-slim-pi-suite/startup-header.ts": "c6116e24bf634c6ba4b64c7c153df69252ea533e43c61913d729486553a6ae05"
+    "customization/checks/tests/shell-ui.test.mjs": "5b2fac34295739379e9d17d6347a59c990fea9388b372efdb054da717ded364f",
+    "extensions/my-slim-pi-suite/startup-header.ts": "1ac0aa4590c0e4f31eccb9ed3fcf75206ed7710caaf4ad0b121d50887272a322"
   },
   "platforms": [
     "win32",
