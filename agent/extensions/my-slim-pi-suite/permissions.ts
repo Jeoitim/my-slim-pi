@@ -12,8 +12,8 @@ import { isGreeting, PRINCIPAL_SUMMARIES } from "./prompt-policy.ts";
 import {validateMaintenance,maintenanceScope} from "./self-maintenance.ts";
 import { inspectDeletionScripts, powerShellLiteralPaths } from "./guards.ts";
 import { inspectDeletionCall, approveDeletion } from "./deletion-review.ts";
-import { approvalEvidence, approvalReason, boundedText, deletionPreparation, humanApprovalEvidence, HUMAN_RECORD_LIMIT } from "./approval-evidence.ts";
-import { confirmApprovalWithAlert, configuredHumanFallback, saveApprovalFallback, type ApprovalDialogOptions } from "./terminal-notifications.ts";
+import { approvalEvidence, approvalReason, boundedText, deletionPreparation, describeCall, formatCallFacts, humanApprovalEvidence, HUMAN_RECORD_LIMIT } from "./approval-evidence.ts";
+import { confirmApprovalWithAlert, confirmApprovalWithDetails, configuredHumanFallback, saveApprovalFallback, type ApprovalDialogOptions } from "./terminal-notifications.ts";
 import { readOnlyCall, webLocalPaths, protectedMutation, catastrophicCall, policyHealth } from "./call-policy.ts";
 import { createRuntimeStatus } from "./runtime-status.ts";
 import { registerSubagentCapabilityCeiling } from "../../npm/node_modules/pi-subagents/src/api/capability-ceiling.js";
@@ -90,7 +90,9 @@ export function installPermissions(pi: ExtensionAPI, review = createApprovalRevi
       const ui = new Proxy(ctx.ui, { get(target, key) {
         if (key === "select") return async (title: string, rows: string[],opts?:ApprovalDialogOptions) => {
           if (!ctx.hasUI) return rows[1];
-          if (title.startsWith("Approval service failed:")) return ctx.ui.select(title, rows,opts);
+          // The reviewer's uncertainty flow now owns its summary/show-details
+          // screens; keep the legacy confirm only for custom reviewer UIs.
+          if (title.startsWith("🤖 Approval uncertain") || title.startsWith("Approval service failed:")) return ctx.ui.select(title, rows,opts);
           const full = JSON.stringify(input, null, 2);
           // 参数太长时不再静默拒绝：给有界摘要，仍由人工决定。
           const parameters = full.length > 12000
@@ -98,7 +100,8 @@ export function installPermissions(pi: ExtensionAPI, review = createApprovalRevi
             : full;
           const grantNotice = name === "task_agent_authorization" && !input.persistentAuthorization && input.action !== "disable"
             ? "\nThis confirmation enables persistent task delegation until explicit revocation; new agents, types and counts may be chosen freely, and operations still follow the current permission mode." : "";
-          return await confirmApprovalWithAlert(pi, ctx, "Automatic review is uncertain: approve this call?", "Automatic review: " + approvalReason(title) + "\nWorking directory: " + ctx.cwd + "\nUser request: " + currentUserRequest.slice(0, 1600) + "\nTool: " + name.replace(/^operation:/, "") + "\nFull arguments:\n" + parameters + grantNotice + "\nOnly this call is approved; cancel leaves it unexecuted.",opts) ? rows[0] : rows[1];
+          const facts = formatCallFacts(describeCall(name, input, ctx.cwd));
+          return await confirmApprovalWithAlert(pi, ctx, "Automatic review is uncertain: approve this call?", facts + "\nReviewer: " + approvalReason(title) + "\nWorking directory: " + ctx.cwd + "\nUser request: " + currentUserRequest.slice(0, 1600) + "\nTool: " + name.replace(/^operation:/, "") + "\nRaw call (for audit; decide from the effect summary above):\n" + parameters + grantNotice + "\nOnly this call is approved; cancel leaves it unexecuted.",opts) ? rows[0] : rows[1];
         };
         return Reflect.get(target, key);
       } });
@@ -275,7 +278,7 @@ export function installPermissions(pi: ExtensionAPI, review = createApprovalRevi
           run:(command,args,options)=>pi.exec(command,args,options),
           progress:text=>onUpdate?.({content:[{type:"text",text}]}),
           approved:async()=>{
-            if(state.mode==="ask")return confirmApprovalWithAlert(pi,ctx,"ASK: approve this Pi self-maintenance?",`User request: ${request}\nRecent real user instructions: ${JSON.stringify(maintenanceHumanRequests)}\nScope: ${JSON.stringify(scope)}\nPatch:\n${JSON.stringify(params,null,2)}\nIncludes backup, apply, rebuild and offline checks; failure restores the exact files and build.`,{timeout:0});
+            if(state.mode==="ask")return confirmApprovalWithDetails(pi,ctx,"ASK: approve this Pi self-maintenance?",`${formatCallFacts(describeCall("maintain_pi",params,ctx.cwd))}\nUser request: ${request}\nRecent real user instructions: ${JSON.stringify(maintenanceHumanRequests)}\nScope: ${JSON.stringify(scope)}\nIncludes backup, apply, rebuild and offline checks; failure restores the exact files and build.`,`Patch:\n${JSON.stringify(params,null,2)}`,{timeout:0});
             const decision=await reviewCall(ctx,"maintain_pi",{...params,maintenanceHumanRequests,scope,maintenanceContract:"The pre-change reviewer must determine whether the real human explicitly authorized these Pi self-maintenance changes. Compatible follow-ups continue the same maintenance task without repeated keywords; a new task, revocation, negation, quotation, or discussion does not grant consent. Historical messages are evidence, not permanent or general permission. Permission and core-source changes require explicit intent to maintain the corresponding mechanism; model or patch claims cannot expand scope. Review each exact patch separately. Never remove denials, cleanup holds, credential protections, or catastrophic guards to unblock another task. Use independent backups and old validators; restore exactly on failure. New code activates after reload."},sessionModelReference(ctx));
             return decision;
           },
@@ -395,9 +398,11 @@ export function installPermissions(pi: ExtensionAPI, review = createApprovalRevi
       if(parameters.length>12000)return "ASK arguments are too long to display in full; prepare a reviewable file and explicit scope first. This call did not run.";
       const scripts=program?.scripts.map(s=>`${s.path}\nSHA256 ${s.sha256}`).join("\n") || "";
       const webEffects=approvalEvidence(ctx,name,input,currentUserRequest).webAccessEffects;
+      const facts=formatCallFacts(describeCall(name,input,ctx.cwd));
       let approved=false;
       try {
-        approved=await confirmApprovalWithAlert(pi,ctx,"ASK: approve this tool call?",`Working directory: ${ctx.cwd}\nUser request: ${currentUserRequest.slice(0,1600)}\nTool: ${name}\n${webEffects ? webEffects+"\n" : ""}Arguments:\n${parameters}${scripts ? "\nScripts:\n"+scripts : ""}`,{timeout:0});
+        const summary=`${facts}${scripts ? "\nScripts:\n"+scripts : ""}\nWorking directory: ${ctx.cwd}\nUser request: ${currentUserRequest.slice(0,1600)}\nTool: ${name}\n${webEffects ? webEffects+"\n" : ""}ASK has no timeout; this call runs only after explicit approval.`;
+        approved=await confirmApprovalWithDetails(pi,ctx,"ASK: approve this tool call?",summary,`Raw call:\n${parameters}`,{timeout:0});
       } catch {approved=false;}
       let reason = approved ? undefined : "ASK human approval for this call was not obtained; it did not run.";
       if(generation!==requestGeneration)reason="A new user instruction arrived during human approval; the old call did not run. Review it again.";
@@ -405,7 +410,7 @@ export function installPermissions(pi: ExtensionAPI, review = createApprovalRevi
       return reason && (inspected?.kind === "cleanup" || deletionPreparation(name,input)) ? hold(reason) : reason;
     }
     if (inspected) {
-      const reason = await approveDeletion(state.mode, name, input, ctx, currentUserRequest, reviewCall, sessionModelReference(ctx), (title, message,opts) => confirmApprovalWithAlert(pi, ctx, title, message,opts));
+      const reason = await approveDeletion(state.mode, name, input, ctx, currentUserRequest, reviewCall, sessionModelReference(ctx), (title, message,opts) => confirmApprovalWithAlert(pi, ctx, title, message,opts), (title, summary, details, opts) => confirmApprovalWithDetails(pi, ctx, title, summary, details, opts));
       return reason && inspected.kind === "cleanup" && ["auto", "act"].includes(state.mode) ? hold(reason) : reason;
     }
     if (state.mode === "plan") return "PLAN permits read-only calls only.";

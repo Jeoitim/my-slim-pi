@@ -120,7 +120,7 @@ test('human fallback is shared, takes effect without reload and never weakens AS
     process.env.PI_CODING_AGENT_DIR=fixture;
     let dialogs=0,alerts=0;
     const pi={events:{emit(){alerts++;}},appendEntry(){}};
-    const ctx={hasUI:true,cwd:fixture,modelRegistry:{find(){}},ui:{notify(){alerts++;},select:async()=>{dialogs++;return '✅ Approve';},confirm:async()=>{dialogs++;return true;}}};
+    const ctx={hasUI:true,cwd:fixture,modelRegistry:{find(){}},ui:{notify(){alerts++;},select:async()=>{dialogs++;return '✅ Approve once';},confirm:async()=>{dialogs++;return true;}}};
     const review=createApprovalReviewer(pi);
     assert.equal(configuredHumanFallback(),'ask');
     saveApprovalFallback(false);

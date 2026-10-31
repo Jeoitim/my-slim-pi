@@ -75,13 +75,20 @@ test('AUTO deletion needs one explicit reviewer decision per invocation and fail
     const choice = await ctx.ui.select('huge-source'.repeat(10000), ['✅ 批准', '❌ 拒绝']);
     return { approved: choice.includes('批准'), source: 'human' };
   });
+  let firstScreen;
+  fallback.ctx.ui.select = async (title, rows) => { firstScreen = title; return rows[2]; };
   fallback.ctx.ui.confirm = async (_title, body) => {
     confirmations++;
     assert.ok(body.length < 8000, 'fallback must not render full script evidence as a selection title');
+    assert.match(body, /Effect: local shell execution/);
+    assert.match(body, /Targets: .*cache/);
     assert.match(body, /rm -rf/);
     return true;
   };
   assert.equal(await fallback.call('bash', { command: 'rm -rf ./cache' }), undefined);
+  assert.match(firstScreen, /Effect: local shell execution/);
+  assert.match(firstScreen, /Targets: .*cache/);
+  assert.doesNotMatch(firstScreen, /Raw call:/, 'the first screen hides raw arguments');
   assert.equal(confirmations, 1);
 });
 
@@ -89,6 +96,7 @@ test('ACT uses internal deletion approval; ASK confirms manually and PLAN stays 
   let reviews = 0, confirms = 0, allow = false;
   const h = await harness(async () => { reviews++; return { approved: allow, source: 'subagent' }; });
   h.ctx.ui.confirm = async () => { confirms++; return allow; };
+  h.ctx.ui.select = async (_title, rows) => { confirms++; return allow ? rows[0] : rows[1]; };
   h.state.mode = 'act';
   assert.equal((await h.call('bash', { command: 'rm -rf ./cache' })).block, true);
   allow = true;
@@ -138,6 +146,7 @@ test('native PowerShell reads, writes and deletion use the current permission mo
     return { approved: allow, source: 'fixture', reason: 'fixture decision' };
   });
   h.ctx.ui.confirm=async()=>true;
+  h.ctx.ui.select=async(_title,rows)=>rows[0];
   for (const mode of ['auto', 'act', 'ask', 'plan']) {
     h.state.mode = mode;
     assert.equal(await h.call('powershell', { command: 'Get-PSDrive -PSProvider FileSystem | Select-Object Name,Used,Free' }), undefined);
@@ -146,6 +155,7 @@ test('native PowerShell reads, writes and deletion use the current permission mo
   }
   assert.equal(reviews, 0);
   h.ctx.ui.confirm=async()=>false;
+  h.ctx.ui.select=async(_title,rows)=>rows[1];
   const write = { command: "Set-Content -LiteralPath './sample.txt' -Value 'test'" };
   for (const mode of ['ask', 'plan']) {
     h.state.mode = mode;
@@ -235,6 +245,7 @@ test('ordinary Auto uncertainty asks with the complete current call and cancella
   h.ctx.ui.confirm = async (_title, text) => { body = text; return false; };
   const result = await h.call('write', { path: './sample.txt', content: 'full test content' });
   assert.equal(result.block, true);
+  assert.match(body, /Effect: local file write/);
   assert.match(body, /full test content/);
   assert.match(body, /Working directory|User request/);
   assert.equal(h.state.approvalHold, false, 'a normal non-cleanup refusal does not latch a cleanup hold');

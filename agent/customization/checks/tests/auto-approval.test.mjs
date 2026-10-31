@@ -59,7 +59,8 @@ test('ASK shares AUTO read exemptions and confirms other calls without a timeout
   assert.match(policyText,/ASK shares AUTO's read-only exemption/);
   assert.doesNotMatch(policyText,/including reads require human approval/);
   let prompts=0,approve=true;
-  h.ctx.ui.confirm=async(_title,message,opts)=>{prompts++;assert.equal(opts.timeout,undefined);assert.match(message,/no timeout/i);return approve;};
+  h.ctx.ui.select=async(title,_rows,opts)=>{prompts++;assert.equal(opts.timeout,undefined);assert.match(title,/no timeout/i);assert.match(title,/Effect:/);return approve?'✅ Approve once':'❌ Deny';};
+  h.ctx.ui.confirm=async()=>{throw Error('ASK must not need a second screen unless Show full call is selected');};
   assert.equal(await h.call('read',{path:join(h.ctx.cwd,'cleanup.ps1')}),undefined);
   for (const [tool,args] of [
     ['grep',{pattern:'Remove-Item',path:h.ctx.cwd}],
@@ -88,10 +89,10 @@ test('ASK shares AUTO read exemptions and confirms other calls without a timeout
 test('ASK invalidates approval when script bytes or the user request change while waiting',async()=>{
   const h=await harness(()=>APPROVE);h.setMode('ask');
   const script=join(h.ctx.cwd,'ordinary.ps1');writeFileSync(script,'Get-Date');
-  h.ctx.ui.confirm=async()=>{writeFileSync(script,'Get-Location');return true;};
+  h.ctx.ui.select=async()=>{writeFileSync(script,'Get-Location');return '✅ Approve once';};
   const changed=await h.call('powershell',{command:`& '${script}'`});
   assert.equal(changed.block,true);assert.match(changed.reason,/changed during human approval/);
-  h.ctx.ui.confirm=async()=>{await h.input('取消旧操作，先继续查看。');return true;};
+  h.ctx.ui.select=async()=>{await h.input('取消旧操作，先继续查看。');return '✅ Approve once';};
   const superseded=await h.call('powershell',EXEC);
   assert.equal(superseded.block,true);assert.match(superseded.reason,/new user instruction/);
   assert.equal(h.requests.length,0);
@@ -99,9 +100,9 @@ test('ASK invalidates approval when script bytes or the user request change whil
 
 test('human timeout feedback blocks this call and preserves cleanup hold until a new user turn',async()=>{
   const h=await harness(()=>'{"approved":false,"confidence":0.2,"reason":"需授权"}',{humanFallback:'ask'});
-  h.ctx.ui.confirm=async()=>{
+  h.ctx.ui.select=async()=>{
     h.events.emit('timrt:approval-timeout',{title:'批准本次删除操作？',timeoutMs:90000});
-    return false;
+    return undefined;
   };
   const result=await h.call('powershell',{command:'Remove-Item -LiteralPath ./cache -Recurse'});
   assert.equal(result.block,true);assert.match(result.reason,/90 seconds/);assert.match(result.reason,/next turn/);
@@ -352,6 +353,32 @@ test('only low-confidence missing user history expands evidence once and never b
   const insufficient=await harness(()=>missing);
   assert.equal((await insufficient.call('write',{path:'./unknown.txt',content:'x'})).block,true);
   assert.equal(insufficient.requests.length,1,'no additional recorded history means no expansion call');
+});
+
+test('host call facts describe effects, resolved targets and unresolved parts',async()=>{
+  const {describeCall,formatCallFacts}=await jiti.import(join(suite,'extensions/my-slim-pi-suite/approval-evidence.ts'));
+  const write=formatCallFacts(describeCall('write',{path:'./src/fact.txt',content:'a\nb'},'/repo'));
+  assert.match(write,/^Effect: local file write$/m);
+  assert.match(write,/src[\\/]fact\.txt/);
+  assert.match(write,/inside workspace/);
+  assert.match(write,/Change: create 3 B \/ 2 lines/);
+  const shell=formatCallFacts(describeCall('powershell',{command:'Get-ChildItem ./cache | Remove-Item -Recurse -Force'},'/repo'));
+  assert.match(shell,/^Effect: local shell execution$/m);
+  assert.match(shell,/Commands: Get-ChildItem, Remove-Item/);
+  assert.match(shell,/Signals: deletion\/cleanup/);
+  assert.match(shell,/cache/);
+  const dynamic=formatCallFacts(describeCall('bash',{command:'rm -rf "$TARGET"'},'/repo'));
+  assert.match(dynamic,/Unresolved: .*TARGET|\$variable/);
+  const maintenance=formatCallFacts(describeCall('maintain_pi',{changes:[{path:'agents/approver.md',content:'x'}]},'/repo'));
+  assert.match(maintenance,/Notes: agents[\\/]approver\.md: 1 B/);
+  assert.doesNotMatch(maintenance,/Targets:/,'AgentRoot-relative patch paths are not resolved against the project cwd');
+  const h=await harness(()=>APPROVE);
+  await h.call('write',{path:'./fact.txt',content:'line one'});
+  const prompt=h.requests[0].context.messages[0].content[0].text;
+  assert.match(prompt,/Host call facts \(deterministic evidence/);
+  assert.match(prompt,/Effect: local file write/);
+  assert.ok(prompt.indexOf('Host call facts')>prompt.indexOf('Proposed call:'),'facts belong to the volatile call suffix');
+  assert.ok(prompt.indexOf('Host call facts')<prompt.indexOf('Arguments:'));
 });
 
 test('changing only call bytes preserves the exact cached evidence prefix',async()=>{

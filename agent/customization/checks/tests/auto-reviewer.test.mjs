@@ -103,6 +103,26 @@ test('a failed cleanup-script preparation asks the human and latches the hold', 
   assert.equal(asked(), 1, '不能改换执行形式继续申请');
 });
 
+test('authorization questions and reason codes reach the human with effect facts', async () => {
+  const { parseDecision } = await jiti.import(join(suite, 'extensions/my-slim-pi-suite/approval-reviewer.ts'));
+  const { approvalReason } = await jiti.import(join(suite, 'extensions/my-slim-pi-suite/approval-evidence.ts'));
+  assert.equal(approvalReason('🤖 Approval uncertain (authorization)\n\nEffect: local file write\nWhy: 范围不清\nQuestion: 是否修改 core？'), '范围不清\nQuestion: 是否修改 core？');
+  assert.deepEqual(parseDecision('{"approved":false,"confidence":0.4,"reason":"范围不清","reasonCode":"authorization","question":"是否修改 core？"}'),
+    {approved:false,confidence:0.4,reason:'范围不清',reasonCode:'authorization',question:'是否修改 core？'});
+  const h = await harness(() => '{"approved":false,"confidence":0.4,"reason":"范围不清","reasonCode":"authorization","question":"是否修改 core？"}',{humanFallback:'ask'});
+  h.setMode('auto');
+  let firstScreen, details;
+  h.ctx.ui.select = async (title, rows) => { firstScreen = title; return rows[2]; }; // Show full call
+  h.ctx.ui.confirm = async (_title, text) => { details = text; return false; };
+  assert.equal((await h.call('write', {path:'./core.ts', content:'x'})).block, true);
+  assert.match(firstScreen, /Effect: local file write/);
+  assert.match(firstScreen, /core\.ts/);
+  assert.match(firstScreen, /范围不清/);
+  assert.match(firstScreen, /是否修改 core/);
+  assert.match(details, /Raw call:/);
+  assert.match(details, /"path": "\.\/core\.ts"/);
+});
+
 test('decision schema rejects coercion while accepting fenced JSON and braces in strings', async () => {
   const { parseDecision } = await jiti.import(join(suite, 'extensions/my-slim-pi-suite/approval-reviewer.ts'));
   for (const input of [

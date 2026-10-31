@@ -74,6 +74,19 @@ export async function confirmApprovalWithAlert(pi: ExtensionAPI, ctx: ExtensionC
   return await approvalDialog(pi,ctx,title,options,opts=>ctx.ui.confirm(title,message+hint,opts)) === true;
 }
 
+export const APPROVE_ROW = "✅ Approve once";
+export const DENY_ROW = "❌ Deny";
+export const SHOW_DETAILS_ROW = "📄 Show full call";
+
+/** Summary first; raw arguments only after the human explicitly asks for them.
+ * Both screens keep the existing timeout, alert and ASK/no-timeout behavior. */
+export async function confirmApprovalWithDetails(pi: ExtensionAPI, ctx: ExtensionContext, title: string, summary: string, details: string, options?: ApprovalDialogOptions): Promise<boolean> {
+  const choice = await selectApprovalWithAlert(pi, ctx, `${title}\n\n${summary}`, [APPROVE_ROW, DENY_ROW, SHOW_DETAILS_ROW], options);
+  if (choice === APPROVE_ROW) return true;
+  if (choice !== SHOW_DETAILS_ROW) return false;
+  return await confirmApprovalWithAlert(pi, ctx, `${title} — full call`, `${summary}\n\n${details}`, options) === true;
+}
+
 /** One BEL for each real human approval prompt; no model tool, process or timer. */
 export function installTerminalNotifications(pi: ExtensionAPI, output = {
   enabled: () => process.platform === "win32" && process.stdout.isTTY === true,
