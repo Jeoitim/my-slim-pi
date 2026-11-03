@@ -5,7 +5,7 @@ import {createRequire} from "node:module";
 
 export type MaintenanceChange={path:string;sha256:string|null;content:string};
 const pathKey=(p:string)=>process.platform==="win32"?p.toLowerCase():p;
-const kernel=/^(?:extensions\/my-slim-pi-suite\/(?:index|self-maintenance|permissions|permission-brief|prompt-policy|call-policy|guards|deletion-review|approval-reviewer|approval-evidence|shell-analysis|terminal-notifications)\.ts|extensions\/my-slim-pi-suite\/read-only-parser\.ps1|customization\/runtime\/|customization\/(?:Maintain-Pi\.ps1|Pi-Maintenance\.bat|maintain-pi\.sh)|bin\/(?:pi|pi-launcher\.js|pi\.cmd|pi\.ps1)|trust\.json)$/i;
+const kernel=/^(?:extensions\/my-slim-pi-suite\/(?:index|self-maintenance|permissions|permission-brief|prompt-policy|call-policy|guards|deletion-review|approval-reviewer|approval-evidence|approval-inspection|shell-analysis|terminal-notifications)\.ts|extensions\/my-slim-pi-suite\/read-only-parser\.ps1|customization\/runtime\/|customization\/(?:Maintain-Pi\.ps1|Pi-Maintenance\.bat|maintain-pi\.sh)|bin\/(?:pi|pi-launcher\.js|pi\.cmd|pi\.ps1)|trust\.json)$/i;
 export const coreMaintenancePath=(path:string)=>kernel.test(path) || /^customization\/(?:runtime|checks)\//i.test(path);
 export const fileHash=(data:Buffer|string)=>createHash("sha256").update(data).digest("hex");
 export {skillSourcePath} from "../../customization/runtime/policy-files.cjs";

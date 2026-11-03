@@ -1,5 +1,5 @@
 /**
- * AUTO 审批：在当前进程内做一次模型调用。
+ * AUTO 审批：在当前进程内判断，可按需进行有界只读检查。
  *
  * 通过宿主模型接口提交完整证据，不启动审批子进程。
  * 故障、无效结论和低置信度均转人工；没有有效审批绝不自动放行写入。
@@ -9,6 +9,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { getAgentDir, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { configuredBackgroundModel } from "./background-models.ts";
+import type { Message } from "@earendil-works/pi-ai";
+import { createApprovalInspection } from "./approval-inspection.ts";
 import { deletionRisk } from "./guards.ts";
 import { confirmApprovalWithDetails, selectApprovalWithAlert, configuredHumanFallback } from "./terminal-notifications.ts";
 import { expandApprovalEvidence, evidenceGrew, boundedText, humanEvidenceRecords, describeCall, formatCallFacts, HUMAN_RECORD_LIMIT, EXPANDED_HUMAN_RECORD_LIMIT } from "./approval-evidence.ts";
@@ -148,33 +150,63 @@ async function askModel(
   ctx: ExtensionContext,
   model: NonNullable<ExtensionContext["model"]>,
   systemPrompt: string,
-  attempt: { budget: number; options: Record<string, unknown>; prompt: string },
+  attempt: { budget: number; options: Record<string, unknown>; prompt: string; inspectionHistory: Message[] },
+  inspection: ReturnType<typeof createApprovalInspection>,
   record: (data: Record<string, unknown>) => void,
 ): Promise<{ text?: string; problem?: string }> {
-  const started = Date.now();
   const signals = [AbortSignal.timeout(attempt.budget)];
   if (ctx.signal) signals.push(ctx.signal);
+  // Every follow-up shares this attempt's original deadline. Tools never get a fresh timeout.
+  const signal = AbortSignal.any(signals);
+  const messages: Message[] = [{ role: "user", content: [{ type: "text", text: attempt.prompt }], timestamp: Date.now() }, ...attempt.inspectionHistory];
+  let started = Date.now(), recorded = false, promptChars = systemPrompt.length + attempt.prompt.length;
   try {
-    const response = await ctx.modelRegistry.complete(
-      model,
-      { systemPrompt, messages: [{ role: "user", content: [{ type: "text", text: attempt.prompt }], timestamp: Date.now() }] },
-      { ...attempt.options, signal: AbortSignal.any(signals), cacheRetention: "short",
-        sessionId: createHash('sha256').update(`pi-approver:${ctx.sessionManager.getSessionId?.() || ctx.cwd}`).digest('hex') },
-    );
-    const usage = response.usage;
-    const answer = response.content.filter(part => part.type === 'text').map(part => part.text ?? '').join('\n').trim();
-    const parsed = parseDecision(answer);
-    const numeric = (value: unknown) => typeof value === 'number' && Number.isFinite(value) ? value : null;
-    record({ elapsedMs: Date.now() - started, promptChars: systemPrompt.length + attempt.prompt.length,
-      input: numeric(usage?.input), output: numeric(usage?.output), cacheRead: numeric(usage?.cacheRead),
-      cacheWrite: numeric(usage?.cacheWrite), cost: numeric(usage?.cost?.total), stopReason: response.stopReason,
-      decision: parsed ? (parsed.confidence < CONFIDENCE_THRESHOLD ? "uncertain" : parsed.approved ? "approve" : "deny") : null,
-      reasonCode: parsed?.reasonCode ?? null });
-    if (response.stopReason === "aborted") return { problem: "Approval request was cancelled" };
-    if (response.stopReason === "error") return { problem: shortError(response.errorMessage) };
-    return answer ? { text: answer } : { problem: "Approval model returned no content" };
+    for (let round = 0; round < 4; round++) {
+      signal.throwIfAborted();
+      started = Date.now(); recorded = false;
+      promptChars = systemPrompt.length + messages.reduce((count, message) => count + JSON.stringify(message).length, 0);
+      const canInspect = round < 3 && inspection.available;
+      const response = await ctx.modelRegistry.complete(
+        model,
+        { systemPrompt, messages: [...messages], tools: canInspect ? inspection.tools : [] },
+        { ...attempt.options, signal, cacheRetention: "short",
+          sessionId: createHash('sha256').update(`pi-approver:${ctx.sessionManager.getSessionId?.() || ctx.cwd}`).digest('hex') },
+      );
+      const usage = response.usage;
+      const answer = response.content.filter(part => part.type === 'text').map(part => part.text ?? '').join('\n').trim();
+      const calls = response.content.filter(part => part.type === 'toolCall');
+      // A JSON-looking preamble is not a verdict while a tool request is outstanding.
+      const parsed = calls.length ? undefined : parseDecision(answer);
+      const numeric = (value: unknown) => typeof value === 'number' && Number.isFinite(value) ? value : null;
+      record({ elapsedMs: Date.now() - started, promptChars,
+        input: numeric(usage?.input), output: numeric(usage?.output), cacheRead: numeric(usage?.cacheRead),
+        cacheWrite: numeric(usage?.cacheWrite), cost: numeric(usage?.cost?.total), stopReason: response.stopReason,
+        decision: parsed ? (parsed.confidence < CONFIDENCE_THRESHOLD ? "uncertain" : parsed.approved ? "approve" : "deny") : null,
+        reasonCode: parsed?.reasonCode ?? null, inspectionRound: round, toolCalls: calls.length });
+      recorded = true;
+      signal.throwIfAborted();
+      if (response.stopReason === "aborted") return { problem: "Approval request was cancelled" };
+      if (response.stopReason === "error") return { problem: shortError(response.errorMessage) };
+      if (calls.length) {
+        if (!canInspect || calls.length > 6 || calls.some(call => !["read", "ls"].includes(call.name))) return { problem: "Reviewer requested unavailable tools or exceeded inspection limits" };
+        messages.push(response);
+        const results: Message[] = [];
+        for (const call of calls) {
+          const result = await inspection.execute(call, signal);
+          messages.push(result);
+          results.push(result);
+          signal.throwIfAborted();
+        }
+        // Retry history must contain complete call/result pairs, never an abandoned batch.
+        attempt.inspectionHistory.push(response, ...results);
+        if (!inspection.available || round === 2) messages.push({ role: "user", content: [{ type: "text", text: "Inspection budget is exhausted. Return the final decision JSON from the available evidence; unresolved material effects require low confidence." }], timestamp: Date.now() });
+        continue;
+      }
+      return answer ? { text: answer } : { problem: "Approval model returned no content" };
+    }
+    return { problem: "Approval inspection did not reach a final decision" };
   } catch (error) {
-    record({ elapsedMs: Date.now() - started, promptChars: systemPrompt.length + attempt.prompt.length, input: null, output: null, cacheRead: null, cacheWrite: null, cost: null, failed: true });
+    if (!recorded) record({ elapsedMs: Date.now() - started, promptChars, input: null, output: null, cacheRead: null, cacheWrite: null, cost: null, failed: true });
     return { problem: shortError(error) };
   }
 }
@@ -226,17 +258,19 @@ export function createApprovalReviewer(pi: ExtensionAPI, options?: {humanFallbac
       humanEvidenceRecords(branch)])).digest('hex');
     const preferExpanded = historyKey === expandedHistory;
     const initialInput = preferExpanded ? expandApprovalEvidence(ctx, input) : input;
+    const inspection = createApprovalInspection(ctx.cwd, name, initialInput);
+    const inspectionHistory: Message[] = [];
     const evidence = approvalPrompt(name, initialInput, ctx.cwd);
     const attempts = [
-      { budget: FIRST_BUDGET_MS, options: { reasoning: "off" }, prompt: evidence, expanded: preferExpanded },
-      { budget: RETRY_BUDGET_MS, options: {}, prompt: `${evidence}\nThe previous response had no parseable decision. Return only the specified JSON object.`, expanded: preferExpanded },
+      { budget: FIRST_BUDGET_MS, options: { reasoning: "off" }, prompt: evidence, expanded: preferExpanded, inspectionHistory },
+      { budget: RETRY_BUDGET_MS, options: {}, prompt: `${evidence}\nThe previous response had no parseable decision. Return only the specified JSON object.`, expanded: preferExpanded, inspectionHistory },
     ];
 
     let problem = "";
     if (unavailableKey === policyKey && Date.now() < unavailableUntil) problem = rememberedProblem || "Approval model was previously unavailable";
     else {
       for (const attempt of attempts) {
-        const outcome = await askModel(ctx, model, `${systemPrompt}\n\n${ANSWER_FORMAT}`, attempt,
+        const outcome = await askModel(ctx, model, `${systemPrompt}\n\n${ANSWER_FORMAT}`, attempt, inspection,
           data => { try { pi.appendEntry('timrt-approval-usage', { tool: name, expanded: attempt.expanded, ...data }); } catch { /* Observability never changes authorization. */ } });
         if (ctx.signal?.aborted) return cancelled();
         if (outcome.problem) { problem = outcome.problem; continue; }
@@ -259,7 +293,10 @@ export function createApprovalReviewer(pi: ExtensionAPI, options?: {humanFallbac
           return uncertain(ctx, name, input, `Reviewer uncertain (confidence ${decision.confidence.toFixed(2)}): ${decision.reason || "no reason given"}`, decision.question, decision.reasonCode);
         }
         const result: ReviewDecision = { approved: decision.approved, source: "subagent", reason: decision.reason, ...(decision.reasonCode ? { reasonCode: decision.reasonCode } : {}), ...(decision.question ? { question: decision.question } : {}), ...(decision.taskAgentAuthorization ? { taskAgentAuthorization: decision.taskAgentAuthorization } : {}) };
-        if (result.approved && cacheKey && !attempt.expanded) {
+        if (result.approved && inspection.used && !await inspection.unchanged()) return { approved: false, source: "error", reason: "Inspected evidence changed during approval; this call did not run. Review the current files again." };
+        if (ctx.signal?.aborted) return cancelled();
+        // File/listing evidence is live state beyond the original cache key.
+        if (result.approved && cacheKey && !attempt.expanded && !inspection.used) {
           if (cache.size > 64) cache.delete(cache.keys().next().value as string);
           cache.set(cacheKey, { at: Date.now(), decision: result });
         }

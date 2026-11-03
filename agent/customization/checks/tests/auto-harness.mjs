@@ -46,6 +46,7 @@ async function harness(responder, reviewerOptions) {
         const answer = await responder(context, requests.length);
         if (answer instanceof Error) throw answer;
         if (typeof answer === 'string') return { role: 'assistant', content: [{ type: 'text', text: answer }], stopReason: 'stop', usage: {} };
+        if (Array.isArray(answer?.content)) return { role: 'assistant', stopReason: 'toolUse', usage: {}, timestamp: Date.now(), ...answer };
         return { role: 'assistant', content: [], stopReason: 'error', errorMessage: String(answer.error || 'provider failed'), usage: {} };
       },
     },
