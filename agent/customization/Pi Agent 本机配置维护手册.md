@@ -1,6 +1,6 @@
 # Pi 本机维护手册
 
-更新：2026-10-26 · Pi 1.4.0 · Node 24+ · Windows / PowerShell 7 · Linux / Bash
+更新：2026-11-05 · Pi 1.5.0 · Node 24+ · Windows / PowerShell 7 · Linux / Bash
 
 本安装目录自带锁定版本的 Pi，无需全局安装。Windows 使用 PowerShell 7，Linux 使用 Bash，均需要 Node.js 24+（含 npm）。
 
@@ -72,7 +72,7 @@ bash "$maint" EditConfig settings.json        # 先备份，再打开编辑器
 
 ## 日常操作
 
-工具调用由 pi-tidy 0.4.11 折叠成摘要，点击或 Ctrl+O 展开；write、replace、insert 编辑结果保持可见。my-slim-pi-suite 通过公开 setHeader 和 setWorkingMessage 提供原 Pi logo 启动页、工作耗时与供应商报告的输出 token 数，保留 /clear 与 /exit 别名。会话统计使用原生 /session，输入框仍显示上下文占比；不再提供 pi-cc 的 /context 与 /ccstyle 面板。启动页复用原主题渐变、48 列双栏断点及标语，快捷键由宿主编辑器提供。quietStartup=true 使普通启动先留白再挂载本地 logo，避免先显示原生标题；原生启动资源清单默认隐藏，可用 pi --verbose 查看，详细模式也会按宿主规则显示原生启动信息。默认不用 Nerd Font 图标，也不另包用户消息边框。thinking 行由 pi-tidy 显示，不受宿主 hideThinkingBlock 控制。
+工具调用由 pi-tidy 0.9.0 折叠成摘要，点击或 Ctrl+O 展开；write、replace、insert 编辑结果保持可见。my-slim-pi-suite 通过公开 setHeader 和 setWorkingMessage 提供原 Pi logo 启动页、工作耗时与供应商报告的输出 token 数，保留 /clear 与 /exit 别名。会话统计使用原生 /session，输入框仍显示上下文占比；不再提供 pi-cc 的 /context 与 /ccstyle 面板。启动页复用原主题渐变、48 列双栏断点及标语，快捷键由宿主编辑器提供。quietStartup=true 使普通启动先留白再挂载本地 logo，避免先显示原生标题；原生启动资源清单默认隐藏，可用 pi --verbose 查看，详细模式也会按宿主规则显示原生启动信息。默认不用 Nerd Font 图标，也不另包用户消息边框。thinking 行由 pi-tidy 显示，不受宿主 hideThinkingBlock 控制。
 
 安装器会询问是否将本次安装设为默认 `pi` 命令，并可选隐藏输入搜索 Key。已有安装先备份再修复，保留模型、认证、长期规则与个人配置。
 
@@ -233,7 +233,7 @@ AUTO/ACT 均须内部审批，ASK 人工确认且无超时，PLAN/清理暂停�
 
 ### 搜索
 
-联网由固定版本 pi-web-access 0.44.0 提供，保留 `web_search`、`fetch_content`、`get_search_content` 三个原生工具。本机保持 `provider: "auto"`，不设置 `searchRouting` 或 `allowedProviders`；供应商顺序、串行回退、成功即停、显式 provider 的严格语义以及是否需要 Key，均以插件文档为准（`npm/node_modules/pi-web-access/README.md`）。安装器可选用 Exa、Brave、Tavily 的 Key，可跳过，也可完全不配（插件自带免费 Exa）；有 Key 不等于强制启用，实际是否使用由回退链决定，显式选择项不会因有 Key 自动进入 auto。追加其他供应商按插件文档修改 `web-search.json`：只增加 `*ApiKey` 或 `proxy` 不触发策略重建，改动能力或路由配置后需 Rebuild 并重启。抓取保留原生 HTTP、正文提取、Fetch 回退与内容缓存，第三方托管抓取服务默认关闭。
+联网由固定版本 pi-web-access 0.47.0 提供，保留 `web_search`、`fetch_content`、`get_search_content` 三个原生工具。本机保持 `provider: "auto"`，不设置 `searchRouting` 或 `allowedProviders`；供应商顺序、串行回退、成功即停、显式 provider 的严格语义以及是否需要 Key，均以插件文档为准（`npm/node_modules/pi-web-access/README.md`）。安装器可选用 Exa、Brave、Tavily 的 Key，可跳过，也可完全不配（插件自带免费 Exa）；有 Key 不等于强制启用，实际是否使用由回退链决定，显式选择项不会因有 Key 自动进入 auto。追加其他供应商按插件文档修改 `web-search.json`：只增加 `*ApiKey` 或 `proxy` 不触发策略重建，改动能力或路由配置后需 Rebuild 并重启。抓取保留原生 HTTP、正文提取、Fetch 回退与内容缓存，第三方托管抓取服务默认关闭。
 
 `toolActivation: "auto"` 由插件按模型能力决定：支持会话中追加工具且保留提示缓存的模型先提供原生 `web_enable`，启用后追加三个工具；其他模型首轮直接声明三个工具。恢复会话沿用已有工具声明。没有统一 Web 包装工具。`/search` 查看原生缓存。
 
@@ -339,17 +339,17 @@ Web 工具由固定版社区扩展注册，不在本地整合层增加包装或�
 
 | 组件 | 固定版本 | 职责 |
 |---|---|---|
-| pi-web-access | 0.44.0 | 原生搜索、抓取与缓存 |
-| pi-tidy | 0.4.11 | 工具折叠、圆角透明边框与展开显示 |
-| pi-ask-user | 0.17.0 | 关键问题澄清、推荐选项与自由回答 |
+| pi-web-access | 0.47.0 | 原生搜索、抓取与缓存 |
+| pi-tidy | 0.9.0 | 工具折叠、圆角透明边框与展开显示 |
+| pi-ask-user | 0.17.2 | 关键问题澄清、推荐选项与自由回答 |
 | pi-hermes-memory | 0.9.11 | 长期记忆、复盘与经验技能 |
-| pi-hashline-edit-pro | 6.5.1 | 锚点读取、编辑、过期检测与撤销 |
-| Pi 原生 MCP | 随 Pi 1.4.0 | 原生连接、延迟发现及统一权限执行管线 |
+| pi-hashline-edit-pro | 7.1.1 | 锚点读取、编辑、过期检测与撤销 |
+| Pi 原生 MCP | 随 Pi 1.5.0 | 原生连接、延迟发现及统一权限执行管线 |
 | pi-permission-suite | 0.2.3 | 上游权限规则引擎，由本地整合入口接入 |
-| pi-subagents | 0.80.0 | 原生管理、FleetView / Inspector 与获授权的任务委派 |
-| principal-pi-skills | 4.14.0 | 单个索引下的 9 项工程技能 |
+| pi-subagents | 0.85.0 | 原生管理、FleetView / Inspector 与获授权的任务委派 |
+| principal-pi-skills | 4.14.1 | 单个索引下的 9 项工程技能 |
 | @anishthite/pi-themes | 0.1.9 | Ayu、Catppuccin、GitHub 等主题 |
-| @narumitw/pi-btw | 0.62.0 | 独立旁聊 |
+| @narumitw/pi-btw | 0.63.4 | 独立旁聊 |
 
 本地 `my-slim-pi-suite` 是唯一整合入口，按模块接入界面、权限、问答与维护。`pi-permission-suite` 是固定版本的上游规则引擎依赖，包自身入口禁用；其包名及 `extensions/pi-permission-suite/config.json` 配置路径保留，AUTO / ACT / ASK / PLAN、内部审批与防绕过策略由本地入口统一协调。更新已有安装时，旧 `timrt-suite` 目录可作为停用的回退材料保留；构建器会禁用其入口，仅加载新入口。启动器使用本机 Node；Windows 使用 PowerShell 7，Linux 使用 Bash。四个命名的预编译启动入口，suite 在启动时加载独立的任务代理产物以恢复原生管理与 Fleet；任务工具声明仍由上游 dynamic 策略按需激活，显示与执行授权分别处理。pi-web-access 直接使用上游预构建包的单一原生入口，共享宿主 SDK；不修改插件、宿主或其编译产物来实现 Web。
 

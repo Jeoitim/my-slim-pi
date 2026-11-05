@@ -89,8 +89,8 @@ try {
   const anchored = await read.execute('check-anchor-read', { path: target }, undefined, undefined, ctx);
   const anchoredText = anchored.content.filter(c => c.type === 'text').map(c => c.text).join('\n');
   console.log('Anchored read:', anchoredText.slice(0, 180));
-  const anchor = anchoredText.match(/([a-zA-Z0-9]{4})\|beta/)?.[1] || anchoredText.match(/([a-zA-Z0-9]{4})[^\n]*beta/)?.[1];
-  assert.ok(anchor, 'anchored read emits a four-character line anchor');
+  const anchor = anchoredText.match(/^([a-z]{5})[│|]beta/m)?.[1];
+  assert.ok(anchor, 'anchored read emits a five-character line anchor');
   writeFileSync(target, 'alpha\nbeta changed by another writer\ngamma\n');
   let stale;
   try { stale = await session.extensionRunner.getToolDefinition('replace').execute('check-stale', { path: target, remove_from: anchor, remove_to: anchor, text: 'replacement' }, undefined, undefined, ctx); }
@@ -100,7 +100,7 @@ try {
   console.log('Stale anchor rejected without modifying the file: OK');
   const fresh = await read.execute('check-fresh', { path: target }, undefined, undefined, ctx);
   const freshText = fresh.content.filter(c => c.type === 'text').map(c => c.text).join('\n');
-  const freshAnchor = freshText.match(/([a-zA-Z0-9]{4})[^\n]*beta changed/)?.[1];
+  const freshAnchor = freshText.match(/^([a-z]{5})[│|]beta changed/m)?.[1];
   assert.ok(freshAnchor);
   const replaced = await session.extensionRunner.getToolDefinition('replace').execute('check-valid-replace', { path: target, remove_from: freshAnchor, remove_to: freshAnchor, text: 'beta safely replaced' }, undefined, undefined, ctx);
   assert.ok(!replaced.isError, JSON.stringify(replaced.content));

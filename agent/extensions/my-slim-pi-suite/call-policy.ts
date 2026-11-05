@@ -113,6 +113,10 @@ function writtenPaths(row:CommandRow,cwd:string): string[] {
 
 export function protectedMutation(root: string, cwd: string, name: string, input: Record<string, any>, readOnly: boolean): string | undefined {
   if (readOnly) return;
+  // Hashline can resolve an omitted path from an anchor. Require the path at
+  // the policy boundary so protected targets cannot evade path inspection.
+  if (/^(?:replace|replace_match|insert)$/i.test(name) && (typeof input.path !== 'string' || !input.path.trim()))
+    return 'This edit requires an explicit file path for permission and protected-target checks.';
   const candidates:string[]=[];
   const shell = /^(?:bash|powershell|shell|exec|terminal)/i.test(name);
   if (shell) {

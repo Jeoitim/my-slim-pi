@@ -222,6 +222,15 @@ test('catastrophic scopes and policy sources cannot be overridden by AUTO approv
   assert.equal(h.requests.length,0,'硬边界不交模型覆盖');
 });
 
+test('anchored edits require an explicit target before any approval', async () => {
+  const h=await harness(()=>APPROVE);
+  for(const name of ['replace','insert','replace_match']) {
+    assert.equal((await h.call(name,{remove_from:'abcde',remove_to:'abcde',anchor:'abcde',text:'changed'})).block,true,name);
+    assert.equal((await h.call(name,{path:join(root,'agents/approver.md'),remove_from:'abcde',remove_to:'abcde',anchor:'abcde',text:'changed'})).block,true,name);
+  }
+  assert.equal(h.requests.length,0);
+});
+
 test('explain_call is observational and matches permission routing', async () => {
   const h=await harness(()=>APPROVE);
   const explain=async(tool,args)=>JSON.parse((await h.tools.get('explain_call').execute('id',{tool,args},undefined,undefined,h.ctx)).content[0].text);

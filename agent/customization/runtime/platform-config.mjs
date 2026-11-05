@@ -14,6 +14,12 @@ export function configurePlatform(root, platform=process.platform) {
   if(!existsSync(target))writeFileSync(target,content,{mode:0o600});
   if(settings.defaultTools===undefined)settings.defaultTools=['read',platform==='win32'?'powershell':'bash','edit','write'];
   migrateThemeSettings(settings);
+  // Preserve the previous tidy appearance when its newer defaults are adopted.
+  if(settings.tidy && typeof settings.tidy==='object'){
+    if(settings.tidy.frameUserMessages===false && settings.tidy.userMessageStyle===undefined)settings.tidy.userMessageStyle='off';
+    if(settings.tidy.collapseTurns===undefined)settings.tidy.collapseTurns='off';
+    if(settings.tidy.finalReplyStyle===undefined && settings.tidy.frameFinalReply===undefined)settings.tidy.finalReplyStyle='off';
+  }
   writeFileSync(settingsFile,JSON.stringify(settings,null,2)+'\n',{mode:0o600});
   // Native pi update uses the upstream managed releases layout and keeps the
   // previous running host. Do not replace an existing installer marker.

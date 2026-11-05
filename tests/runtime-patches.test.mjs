@@ -99,7 +99,7 @@ test('native update and version inspection remain usable with an incompatible ex
 test('named artifacts migrate only owned entries and invalidate when a tidy sibling changes',()=>{
  const {root,put}=fixture();
  put('settings.json',JSON.stringify({packages:['npm:pi-tidy@0.4.11'],extensions:['./npm/node_modules/pi-cc-extensions/extensions/pi-cc-extensions.compiled.mjs','./npm/node_modules/pi-hermes-memory/src/timrt-fast.mjs','./extensions/my-slim-pi-suite/timrt-fast.mjs','./custom/timrt-fast.mjs','-builtin:mcp']}));
- put('npm/node_modules/pi-tidy/frame.ts','original frame');
+ put('npm/node_modules/pi-tidy/src/messages/frame.ts','original frame');
  put('customization/runtime/build-runtime/node_modules/esbuild/index.js',"exports.build=async options=>{require('node:fs').writeFileSync(options.outfile,'compiled');};");
  const run=()=>spawnSync(process.execPath,[join(root,'customization/runtime/build-extensions.cjs')],{encoding:'utf8',env:{...process.env,PI_MAINTENANCE_TARGET:root}});
  let result=run();assert.equal(result.status,0,result.stderr);
@@ -114,8 +114,8 @@ test('named artifacts migrate only owned entries and invalidate when a tidy sibl
  const entries=settings.extensions.filter(p=>p.endsWith('.compiled.mjs'));
  assert.equal(entries.length,4);assert.equal(new Set(entries.map(p=>p.split('/').at(-1))).size,4);
  const check=()=>spawnSync(process.execPath,['-e',"if(!require(process.argv[1]).valid())process.exit(1)",join(root,'customization/runtime/build-extensions.cjs')],{env:{...process.env,PI_MAINTENANCE_TARGET:root}}).status;
- assert.equal(check(),0);put('npm/node_modules/pi-tidy/frame.ts','modified frame');assert.notEqual(check(),0);
+ assert.equal(check(),0);put('npm/node_modules/pi-tidy/src/messages/frame.ts','modified frame');assert.notEqual(check(),0);
  result=run();assert.equal(result.status,0,result.stderr);assert.equal(check(),0);
  assert.deepEqual(JSON.parse(readFileSync(join(root,'settings.json'))),settings,'rebuilding cannot duplicate entries');
- unlinkSync(join(root,'npm/node_modules/pi-tidy/frame.ts'));assert.notEqual(check(),0,'removing a source file also invalidates the compiled inventory');
+ unlinkSync(join(root,'npm/node_modules/pi-tidy/src/messages/frame.ts'));assert.notEqual(check(),0,'removing a source file also invalidates the compiled inventory');
 });

@@ -13,7 +13,7 @@ const entries = [
   { source: 'npm/node_modules/pi-hashline-edit-pro/index.ts', output: 'npm/node_modules/pi-hashline-edit-pro/pi-hashline-edit-pro.compiled.mjs', startup: true },
   { source: 'extensions/my-slim-pi-suite/index.ts', output: 'extensions/my-slim-pi-suite/my-slim-pi-suite.compiled.mjs', startup: true },
   { source: 'npm/node_modules/pi-subagents/index.js', output: 'npm/node_modules/pi-subagents/pi-subagents.compiled.mjs', startup: false },
-  { source: 'npm/node_modules/pi-tidy/index.ts', output: 'npm/node_modules/pi-tidy/pi-tidy.compiled.mjs', startup: true },
+  { source: fs.existsSync(path.join(root, 'npm/node_modules/pi-tidy/src/index.ts')) ? 'npm/node_modules/pi-tidy/src/index.ts' : 'npm/node_modules/pi-tidy/index.ts', output: 'npm/node_modules/pi-tidy/pi-tidy.compiled.mjs', startup: true },
 ];
 const sources = entries.map(entry => entry.source);
 const outputs = entries.map(entry => entry.output);
@@ -28,7 +28,14 @@ local.push('customization/runtime/patch-portable-paths.cjs');
 local.push('npm/node_modules/pi-permission-suite/config-loader.ts');
 local.push(...['index.ts', 'settings.ts', 'single-select-layout.ts', 'tern.ts'].map(n => `npm/node_modules/pi-ask-user/${n}`));
 local.push('npm/node_modules/pi-subagents/src/api/capability-ceiling.js', 'npm/node_modules/pi-subagents/src/runs/shared/capability-ceiling.js');
-local.push(...fs.readdirSync(tidyDir).filter(name => name.endsWith('.ts')).map(name => 'npm/node_modules/pi-tidy/' + name));
+function tidySources(dir) {
+  return fs.readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
+    const file = path.join(dir, entry.name);
+    if (entry.isDirectory()) return tidySources(file);
+    return entry.isFile() && entry.name.endsWith('.ts') ? [path.relative(root, file).replaceAll('\\', '/')] : [];
+  });
+}
+local.push(...tidySources(tidyDir));
 const packageRoots = ['pi-hermes-memory', 'pi-hashline-edit-pro', 'pi-subagents', 'pi-permission-suite', 'pi-ask-user', 'pi-tidy'];
 // npm owns installed versions. Track its manifests too, including packages whose
 // native entries are not bundled, so a direct npm upgrade cannot leave a stale seal.

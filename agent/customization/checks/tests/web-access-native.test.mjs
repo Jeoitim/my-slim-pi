@@ -51,8 +51,8 @@ test('native package auto activation, real permission pipeline, serial fallback,
     assert.ok(session.getActiveToolNames().includes('web_enable'));
     assert.ok(!session.getActiveToolNames().includes('web_search'));
     assert.ok(!session.getAllTools().some(t=>['web','source_check'].includes(t.name)));
-    const searchSchema=JSON.stringify(session.extensionRunner.getToolDefinition('web_search').parameters);
-    for(const provider of ['exa','parallel-mcp','degoog','duckduckgo','keenable','searxng','openai','kimi'])assert.ok(searchSchema.includes('"'+provider+'"'),provider);
+    const searchSchema=session.extensionRunner.getToolDefinition('web_search').parameters;
+    assert.equal(searchSchema.properties.provider.type,'string');
     for(const command of ['curator','websearch','google-account'])assert.equal(session.extensionRunner.getCommand(command),undefined);
     const call=async(name,args)=>{
       const id='web-fixture-'+session.agent.state.messages.length;
@@ -62,7 +62,7 @@ test('native package auto activation, real permission pipeline, serial fallback,
       return {...outcome.result,isError:outcome.isError};
     };
     const mode=session.extensionRunner.getCommand('approval-mode');await (mode.handler||mode.command.handler)('plan',session.extensionRunner.createContext());
-    assert.equal((await call('web_enable',{})).isError,false);
+    const enabled=await call('web_enable',{});assert.equal(enabled.isError,false,JSON.stringify(enabled));
     for(const tool of ['web_search','fetch_content','get_search_content'])assert.ok(session.getActiveToolNames().includes(tool),tool);
     const before=calls.length;
     for(const args of [{url:join(cwd,'private.mp4')},{url:'https://github.com/example/repo',forceClone:true},{url:'https://example.com',auth:true},{url:'https://example.com',proxy:'http://proxy.example:3128'}])assert.equal((await call('fetch_content',args)).isError,true);

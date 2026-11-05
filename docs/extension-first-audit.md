@@ -1,10 +1,10 @@
 # 扩展架构与维护边界
 
-当前基线为 Pi 1.4.0，Web 扩展为 [nicobailon/pi-web-access 0.44.0](https://github.com/nicobailon/pi-web-access)，任务代理为 pi-subagents 0.80.0，关键澄清为 pi-ask-user 0.17.0。核对日期 2026-10-22；固定版本与分发哈希以 distribution.json 为准。
+当前基线为 Pi 1.5.0，Web 扩展为 [nicobailon/pi-web-access 0.47.0](https://github.com/nicobailon/pi-web-access)，任务代理为 pi-subagents 0.85.0，关键澄清为 pi-ask-user 0.17.2。核对日期 2026-10-22；固定版本与分发哈希以 distribution.json 为准。
 
 ## 工具显示与 pi-tidy
 
-新增 [pi-tidy 0.4.11](https://github.com/Andy8647/pi-tidy)，通过固定 npm 包生成的单一预编译入口加载，复用宿主 SDK，不增加运行依赖、执行工具或常驻提示词。工具 renderer 注册使用公开 API；边框、分组和消息显示仍使用上游原型补丁，不能声称全程仅使用公开 API。没有修改上游源码或另造包装工具。
+新增 [pi-tidy 0.9.0](https://github.com/Andy8647/pi-tidy)，通过固定 npm 包生成的单一预编译入口加载，复用宿主 SDK，不增加运行依赖、执行工具或常驻提示词。工具 renderer 注册使用公开 API；边框、分组和消息显示仍使用上游原型补丁，不能声称全程仅使用公开 API。没有修改上游源码或另造包装工具。
 
 工具展示由 pi-tidy 单独接管。启动页、工作耗时、供应商报告的输出 token 数以及 /clear、/exit 别名由 my-slim-pi-suite 的 shell-ui 模块通过公开 API 提供；会话统计使用原生 /session，输入框保留上下文占比。pi-cc-extensions 已从直接依赖、配置、构建入口和快捷键桥接补丁中移除，其独占的间接依赖随锁文件清理；其他固定版本不变。
 
@@ -16,7 +16,7 @@
 
 构建时迁移已知旧 timrt-fast.mjs 引用，保留未启用的旧文件供回退；不会删除用户其他目录中的同名扩展。pi-tidy 的原生入口被资源过滤关闭，其所有发布 TypeScript 源码纳入缓存失效检查。构建、启动验证或锁一致性检查失败时，配置、生成入口和策略清单仍按原事务恢复。分发和白名单导出不包含任何 *.compiled.mjs。
 
-`@andy8647/pi-toolbox@0.4.1` 是 pi-tidy 的已弃用旧名；npm 元数据明确要求迁移到 pi-tidy。当前保留 pi-tidy 0.4.11，不并装旧名，不新增重复的工具边框或执行覆盖。2026-10-26 核对。
+`@andy8647/pi-toolbox@0.4.1` 是 pi-tidy 的已弃用旧名；npm 元数据明确要求迁移到 pi-tidy。当前保留 pi-tidy 0.9.0，不并装旧名，不新增重复的工具边框或执行覆盖。2026-10-26 核对。
 
 ## 工具声明压缩
 
@@ -36,17 +36,17 @@ web-search.json 的能力配置进入策略校验；Key 和代理轮换不改变
 
 ## 关键问题澄清扩展
 
-`pi-ask-user@0.17.0`（[上游](https://github.com/edlsh/pi-ask-user)，2026-10-21 核对）固定在包清单和锁文件中。包自身的自动入口、强制提问技能及提示词资源均禁用，由唯一 `my-slim-pi-suite` 入口通过公开 `registerTool` 接入；保留上游 UI 和渲染，仅适配行为说明、顺序批量问答及模式控制的截止时间。规则放在工具声明中，不重复扩充 APPEND_SYSTEM；开发、调查、审查角色明确先找 Supervisor。
+`pi-ask-user@0.17.2`（[上游](https://github.com/edlsh/pi-ask-user)，2026-10-21 核对）固定在包清单和锁文件中。包自身的自动入口、强制提问技能及提示词资源均禁用，由唯一 `my-slim-pi-suite` 入口通过公开 `registerTool` 接入；保留上游 UI 和渲染，仅适配行为说明、顺序批量问答及模式控制的截止时间。规则放在工具声明中，不重复扩充 APPEND_SYSTEM；开发、调查、审查角色明确先找 Supervisor。
 
 AUTO/ACT 整次问答 90 秒到期后，保留已提交回答，为未回答题目采用第一项推荐方案，标记 `source: timeout-default`，不写入人类输入、不发出 `ask:answered`。主动取消、调用中止、新人类输入、会话切换、界面错误及无 UI 不产生默认答案。ASK/PLAN 不自动选择；任务委派和操作审批维持原机制。`ask_user` 在健康策略下按信息收集免审，避免先审批“是否可以提问”。RPC/Web 模式使用 Pi 的 `select`/`input` 原生对话框，桌面和浏览器不再把终端自定义组件当作唯一交互路径；TUI 仍使用完整 picker。
 
-依赖源码未改动；SDK/TUI 和旧名 `@sinclair/typebox` 使用 Pi 1.4.0 现有宿主别名，共享宿主实例。构建有效性检查覆盖该包全部四个运行时源码及 package.json，保持四个命名的预编译启动入口和一个任务代理产物；任务代理运行时在启动时加载以提供原生管理和 Fleet，声明仍按需激活。双平台隔离安装、超时与取消、真实 picker 渲染和组件集成结果见 [跨平台验收](CROSS-PLATFORM.md#验证结果)。
+依赖源码未改动；SDK/TUI 和旧名 `@sinclair/typebox` 使用 Pi 1.5.0 现有宿主别名，共享宿主实例。构建有效性检查覆盖该包全部四个运行时源码及 package.json，保持四个命名的预编译启动入口和一个任务代理产物；任务代理运行时在启动时加载以提供原生管理和 Fleet，声明仍按需激活。双平台隔离安装、超时与取消、真实 picker 渲染和组件集成结果见 [跨平台验收](CROSS-PLATFORM.md#验证结果)。
 
 回退时恢复整组 suite 源码、构建器、子代理角色、settings、npm 包清单和锁文件，按旧锁重新安装并重建；从分发清单移除新增文件后刷新已有哈希并审计。普通 Restore 不会卸载新依赖。升级该插件时重新核对公开工具接口、UI AbortSignal 关闭行为及宿主 TypeBox 别名，不通过修改第三方源码兼容。
 
 ## 任务代理原生管理与持续授权
 
-`/subagents` 直接使用 pi-subagents 0.80.0 上游管理页，`/subagents-fleet` 使用原生 Fleet Inspector；后台审批/Hermes 模型选择移至 `/background-models`。原生 FleetView 使用 `belowEditor`，其空编辑器方向键交互和 Inspector 路由由上游实现。本地不复制管理界面或代理监控状态。
+`/subagents` 直接使用 pi-subagents 0.85.0 上游管理页，`/subagents-fleet` 使用原生 Fleet Inspector；后台审批/Hermes 模型选择移至 `/background-models`。原生 FleetView 使用 `belowEditor`，其空编辑器方向键交互和 Inspector 路由由上游实现。本地不复制管理界面或代理监控状态。
 
 启动时通过现有单一 suite 入口初始化上游运行时，恢复管理、监督问答和 Fleet；工具声明继续采用原生 dynamic 策略。新建任务与管理既有任务分开：状态/记录、`bg_wait`、`contact_supervisor` 和 `subagent_supervisor` 不要求新一轮委派授权。原有输入正则授权函数已删除，用户消息只记录为真实证据；在具体授权变化或创建任务时交原审批器语义判断，不为每条普通消息额外调用模型。
 

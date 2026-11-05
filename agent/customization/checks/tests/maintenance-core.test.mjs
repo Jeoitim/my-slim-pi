@@ -89,3 +89,17 @@ test('platform configuration deploys one complete prompt and preserves custom to
     assert.equal(fs.readFileSync(join(root,'APPEND_SYSTEM.md'),'utf8'),'custom rules');assert.deepEqual(JSON.parse(fs.readFileSync(join(root,'settings.json'))).defaultTools,['read']);
   }
 });
+
+test('tidy upgrade preserves the previous appearance and explicit newer choices',()=>{
+  const root=fixture();
+  put(root,'APPEND_SYSTEM.linux.md','Linux rules');
+  const read=()=>JSON.parse(fs.readFileSync(join(root,'settings.json'),'utf8'));
+  put(root,'settings.json',JSON.stringify({tidy:{frameUserMessages:false}}));
+  configurePlatform(root,'linux');
+  let tidy=read().tidy;
+  assert.equal(tidy.userMessageStyle,'off');assert.equal(tidy.collapseTurns,'off');assert.equal(tidy.finalReplyStyle,'off');
+  put(root,'settings.json',JSON.stringify({tidy:{frameUserMessages:false,userMessageStyle:'rail',collapseTurns:'live',finalReplyStyle:'frame'}}));
+  configurePlatform(root,'linux');
+  tidy=read().tidy;
+  assert.equal(tidy.userMessageStyle,'rail');assert.equal(tidy.collapseTurns,'live');assert.equal(tidy.finalReplyStyle,'frame');
+});
