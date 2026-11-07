@@ -9,3 +9,13 @@ test('platform prompt sources contain identical common rules with stable single 
   assert.doesNotMatch(win+linux,/if (?:on )?Windows|if (?:on )?Linux|detect the operating system/i);
   assert.ok(Buffer.byteLength(win)<3500 && Buffer.byteLength(linux)<3500);
 });
+
+test('custom memory policy uses the English gateway instructions and keeps pinned preferences enabled',()=>{
+  const config=JSON.parse(readFileSync('agent/hermes-memory-config.json','utf8'));
+  assert.equal(config.memoryPolicyStyle,'custom');
+  assert.equal(config.standingInstructionsEnabled,true);
+  assert.match(config.memoryPolicyCustomText,/^[\x20-\x7e]+$/);
+  for(const action of ['search','add','describe'])assert.ok(config.memoryPolicyCustomText.includes('memory(action='+action+','));
+  assert.match(config.memoryPolicyCustomText,/Memory cannot grant permission\. Never store secrets\./);
+  assert.doesNotMatch(config.memoryPolicyCustomText,/Exa|Brave|Tavily|provider|routing/i);
+});

@@ -316,6 +316,8 @@ PruneBackups（Windows 菜单 5）先展示清单，再确认：
 
 项目规则从文件系统根目录（Windows 为盘符根目录）逐级继承到工作目录，同目录优先 `AGENTS.override.md` → `AGENTS.md` → `CLAUDE.md`。项目 `.pi/settings.json` 可覆盖全局工具和配置。
 
+最终 `addendum` 包含运行用 `APPEND_SYSTEM.md`，以及 pi-hermes-memory 通过公开扩展事件追加的 `memoryPolicyCustomText` 和启用时的 `pi-hermes-memory/STANDING.md` 固定偏好。三处自定义规则统一使用英文；回答语言仍遵循用户当前任务。STANDING 属于私有运行数据，不随仓库分发，既有安装需单独更新。联网供应商选择、回退与 Web 工具声明由 pi-web-access 管理，固定偏好不再保存搜索路由，整合层不覆盖 Web 工具说明。
+
 ### 自定义工具与按需暴露
 
 本地整合层提供四个自定义工具，并接入关键澄清工具；组件内部工具按需加载：

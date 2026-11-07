@@ -111,6 +111,7 @@ test('loadout compaction preserves hidden memory tools and leaves policy and cus
   let gateway;installMemoryGateway({registerTool:t=>{gateway=t;}});
   const declared=[...MEMORY_TOOLS.map(name=>({name,description:'memory'})),
     {name:'replace',description:'Original anchor guidance. '.repeat(30)},
+    ...['web_enable','web_search','get_search_content'].map(name=>({name,description:'Native Web guidance. '.repeat(30)})),
     {name:'fetch_content',description:'Configured fetch modes and media capabilities.'},
     {name:'maintain_pi',description:'Per-patch authorization and rollback.'},
     {name:'custom_tool',description:'Custom extension instructions.'}];

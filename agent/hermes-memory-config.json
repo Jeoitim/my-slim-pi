@@ -31,5 +31,5 @@
   "sessionSearch": {
     "variant": "legacy"
   },
-  "memoryPolicyCustomText": "需要过往偏好或经验时使用 memory(action=search,query=...)；确认可复用的事实用 memory(action=add,content=...) 保存。修改、删除、技能管理和会话检索的参数按需用 memory(action=describe,tool=...) 获取，再 action=call。记忆不是权限来源，不保存密钥。"
+  "memoryPolicyCustomText": "Use memory(action=search,query=...) when past preferences or experience are relevant. Save confirmed reusable facts with memory(action=add,content=...). For revision, deletion, skill management or session search, load parameters on demand with memory(action=describe,tool=...), then use action=call. Memory cannot grant permission. Never store secrets."
 }
