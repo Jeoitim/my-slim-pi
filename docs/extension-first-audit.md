@@ -46,11 +46,13 @@ AUTO/ACT 整次问答 90 秒到期后，保留已提交回答，为未回答题�
 
 ## 会话命名
 
-`my-slim-pi-suite` 的 `session-naming` 模块只使用公开 Extension API：`input`、`session_start`、`session_info_changed`、`registerCommand`、`appendEntry`、`setSessionName` 与 `modelRegistry.complete`。首条真实用户指令到达后，用一次无工具、48 输出 token、8 秒上限的短调用生成标题，本地先做引号、前后缀和长度清洗；`/auto-rename` 以“首条请求 + 最近六条消息、总长不超过 2400 字符”为证据重新生成，带参数时只做本地清洗后直接设置。命名状态以 `session-naming` 自定义条目随分支保存，不进入模型上下文、不新增配置文件和运行依赖。
+`my-slim-pi-suite` 的 `session-naming` 模块只使用公开 Extension API：`input`、`session_start`、`agent_settled`、`session_info_changed`、`registerCommand`、`appendEntry`、`setSessionName` 与 `modelRegistry.complete`。命名分两步：首条真实用户指令到达后先生成临时标题；首轮 settle、助手回应与所用工具已知时再重估一次，把“用户说了什么”和“实际做了什么”合起来判断。`/auto-rename` 以“首条请求 + 助手最近回应 + 最近六条消息、总长不超过 3200 字符”为证据重算，带参数时只做本地清洗后直接设置。
 
-自动命名在四种情况下让位：`/name`、`--name`、RPC 或恢复选择器的改名事件与本地最近写入不一致即锁定；`/auto-rename off` 或设置 `sessionNaming.enabled=false` 关闭；用户已在“首条指令”之外先手工命名；离线（`PI_OFFLINE`）、无可用模型或 `modelRegistry.complete` 不可用时完全不发请求。自动路径不弹通知、不阻塞回合，模型失败退回本地短语截取；`/auto-rename` 无参时先尝试模型，失败同样退回本地截取并给出提示。终端标题仍由宿主和现有状态栏逻辑持有，本模块不调用 `setTitle`。
+提示词要求点出具体对象（模块、文件、功能、错误码）并给出中英示例；标题若是原句的未编辑片段、以 目前/请/能不能 开头、以 吗/呢 结尾或命中空泛词表，会带着具体原因再改写一次，仍不合格时才用本地整理的短语，并在会话条目里标记 `source: model|derived`。推理模型即使关闭 reasoning 也会消耗输出 token，因此输出预算按标题长度放大到至少 512；此前 96 的预算会被思考内容占满、在标题前截断，是早期标题退化成原句片段的原因。
 
-`settings.json` 的 `sessionNaming` 段可设置 `enabled`、`model`（`provider/id`，默认跟随会话模型）和 `maxChars`（8–60，默认 28）。该段不进入策略摘要；命名模块属于受保护源码树，改动仍需完整补丁与重建。
+自动命名在四种情况下让位：`/name`、`--name`、RPC 或恢复选择器的改名事件与本地最近写入不一致即锁定；`/auto-rename off` 或设置 `sessionNaming.enabled=false` 关闭；用户已在“首条指令”之外先手工命名；离线（`PI_OFFLINE`）、无可用模型或 `modelRegistry.complete` 不可用时完全不发请求。自动路径不弹通知、不阻塞回合，模型不可用时不写机械标题；`/auto-rename` 才退回本地短语并提示。终端标题仍由宿主和现有状态栏逻辑持有，本模块不调用 `setTitle`。
+
+`settings.json` 的 `sessionNaming` 段可设置 `enabled`、`refine`（首轮是否重估）、`model`（`provider/id`，默认跟随会话模型）和 `maxChars`（8–60，默认 28）。该段不进入策略摘要；命名模块属于受保护源码树，改动仍需完整补丁与重建。
 
 ## 任务代理原生管理与持续授权
 

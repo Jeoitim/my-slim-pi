@@ -193,7 +193,7 @@ export function cleanup(root, plan, kind, mode) {
   for(const row of plan){if(JSON.stringify(treeState(root,row.path))!==JSON.stringify(row.state))throw Error('Cleanup file changed');fs.rmSync(child(root,row.path),{recursive:true});}
 }
 export function runNode(root, args, log) {
-  const result=spawnSync(process.execPath,args,{cwd:root,stdio:log?'pipe':'inherit',encoding:'utf8',maxBuffer:16_000_000,timeout:180_000,windowsHide:true,env:{...process.env,BRAVE_API_KEY:process.env.BRAVE_API_KEY||process.env.BRAVE_SEARCH_API_KEY,PI_CODING_AGENT_DIR:root,PI_MAINTENANCE_TARGET:root,PI_OFFLINE:'1',PI_HASHLINE_DIR:path.join(root,'pi-hashline-edit-pro')}});
+  const result=spawnSync(process.execPath,args,{cwd:root,stdio:log?'pipe':'inherit',encoding:'utf8',maxBuffer:16_000_000,timeout:600_000,windowsHide:true,env:{...process.env,BRAVE_API_KEY:process.env.BRAVE_API_KEY||process.env.BRAVE_SEARCH_API_KEY,PI_CODING_AGENT_DIR:root,PI_MAINTENANCE_TARGET:root,PI_OFFLINE:'1',PI_HASHLINE_DIR:path.join(root,'pi-hashline-edit-pro')}});
   if(log){process.stdout.write(result.stdout||'');process.stderr.write(result.stderr||'');fs.appendFileSync(log,(result.stdout||'')+(result.stderr||''));}
   if(result.status!==0)throw Error('Maintenance child failed ('+(result.status ?? result.error?.code)+'): '+String(result.error?.message||'')+'\n'+((result.stderr||'')+'\n'+(result.stdout||'')).slice(-3500)+(log?'\nLog: '+log:''));
 }
