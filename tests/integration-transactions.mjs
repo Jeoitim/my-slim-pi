@@ -1,7 +1,7 @@
 // Explicit integration command; intentionally outside Check's recursive test discovery.
 // Only a disposable installation under a repository's .local directory is accepted.
 import assert from 'node:assert/strict';
-import {readFileSync,writeFileSync} from 'node:fs';
+import {readFileSync,writeFileSync,existsSync} from 'node:fs';
 import {resolve,join} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {spawnSync} from 'node:child_process';
@@ -21,14 +21,16 @@ const jiti=createJiti(import.meta.url);
 const {policyHealth}=await jiti.import(join(root,'extensions/my-slim-pi-suite/call-policy.ts'));
 const {createRequire}=await import('node:module');
 const require=createRequire(import.meta.url),builder=join(root,'customization/runtime/build-extensions.cjs');
-const states=require(builder).stateFiles();
+// Retired artifact names are still listed for rollback safety even when the
+// installed package no longer ships them; only existing files can be compared.
+const states=require(builder).stateFiles().filter(p=>existsSync(join(root,p)));
 const beforeBuild=new Map(states.map(p=>[p,readFileSync(join(root,p))]));
 assert.equal(policyHealth(root).ok,true);
 const path='pi-btw.json',before=readFileSync(join(root,path));
 await assert.rejects(applyMaintenance(root,'继续之前的 Pi 界面维护',[{path,sha256:fileHash(before),content:before.toString('utf8')+'\n'}],{
   approved:async()=>true,current:()=>true,policyIntact:()=>policyHealth(root).ok,
   run:(command,args,options)=>args.at(-1)==='Check'?Promise.resolve({code:1,stdout:'',stderr:'forced post-build failure'}):run(command,args,options),
-}),/保护基线已精确恢复/);
+}),/protected baseline restored exactly/);
 for(const [p,data] of beforeBuild)assert.deepEqual(readFileSync(join(root,p)),data,p);
 assert.deepEqual(readFileSync(join(root,path)),before);assert.equal(policyHealth(root).ok,true);
 assert.equal(require(builder).valid(),true,'rollback must not trigger an implicit rebuild at next launch');
@@ -43,7 +45,7 @@ for(const [file,content,failure] of [
   const deps={approved:async()=>true,current:()=>true,run};
   try {
     if(failure) {
-      await assert.rejects(applyMaintenance(root,'请维护 Pi 事务、构建和校验内核',[change],deps),/语法预检失败/);
+      await assert.rejects(applyMaintenance(root,'请维护 Pi 事务、构建和校验内核',[change],deps),/failed syntax preflight/);
       assert.deepEqual(readFileSync(target),before);
       console.log('PASS: invalid candidate maintainer rejected before backup or source mutation');
     } else {

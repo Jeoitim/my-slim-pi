@@ -56,20 +56,21 @@ macOS 应走 Bash 版本的适配方向。目前安装器明确支持 Windows / 
 
 ## 开始使用
 
-- **联网**：`pi-web-access@0.47.0` 原生 `web_search`、`fetch_content`、`get_search_content`；原生 auto 策略，保留全部免 Key 供应商和已有平台凭据，自动激活，保留内容缓存。
+- **联网**：`pi-web-access@0.48.0` 原生 `web_search`、`fetch_content`、`get_search_content`；原生 auto 策略，保留全部免 Key 供应商和已有平台凭据，自动激活，保留内容缓存。
 - **模型**：用 `/login` 或自己的 `models.json` 配置供应商，`/model` 选择模型。
-- **工具显示**：`pi-tidy@0.9.0` 将连续工具调用折叠为可展开摘要，`Ctrl+O` 展开全部；Hashline 编辑与写入保持可见。启动页、工作状态与常用别名由本地 my-slim-pi-suite 提供，不再安装 pi-cc-extensions。
+- **工具显示**：`pi-tidy@0.9.8` 将连续工具调用折叠为可展开摘要，`Ctrl+O` 展开全部；Hashline 编辑与写入保持可见。启动页、工作状态与常用别名由本地 my-slim-pi-suite 提供，不再安装 pi-cc-extensions。
 - **主题**：`/theme` 预览并保存；Ayu Light / Dark、Catppuccin Latte / Frappé / Macchiato / Mocha、Gruvbox 深浅各三种对比度，以及 GitHub Light / Dark 和 Claude Warm。配色来源及旧名称兼容见[主题说明](docs/theme-palettes.md)。
 - **关键澄清**：`pi-ask-user@0.17.2` 先调查再按需提问；AUTO / ACT 问答 90 秒未完成自动采用第一项推荐方案继续，ASK / PLAN 不自动选择。提问不代替审批或委派授权。
 - **权限**：提供 AUTO / ACT / ASK / PLAN；ASK 的非只读操作逐次人工确认，PLAN 保持只读。
 - **任务代理**：`/subagents` 原生管理、`/subagents-fleet` 原生 Inspector；编辑器下方 FleetView 可在空输入时按 `↓` / `←` 进入。创建任务需真实用户授权，启用后持续有效，直到明确撤销；`/task-agents` 打开开关面板（`Ctrl+Shift+A` 也可），`on|off` 仍可直接调整，后台模型设置移至 `/background-models`。
+- **会话命名**：首条用户指令到达后自动生成短标题写进原生会话名，`/resume` 列表不再显示原始首句；`/auto-rename` 按对话重新生成，`/auto-rename <名称>` 直接指定，`off|on` 开关本会话自动命名；用 `/name` 或 `--name` 手工改名后不再覆盖。
 - **维护**：Windows 打开 `customization/Pi-Maintenance.bat`；Linux 运行 `bash ~/.pi/agent/customization/maintain-pi.sh Status`。
 
 详细命令见[日常使用与维护手册](agent/customization/Pi%20Agent%20本机配置维护手册.md)。
 
 ## 更新与恢复
 
-日常更新 Pi 本体直接运行 `pi update`。插件在实际 AgentRoot 的 `npm` 目录运行 `npm install 包名@latest --save-exact --legacy-peer-deps --ignore-scripts`，然后重启 Pi；下一次启动自动同步已配置包的版本、重建并检查，无需手动修改补丁版本门禁。插件继续精确固定，普通 `npm update` 和 `pi update --extensions` 不会跨过固定版本。真实接口不兼容时仍会停止并保留修复入口，见[升级与更新方式](docs/pi-1.5-upgrade-assessment.md)。
+日常更新 Pi 本体直接运行 `pi update`。插件在实际 AgentRoot 的 `npm` 目录运行 `npm install 包名@latest --save-exact --legacy-peer-deps --ignore-scripts`，然后重启 Pi；下一次启动自动同步已配置包的版本、重建并检查，无需手动修改补丁版本门禁。插件继续精确固定，普通 `npm update` 和 `pi update --extensions` 不会跨过固定版本。真实接口不兼容时仍会停止并保留修复入口，见[升级与更新方式](docs/pi-1.5.2-upgrade-assessment.md)。
 
 重新运行安装器，选择“备份后更新或修复”。已有模型、搜索 Key 和代理会保留；Web 能力设置采用本仓库已审查的原生配置，其他长期规则及个人配置保留；更新前生成配置和核心源码快照。安装失败会保留目录及备份，方便继续修复。
 
@@ -77,6 +78,6 @@ macOS 应走 Bash 版本的适配方向。目前安装器明确支持 Windows / 
 
 ## 关于此仓库
 
-当前固定版本为 **Pi 1.5.0**，包含十个社区组件；不包含个人模型、密钥、会话或记忆数据库。具体版本见 [distribution.json](distribution.json)。
+当前固定版本为 **Pi 1.5.2**，包含十个社区组件；不包含个人模型、密钥、会话或记忆数据库。具体版本见 [distribution.json](distribution.json)。
 
 [维护仓库](docs/MAINTAINING.md) · [双平台验证报告](docs/CROSS-PLATFORM.md) · [架构审计](docs/extension-first-audit.md)

@@ -1,6 +1,6 @@
 # Pi 本机维护手册
 
-更新：2026-11-05 · Pi 1.5.0 · Node 24+ · Windows / PowerShell 7 · Linux / Bash
+更新：2026-11-16 · Pi 1.5.2 · Node 24+ · Windows / PowerShell 7 · Linux / Bash
 
 本安装目录自带锁定版本的 Pi，无需全局安装。Windows 使用 PowerShell 7，Linux 使用 Bash，均需要 Node.js 24+（含 npm）。
 
@@ -72,7 +72,7 @@ bash "$maint" EditConfig settings.json        # 先备份，再打开编辑器
 
 ## 日常操作
 
-工具调用由 pi-tidy 0.9.0 折叠成摘要，点击或 Ctrl+O 展开；write、replace、insert 编辑结果保持可见。my-slim-pi-suite 通过公开 setHeader 和 setWorkingMessage 提供原 Pi logo 启动页、工作耗时与供应商报告的输出 token 数，保留 /clear 与 /exit 别名。会话统计使用原生 /session，输入框仍显示上下文占比；不再提供 pi-cc 的 /context 与 /ccstyle 面板。启动页复用原主题渐变、48 列双栏断点及标语，快捷键由宿主编辑器提供。quietStartup=true 使普通启动先留白再挂载本地 logo，避免先显示原生标题；原生启动资源清单默认隐藏，可用 pi --verbose 查看，详细模式也会按宿主规则显示原生启动信息。默认不用 Nerd Font 图标，也不另包用户消息边框。thinking 行由 pi-tidy 显示，不受宿主 hideThinkingBlock 控制。
+工具调用由 pi-tidy 0.9.8 折叠成摘要，点击或 Ctrl+O 展开；write、replace、insert 编辑结果保持可见。my-slim-pi-suite 通过公开 setHeader 和 setWorkingMessage 提供原 Pi logo 启动页、工作耗时与供应商报告的输出 token 数，保留 /clear 与 /exit 别名。会话统计使用原生 /session，输入框仍显示上下文占比；不再提供 pi-cc 的 /context 与 /ccstyle 面板。启动页复用原主题渐变、48 列双栏断点及标语，快捷键由宿主编辑器提供。quietStartup=true 使普通启动先留白再挂载本地 logo，避免先显示原生标题；原生启动资源清单默认隐藏，可用 pi --verbose 查看，详细模式也会按宿主规则显示原生启动信息。默认不用 Nerd Font 图标，也不另包用户消息边框。thinking 行由 pi-tidy 显示，不受宿主 hideThinkingBlock 控制。
 
 安装器会询问是否将本次安装设为默认 `pi` 命令，并可选隐藏输入搜索 Key。已有安装先备份再修复，保留模型、认证、长期规则与个人配置。
 
@@ -84,6 +84,7 @@ bash "$maint" EditConfig settings.json        # 先备份，再打开编辑器
 - `/effort` 调节思考程度；Shift+Tab 或 Ctrl+Alt+E 循环切换。可选级别以当前模型配置为准。
 - 默认主题为 `claude-warm`（橙色强调色、暖深色背景）。`/theme` 筛选并实时预览主题，回车保存，Esc 取消；支持 `/theme github-light`。宽终端左右排列，窄终端上下排列。
 - `/background-models` 设置权限审批与 Hermes 总结模型，默认跟随当前会话，也可分别覆盖。
+- 会话命名：首条真实用户指令到达后自动生成一个短标题（跟随该指令的语种），写入原生会话名，`/resume` 列表不再显示原始首句。`/auto-rename` 按当前对话重新生成，`/auto-rename <名称>` 直接指定，`/auto-rename off|on` 开关本会话的自动命名。用 `/name`、`--name` 或恢复选择器手工改名后自动命名立即让位，不再覆盖；无模型或调用失败时退回本地短语截取，并在设置关闭、PLAN 或离线时完全不调用模型。
 - 本扩展渲染的界面文案统一使用英文：命令说明、模式/主题/后台模型/任务代理菜单、ASK 与审批对话框、超时与状态提示。模型提示词、系统规则、工具描述与返回给模型的阻塞理由保持中文；宿主内置界面与第三方组件沿用上游文案。
 - `/subagents` 直接打开上游原版子代理管理界面；`/subagents-fleet` 打开原生 Fleet Inspector，查看运行中及最近完成的代理、对话与工具记录，也可管理已有任务。
 - 原生 FleetView 在编辑器下方显示活跃任务。编辑器为空且有任务条目时，按 `↓` 或 `←` 进入代理列表；继续选择条目并回车打开 Inspector，Esc 返回。没有条目时上游会收起视图。
@@ -226,6 +227,7 @@ AUTO/ACT 均须内部审批，ASK 人工确认且无超时，PLAN/清理暂停�
 - **插件**：在 AgentRoot/npm 目录运行 `npm install 包名@latest --save-exact --legacy-peer-deps --ignore-scripts`，然后重新启动 Pi。最后两个选项保持宿主 SDK 共享和跳过安装脚本。一次可列多个 包名@latest。
 - **自动完成**：下次启动同步已配置包的版本，保留包资源过滤和单一入口，应用结构兼容补丁、重建并检查离线启动；正常升级无需手动修改版本门禁或重复 Rebuild/Check。
 - **实际不兼容**：替换位置或加载行为发生变化时，停止会话并报告；更新、安装和版本查询仍可运行。恢复插件需用旧锁重新安装；只恢复配置不会恢复 node_modules。Pi 可将 install/current-version 切回保留的旧版后重启。
+- **镜像异常**：锁文件记录的是 registry.npmjs.org 的下载地址；安装器按锁文件地址安装（`--replace-registry-host=never`），避免镜像 CDN 证书异常导致 npm ci 失败。手工执行 npm ci 时同样带上该参数；`pi update` 自行调用 npm，可临时设置 `npm_config_replace_registry_host=never`。
 
 插件仍精确固定，因此 `pi update --extensions` 或普通 `npm update` 会遵循固定版本，不会自动升到下一版。未来版本的结构兼容检查不能代替重大更新的行为验收；本次保留 AUTO / ACT / ASK / PLAN、逐次审批和任务代理授权。
 
@@ -233,7 +235,7 @@ AUTO/ACT 均须内部审批，ASK 人工确认且无超时，PLAN/清理暂停�
 
 ### 搜索
 
-联网由固定版本 pi-web-access 0.47.0 提供，保留 `web_search`、`fetch_content`、`get_search_content` 三个原生工具。本机保持 `provider: "auto"`，不设置 `searchRouting` 或 `allowedProviders`；供应商顺序、串行回退、成功即停、显式 provider 的严格语义以及是否需要 Key，均以插件文档为准（`npm/node_modules/pi-web-access/README.md`）。安装器可选用 Exa、Brave、Tavily 的 Key，可跳过，也可完全不配（插件自带免费 Exa）；有 Key 不等于强制启用，实际是否使用由回退链决定，显式选择项不会因有 Key 自动进入 auto。追加其他供应商按插件文档修改 `web-search.json`：只增加 `*ApiKey` 或 `proxy` 不触发策略重建，改动能力或路由配置后需 Rebuild 并重启。抓取保留原生 HTTP、正文提取、Fetch 回退与内容缓存，第三方托管抓取服务默认关闭。
+联网由固定版本 pi-web-access 0.48.0 提供，保留 `web_search`、`fetch_content`、`get_search_content` 三个原生工具。本机保持 `provider: "auto"`，不设置 `searchRouting` 或 `allowedProviders`；供应商顺序、串行回退、成功即停、显式 provider 的严格语义以及是否需要 Key，均以插件文档为准（`npm/node_modules/pi-web-access/README.md`）。安装器可选用 Exa、Brave、Tavily 的 Key，可跳过，也可完全不配（插件自带免费 Exa）；有 Key 不等于强制启用，实际是否使用由回退链决定，显式选择项不会因有 Key 自动进入 auto。追加其他供应商按插件文档修改 `web-search.json`：只增加 `*ApiKey` 或 `proxy` 不触发策略重建，改动能力或路由配置后需 Rebuild 并重启。抓取保留原生 HTTP、正文提取、Fetch 回退与内容缓存，第三方托管抓取服务默认关闭。
 
 `toolActivation: "auto"` 由插件按模型能力决定：支持会话中追加工具且保留提示缓存的模型先提供原生 `web_enable`，启用后追加三个工具；其他模型首轮直接声明三个工具。恢复会话沿用已有工具声明。没有统一 Web 包装工具。`/search` 查看原生缓存。
 
@@ -341,18 +343,19 @@ Web 工具由固定版社区扩展注册，不在本地整合层增加包装或�
 
 | 组件 | 固定版本 | 职责 |
 |---|---|---|
-| pi-web-access | 0.47.0 | 原生搜索、抓取与缓存 |
-| pi-tidy | 0.9.0 | 工具折叠、圆角透明边框与展开显示 |
+| pi-web-access | 0.48.0 | 原生搜索、抓取与缓存 |
+| pi-tidy | 0.9.8 | 工具折叠、圆角透明边框与展开显示 |
 | pi-ask-user | 0.17.2 | 关键问题澄清、推荐选项与自由回答 |
-| pi-hermes-memory | 0.9.11 | 长期记忆、复盘与经验技能 |
-| pi-hashline-edit-pro | 7.1.1 | 锚点读取、编辑、过期检测与撤销 |
-| Pi 原生 MCP | 随 Pi 1.5.0 | 原生连接、延迟发现及统一权限执行管线 |
+| pi-hermes-memory | 0.11.0 | 长期记忆、复盘与经验技能 |
+| pi-hashline-edit-pro | 7.2.0 | 锚点读取、编辑、过期检测与撤销 |
+| Pi 原生 MCP | 随 Pi 1.5.2 | 原生连接、延迟发现及统一权限执行管线 |
 | pi-permission-suite | 0.2.3 | 上游权限规则引擎，由本地整合入口接入 |
-| pi-subagents | 0.85.0 | 原生管理、FleetView / Inspector 与获授权的任务委派 |
-| principal-pi-skills | 4.14.1 | 单个索引下的 9 项工程技能 |
+| pi-subagents | 0.88.1 | 原生管理、FleetView / Inspector 与获授权的任务委派 |
+| principal-pi-skills | 4.15.3 | 单个索引下的 9 项工程技能 |
 | @anishthite/pi-themes | 0.1.9 | Ayu、Catppuccin、GitHub 等主题 |
-| @narumitw/pi-btw | 0.63.4 | 独立旁聊 |
+| @narumitw/pi-btw | 0.63.8 | 独立旁聊 |
 
-本地 `my-slim-pi-suite` 是唯一整合入口，按模块接入界面、权限、问答与维护。`pi-permission-suite` 是固定版本的上游规则引擎依赖，包自身入口禁用；其包名及 `extensions/pi-permission-suite/config.json` 配置路径保留，AUTO / ACT / ASK / PLAN、内部审批与防绕过策略由本地入口统一协调。更新已有安装时，旧 `timrt-suite` 目录可作为停用的回退材料保留；构建器会禁用其入口，仅加载新入口。启动器使用本机 Node；Windows 使用 PowerShell 7，Linux 使用 Bash。四个命名的预编译启动入口，suite 在启动时加载独立的任务代理产物以恢复原生管理与 Fleet；任务工具声明仍由上游 dynamic 策略按需激活，显示与执行授权分别处理。pi-web-access 直接使用上游预构建包的单一原生入口，共享宿主 SDK；不修改插件、宿主或其编译产物来实现 Web。
+本地 `my-slim-pi-suite` 是唯一整合入口，按模块接入界面、权限、问答与维护。`pi-permission-suite` 是固定版本的上游规则引擎依赖，包自身入口禁用；其包名及 `extensions/pi-permission-suite/config.json` 配置路径保留，AUTO / ACT / ASK / PLAN、内部审批与防绕过策略由本地入口统一协调。更新已有安装时，旧 `timrt-suite` 目录已清理；如需回退，从本次升级前的快照取回。启动器使用本机 Node；Windows 使用 PowerShell 7，Linux 使用 Bash。四个命名的预编译启动入口，suite 在启动时加载独立的任务代理产物以恢复原生管理与 Fleet；任务工具声明仍由上游 dynamic 策略按需激活，显示与执行授权分别处理。pi-web-access 直接使用上游预构建包的单一原生入口，共享宿主 SDK；不修改插件、宿主或其编译产物来实现 Web。
 
 `cache/node-compile` 与 `cache/jiti` 日常保留。Hashline 默认数据放在当前 AgentRoot 的 `pi-hashline-edit-pro`；显式设置 PI_HASHLINE_DIR 时遵循该设置。启动器依据 `customization/runtime/compiled-extensions.json` 检测源码、SDK 和输出变化，必要时自动重建。生成入口使用 `<插件名>.compiled.mjs`，分别显示记忆、Hashline、pi-tidy 和本地 my-slim-pi-suite；任务代理使用独立的命名运行时。BTW 和 Web 沿用原生 dist 入口。npm 上的 `@andy8647/pi-toolbox` 是 pi-tidy 的已弃用旧名，不应与当前 pi-tidy 同时安装。
+

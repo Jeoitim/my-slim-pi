@@ -73,7 +73,7 @@ try {
     permission.path.deny[join(target,'secrets/*')]='Private search credentials';permission.path.deny[join(target,'auth.json')]='Private model credentials';permission.path.deny[join(target,'web-search.json')]='Private web configuration and credentials';
     fs.writeFileSync(permissionFile,JSON.stringify(permission,null,2)+'\n',{mode:0o600});
     for(const dir of ['install/releases/'+manifest.piVersion,'npm','customization/runtime/build-runtime']) {
-      const r=spawnSync('npm',['ci','--prefix',child(target,dir),'--no-audit','--no-fund','--ignore-scripts',...(dir==='npm'?['--legacy-peer-deps']:[])],{cwd:target,stdio:'inherit'});
+      const r=spawnSync('npm',['ci','--prefix',child(target,dir),'--no-audit','--no-fund','--ignore-scripts','--replace-registry-host=never',...(dir==='npm'?['--legacy-peer-deps']:[])],{cwd:target,stdio:'inherit'});
       if(r.status!==0)throw Error('Locked dependency installation failed: '+dir);
     }
     if(extras.length)runNode(target,[child(target,'install/releases/'+manifest.piVersion+'/node_modules/@earendil-works/pi-coding-agent/dist/cli.js'),'update','--extensions']);

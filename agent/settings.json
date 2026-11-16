@@ -13,11 +13,11 @@
   "quietStartup": true,
   "packages": [
     {
-      "source": "npm:pi-hermes-memory@0.9.11",
+      "source": "npm:pi-hermes-memory@0.11.0",
       "extensions": []
     },
     {
-      "source": "npm:pi-hashline-edit-pro@7.1.1",
+      "source": "npm:pi-hashline-edit-pro@7.2.0",
       "extensions": []
     },
     {
@@ -25,13 +25,13 @@
       "extensions": []
     },
     {
-      "source": "npm:pi-subagents@0.85.0",
+      "source": "npm:pi-subagents@0.88.1",
       "extensions": [],
       "skills": [],
       "prompts": []
     },
     {
-      "source": "npm:principal-pi-skills@4.14.1",
+      "source": "npm:principal-pi-skills@4.15.3",
       "extensions": [],
       "prompts": []
     },
@@ -42,8 +42,8 @@
         "themes/github-*.json"
       ]
     },
-    "npm:@narumitw/pi-btw@0.63.4",
-    "npm:pi-web-access@0.47.0",
+    "npm:@narumitw/pi-btw@0.63.8",
+    "npm:pi-web-access@0.48.0",
     {
       "source": "npm:pi-ask-user@0.17.2",
       "extensions": [],
@@ -51,7 +51,7 @@
       "prompts": []
     },
     {
-      "source": "npm:pi-tidy@0.9.0",
+      "source": "npm:pi-tidy@0.9.8",
       "extensions": []
     }
   ],
@@ -84,6 +84,14 @@
       "write",
       "replace",
       "insert"
-    ]
-  }
+    ],
+    "userMessageStyle": "off",
+    "collapseTurns": "off",
+    "finalReplyStyle": "off"
+  },
+  "extensionChangelogVersions": {
+    "{\"source\":\"npm:@narumitw/pi-btw@0.63.8\",\"scope\":\"user\"}": "0.63.8",
+    "{\"source\":\"npm:pi-web-access@0.48.0\",\"scope\":\"user\"}": "0.48.0"
+  },
+  "cacheWarming": "streaming"
 }

@@ -1,4 +1,4 @@
-﻿[CmdletBinding()]
+[CmdletBinding()]
 param(
     [string]$AgentRoot = (Join-Path $env:USERPROFILE '.pi\agent'),
     [switch]$Update,
@@ -28,6 +28,8 @@ for ($cursor=$target; $cursor; $cursor=Split-Path -Parent $cursor) {
 }
 $node = (Get-Command node -ErrorAction SilentlyContinue).Source
 $npm = (Get-Command npm.cmd -ErrorAction SilentlyContinue).Source
+# nvm and other wrappers may only provide an npm executable shim instead of npm.cmd.
+if (-not $npm) { $npm = (Get-Command npm -ErrorAction SilentlyContinue).Source }
 $pwsh = (Get-Command pwsh.exe -ErrorAction SilentlyContinue).Source
 if (-not $node -or -not $npm) { throw '未找到 Node.js 或 npm。请先安装 Node.js 24+（含 npm），重新打开 PowerShell 7 后再运行；无需预装 Pi。' }
 if (-not $pwsh) { throw '未在 PATH 中找到 pwsh.exe。请安装 PowerShell 7 并重新打开终端；无需预装 Pi。' }
@@ -146,7 +148,7 @@ try {
     }
     foreach ($directory in @("install\releases\$($manifest.piVersion)",'npm','customization\runtime\build-runtime')) {
         Write-Host "安装锁定依赖：$directory"
-        $npmArgs = @('ci','--prefix',(Join-Path $target $directory),'--no-audit','--no-fund','--ignore-scripts')
+        $npmArgs = @('ci','--prefix',(Join-Path $target $directory),'--no-audit','--no-fund','--ignore-scripts','--replace-registry-host=never')
         if ($directory -eq 'npm') { $npmArgs += '--legacy-peer-deps' } # Host SDK is supplied by Pi, not installed as plugin peers.
         & $npm @npmArgs
         if ($LASTEXITCODE -ne 0) { throw "依赖安装失败：$directory" }

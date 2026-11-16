@@ -1,10 +1,10 @@
 # 扩展架构与维护边界
 
-当前基线为 Pi 1.5.0，Web 扩展为 [nicobailon/pi-web-access 0.47.0](https://github.com/nicobailon/pi-web-access)，任务代理为 pi-subagents 0.85.0，关键澄清为 pi-ask-user 0.17.2。核对日期 2026-10-22；固定版本与分发哈希以 distribution.json 为准。
+当前基线为 Pi 1.5.2，Web 扩展为 [nicobailon/pi-web-access 0.48.0](https://github.com/nicobailon/pi-web-access)，任务代理为 pi-subagents 0.88.1，关键澄清为 pi-ask-user 0.17.2。核对日期 2026-11-16；固定版本与分发哈希以 distribution.json 为准。
 
 ## 工具显示与 pi-tidy
 
-新增 [pi-tidy 0.9.0](https://github.com/Andy8647/pi-tidy)，通过固定 npm 包生成的单一预编译入口加载，复用宿主 SDK，不增加运行依赖、执行工具或常驻提示词。工具 renderer 注册使用公开 API；边框、分组和消息显示仍使用上游原型补丁，不能声称全程仅使用公开 API。没有修改上游源码或另造包装工具。
+新增 [pi-tidy 0.9.8](https://github.com/Andy8647/pi-tidy)，通过固定 npm 包生成的单一预编译入口加载，复用宿主 SDK，不增加运行依赖、执行工具或常驻提示词。工具 renderer 注册使用公开 API；边框、分组和消息显示仍使用上游原型补丁，不能声称全程仅使用公开 API。没有修改上游源码或另造包装工具。
 
 工具展示由 pi-tidy 单独接管。启动页、工作耗时、供应商报告的输出 token 数以及 /clear、/exit 别名由 my-slim-pi-suite 的 shell-ui 模块通过公开 API 提供；会话统计使用原生 /session，输入框保留上下文占比。pi-cc-extensions 已从直接依赖、配置、构建入口和快捷键桥接补丁中移除，其独占的间接依赖随锁文件清理；其他固定版本不变。
 
@@ -16,7 +16,7 @@
 
 构建时迁移已知旧 timrt-fast.mjs 引用，保留未启用的旧文件供回退；不会删除用户其他目录中的同名扩展。pi-tidy 的原生入口被资源过滤关闭，其所有发布 TypeScript 源码纳入缓存失效检查。构建、启动验证或锁一致性检查失败时，配置、生成入口和策略清单仍按原事务恢复。分发和白名单导出不包含任何 *.compiled.mjs。
 
-`@andy8647/pi-toolbox@0.4.1` 是 pi-tidy 的已弃用旧名；npm 元数据明确要求迁移到 pi-tidy。当前保留 pi-tidy 0.9.0，不并装旧名，不新增重复的工具边框或执行覆盖。2026-10-26 核对。
+`@andy8647/pi-toolbox@0.4.1` 是 pi-tidy 的已弃用旧名；npm 元数据明确要求迁移到 pi-tidy。当前保留 pi-tidy 0.9.8，不并装旧名，不新增重复的工具边框或执行覆盖。2026-10-26 核对。
 
 ## 工具声明压缩
 
@@ -40,13 +40,21 @@ web-search.json 的能力配置进入策略校验；Key 和代理轮换不改变
 
 AUTO/ACT 整次问答 90 秒到期后，保留已提交回答，为未回答题目采用第一项推荐方案，标记 `source: timeout-default`，不写入人类输入、不发出 `ask:answered`。主动取消、调用中止、新人类输入、会话切换、界面错误及无 UI 不产生默认答案。ASK/PLAN 不自动选择；任务委派和操作审批维持原机制。`ask_user` 在健康策略下按信息收集免审，避免先审批“是否可以提问”。RPC/Web 模式使用 Pi 的 `select`/`input` 原生对话框，桌面和浏览器不再把终端自定义组件当作唯一交互路径；TUI 仍使用完整 picker。
 
-依赖源码未改动；SDK/TUI 和旧名 `@sinclair/typebox` 使用 Pi 1.5.0 现有宿主别名，共享宿主实例。构建有效性检查覆盖该包全部四个运行时源码及 package.json，保持四个命名的预编译启动入口和一个任务代理产物；任务代理运行时在启动时加载以提供原生管理和 Fleet，声明仍按需激活。双平台隔离安装、超时与取消、真实 picker 渲染和组件集成结果见 [跨平台验收](CROSS-PLATFORM.md#验证结果)。
+依赖源码未改动；SDK/TUI 和旧名 `@sinclair/typebox` 使用 Pi 1.5.2 现有宿主别名，共享宿主实例。构建有效性检查覆盖该包全部四个运行时源码及 package.json，保持四个命名的预编译启动入口和一个任务代理产物；任务代理运行时在启动时加载以提供原生管理和 Fleet，声明仍按需激活。双平台隔离安装、超时与取消、真实 picker 渲染和组件集成结果见 [跨平台验收](CROSS-PLATFORM.md#验证结果)。
 
 回退时恢复整组 suite 源码、构建器、子代理角色、settings、npm 包清单和锁文件，按旧锁重新安装并重建；从分发清单移除新增文件后刷新已有哈希并审计。普通 Restore 不会卸载新依赖。升级该插件时重新核对公开工具接口、UI AbortSignal 关闭行为及宿主 TypeBox 别名，不通过修改第三方源码兼容。
 
+## 会话命名
+
+`my-slim-pi-suite` 的 `session-naming` 模块只使用公开 Extension API：`input`、`session_start`、`session_info_changed`、`registerCommand`、`appendEntry`、`setSessionName` 与 `modelRegistry.complete`。首条真实用户指令到达后，用一次无工具、48 输出 token、8 秒上限的短调用生成标题，本地先做引号、前后缀和长度清洗；`/auto-rename` 以“首条请求 + 最近六条消息、总长不超过 2400 字符”为证据重新生成，带参数时只做本地清洗后直接设置。命名状态以 `session-naming` 自定义条目随分支保存，不进入模型上下文、不新增配置文件和运行依赖。
+
+自动命名在四种情况下让位：`/name`、`--name`、RPC 或恢复选择器的改名事件与本地最近写入不一致即锁定；`/auto-rename off` 或设置 `sessionNaming.enabled=false` 关闭；用户已在“首条指令”之外先手工命名；离线（`PI_OFFLINE`）、无可用模型或 `modelRegistry.complete` 不可用时完全不发请求。自动路径不弹通知、不阻塞回合，模型失败退回本地短语截取；`/auto-rename` 无参时先尝试模型，失败同样退回本地截取并给出提示。终端标题仍由宿主和现有状态栏逻辑持有，本模块不调用 `setTitle`。
+
+`settings.json` 的 `sessionNaming` 段可设置 `enabled`、`model`（`provider/id`，默认跟随会话模型）和 `maxChars`（8–60，默认 28）。该段不进入策略摘要；命名模块属于受保护源码树，改动仍需完整补丁与重建。
+
 ## 任务代理原生管理与持续授权
 
-`/subagents` 直接使用 pi-subagents 0.85.0 上游管理页，`/subagents-fleet` 使用原生 Fleet Inspector；后台审批/Hermes 模型选择移至 `/background-models`。原生 FleetView 使用 `belowEditor`，其空编辑器方向键交互和 Inspector 路由由上游实现。本地不复制管理界面或代理监控状态。
+`/subagents` 直接使用 pi-subagents 0.88.1 上游管理页，`/subagents-fleet` 使用原生 Fleet Inspector；后台审批/Hermes 模型选择移至 `/background-models`。原生 FleetView 使用 `belowEditor`，其空编辑器方向键交互和 Inspector 路由由上游实现。本地不复制管理界面或代理监控状态。
 
 启动时通过现有单一 suite 入口初始化上游运行时，恢复管理、监督问答和 Fleet；工具声明继续采用原生 dynamic 策略。新建任务与管理既有任务分开：状态/记录、`bg_wait`、`contact_supervisor` 和 `subagent_supervisor` 不要求新一轮委派授权。原有输入正则授权函数已删除，用户消息只记录为真实证据；在具体授权变化或创建任务时交原审批器语义判断，不为每条普通消息额外调用模型。
 
@@ -84,3 +92,4 @@ Hermes 搜索命中跟踪默认显式关闭，保持搜索的只读约定；首�
 当前迁移的双平台结果、性能和上下文数据统一见 [Web 迁移验收](web-access-migration.md)，不沿用旧架构的测试计数或性能结果。
 
 回退须恢复整组源码、settings、mcp、依赖清单及锁文件，并按旧锁重新安装和重建。安装器私密快照保存旧搜索凭据和原始配置；普通 Restore 仅恢复快照文件，不自动还原 npm 依赖。升级 pi-web-access 时重新审查参数、配置默认值、动态激活和敏感抓取行为，并运行双平台原生隔离测试。
+

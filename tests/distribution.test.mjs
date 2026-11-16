@@ -47,16 +47,18 @@ test('installer refuses a drive root as a destination',{skip:process.platform!==
 });
 
 const psLiteral=value=>"'"+value.replaceAll("'","''")+"'";
-for(const missing of ['pi','node','npm.cmd','pwsh.exe']) {
+for(const missing of ['pi','node','npm','pwsh.exe']) {
  test(`installer prerequisite handling: ${missing === 'pi' ? 'Pi need not be preinstalled' : 'missing '+missing}`,{skip:process.platform!=='win32'},()=>{
   mkdirSync('.local',{recursive:true});
   const fixture=mkdtempSync(join(root,'.local','prerequisite-'));
   const target=join(fixture,'target'),harness=join(fixture,'check.ps1');
+  // npm may be npm.cmd or an executable shim such as nvm's npm.exe; both must count as missing.
+  const absent=missing==='npm'?['npm','npm.cmd']:[missing];
   writeFileSync(harness,`
 $ErrorActionPreference='Stop'
 function Get-Command {
  param([string]$Name,$ErrorAction)
- if ($Name -eq '${missing}') { return $null }
+ if (@(${absent.map(name=>`'${name}'`).join(',')}) -contains $Name) { return $null }
  if ($Name -match '^pi(?:\\.|$)') { throw 'Must not probe a global Pi installation' }
  Microsoft.PowerShell.Core\\Get-Command -Name $Name -ErrorAction $ErrorAction
 }

@@ -42,7 +42,7 @@ try {
   assert.ok(session.getActiveToolNames().includes('replace'));
   await session.extensionRunner.emitInput('帮我修复普通开发问题，读取需要的 Principal build 技能。', undefined, 'interactive');
   assert.ok(session.getAllTools().some(t => t.name === 'subagent'), 'native runtime is loaded for Fleet and management without granting new launches');
-  for(const name of ['subagents','subagents-fleet','background-models','task-agents'])assert.ok(session.extensionRunner.getCommand(name),name);
+  for(const name of ['subagents','subagents-fleet','background-models','task-agents','auto-rename'])assert.ok(session.extensionRunner.getCommand(name),name);
   const policy = readFileSync(join(root, 'APPEND_SYSTEM.md'), 'utf8');
   const before = await session.extensionRunner.emitBeforeAgentStart({ messageType: 'user', prompt: '普通开发验证，不调用模型' }, { cwd: homedir(), selectedTools: session.getActiveToolNames(), appendSystemPrompt: policy });
   assert.ok(!before.systemPromptOptions.forceSystemPrompt, 'preserve structured system prompt caching');

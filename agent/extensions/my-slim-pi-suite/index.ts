@@ -8,6 +8,7 @@ import { installTerminalNotifications } from "./terminal-notifications.ts";
 import { installAskUser } from "./ask-user.ts";
 import { withTaskAgentsPanel } from "./task-agents-panel.ts";
 import { installShellUi } from "./shell-ui.ts";
+import { installSessionNaming } from "./session-naming.ts";
 
 export default function (pi: ExtensionAPI) {
   installUiState(pi);
@@ -30,6 +31,7 @@ export default function (pi: ExtensionAPI) {
   installComposer(pi, permissions, setShellKeys);
   installMemoryGateway(pi);
   installPromptPolicy(pi);
+  installSessionNaming(pi);
   installTerminalNotifications(pi);
   pi.registerShortcut("ctrl+shift+a", { description: "Task-agent authorization panel", handler: async ctx => { await taskAgentsPanel?.(ctx); } });
 }
