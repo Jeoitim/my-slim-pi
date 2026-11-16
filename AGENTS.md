@@ -11,6 +11,8 @@ My Slim Pi 是个人个性化 Agent，而非以代码量、依赖数或功能数
 - Windows / PowerShell 7 与 Linux / Bash，Node 24。此仓库保存可分享源码；真实运行数据在独立安装目录。
 - Windows 与 Linux 是同步维护的两个原生版本。涉及启动、安装、维护、扩展或平台行为的变更，须同时核对两端实现，分别在独立安装目录验证；不能只验证 Windows 后宣称 Linux 可用。在 Windows 开发且已安装 WSL2 发行版时，使用 WSL2 的 Linux 原生目录、Node 和 Bash 完成 Linux 验证，不能复用 Windows AgentRoot 或依赖。记录两端验证结果；无法验证时明确说明缺口，不以推测替代。
 - 不提交凭据、个人 models/auth/trust、会话、记忆、依赖、缓存、日志及生成的编译/策略清单。
+- 仓库只收录本项目原创的内置技能（当前为 `pi-maintenance`、`principal`）。用户自行安装或临时加入的技能一律属于个人配置，导出器按 `PUBLISHED_SKILLS` 白名单过滤，不导出、不提交，也不为它们改题目录结构。
+- 运行目录与仓库的漂移先分类再处理：受管源码（`APPEND_SYSTEM`、suite 源码、agents 角色、维护与检查脚本、`settings.json` 的共享项）以仓库为准，回填运行目录；个人配置（第三方技能、`mcp.json` 的服务器与鉴权、本地模型与凭据、`extensionChangelogVersions` 等逐机状态）只留在本机，仓库仅保留空模板或已剔除后的公开版本。
 - 修改 agent/ 源码后刷新 distribution.json 的已有文件哈希，运行 npm test 和 npm run audit:share。
 - 安装测试使用仓库 .local/ 内的独立 AgentRoot，不能把当前用户 ~/.pi/agent 当测试夹具，不设置用户 PATH。
 - 保持固定版本、原生包布局、单一扩展入口和宿主 SDK 共享；新依赖或升级要保留回退并执行隔离构建检查。

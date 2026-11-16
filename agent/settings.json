@@ -89,9 +89,5 @@
     "collapseTurns": "off",
     "finalReplyStyle": "off"
   },
-  "extensionChangelogVersions": {
-    "{\"source\":\"npm:@narumitw/pi-btw@0.63.8\",\"scope\":\"user\"}": "0.63.8",
-    "{\"source\":\"npm:pi-web-access@0.48.0\",\"scope\":\"user\"}": "0.48.0"
-  },
   "cacheWarming": "streaming"
 }

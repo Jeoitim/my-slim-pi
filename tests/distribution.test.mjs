@@ -21,6 +21,18 @@ test('share defaults contain no personal provider and use an isolated launcher',
  assert.match(readFileSync('agent/customization/Maintain-Pi.ps1','utf8'),/\$env:PI_CODING_AGENT_DIR = \$script:AgentRoot/);
  assert.equal(existsSync('agent/models.json'),false);assert.equal(existsSync('agent/auth.json'),false);
 });
+test('only built-in skills and the public MCP template are published',()=>{
+ const builtin=['pi-maintenance','principal'];
+ const skills=Object.keys(manifest.files).filter(path=>path.startsWith('skills/'));
+ assert.ok(skills.length>0);
+ for(const path of skills)assert.ok(builtin.includes(path.split('/')[1]),'published skill is not built in: '+path);
+ for(const name of builtin)assert.ok(skills.some(path=>path==='skills/'+name+'/SKILL.md'),'missing built-in skill: '+name);
+ const exporter=readFileSync('scripts/export-config.mjs','utf8');
+ assert.match(exporter,/PUBLISHED_SKILLS=\['pi-maintenance','principal'\]/);
+ assert.equal(JSON.parse(readFileSync('agent/mcp.json','utf8')).mcpServers && Object.keys(JSON.parse(readFileSync('agent/mcp.json','utf8')).mcpServers).length,0);
+ assert.equal(JSON.parse(readFileSync('agent/settings.json','utf8')).extensionChangelogVersions,undefined);
+ assert.match(exporter,/delete clean\.extensionChangelogVersions/);
+});
 test('installer defaults to no overwrite and no persistent PATH change',()=>{
  const script=readFileSync('scripts/Install-MySlimPi.ps1','utf8');
  assert.match(script,/\$exists -and -not \$Update/);

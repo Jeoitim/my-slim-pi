@@ -17,10 +17,14 @@ for(const [dir,pattern] of [['extensions/my-slim-pi-suite',/\.(?:ts|ps1)$/],['cu
   for(const entry of readdirSync(join(source,dir),{withFileTypes:true}))if(entry.isFile() && pattern.test(entry.name))selected.push(dir+'/'+entry.name);
 }
 // Skill source export shares the same textual-file scope as backup and transactions.
+// Skills installed for the current user are personal runtime state. Only the
+// built-in skills this repository authors are published.
+const PUBLISHED_SKILLS=['pi-maintenance','principal'];
 function selectSkills(dir='skills') {
   if(!existsSync(join(source,dir)))return;
   for(const entry of readdirSync(join(source,dir),{withFileTypes:true})) {
     const path=dir+'/'+entry.name;
+    if(dir==='skills' && !PUBLISHED_SKILLS.includes(entry.name))continue;
     if(entry.isSymbolicLink())throw Error('Skill export refuses links');
     if(entry.isDirectory())selectSkills(path);else if(skillSourcePath(path))selected.push(path);
   }
@@ -58,13 +62,19 @@ for(const path of [...new Set(selected)].sort()){
     // authenticated proxies. Export the reviewed public template only.
     text=readFileSync(join(payload,'web-search.json'),'utf8');
   }
+  if(path==='mcp.json') {
+    // Servers, headers and env carry personal endpoints and secrets; publish the
+    // empty template that a fresh installation starts from.
+    text=readFileSync(join(payload,'mcp.json'),'utf8');
+  }
   if(path==='extensions/pi-permission-suite/config.json') {
     const config=JSON.parse(text); delete config.taskAgentsEnabled;
     text=JSON.stringify(config,null,2)+'\n';
   }
   if(path.endsWith('.json'))privacyCheck(JSON.parse(text),path);
   if(path==='settings.json'){
-    const clean=JSON.parse(text);delete clean.defaultProvider;delete clean.defaultModel;delete clean.lastChangelogVersion;
+    // Personal model selection and per-machine changelog bookkeeping stay local.
+    const clean=JSON.parse(text);delete clean.defaultProvider;delete clean.defaultModel;delete clean.lastChangelogVersion;delete clean.extensionChangelogVersions;
     text=JSON.stringify(clean,null,2)+'\n';
   }
   if(path==='npm/package.json' || path==='npm/package-lock.json'){

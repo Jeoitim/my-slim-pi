@@ -61,3 +61,7 @@ Windows 先用 `Install.bat -Plan`、Linux 使用 `bash install.sh --agent-root 
 不会导出 auth.json、models.json、secrets、trust.json、会话、记忆数据库、backups、缓存、日志、编译产物或 node_modules。私有备份应另行保存，不提交到 Git。
 
 导出采用白名单，新增文件需要明确加入导出器。第三方组件保留各自许可证，通过 npm 获取。发布或推送到远端由使用者另行决定。
+
+技能只导出本项目原创的内置项（`pi-maintenance`、`principal`），由导出器的 `PUBLISHED_SKILLS` 白名单过滤；用户自行安装的技能属于个人配置，不导出也不提交。`mcp.json` 只导出空模板，服务器、请求头与环境变量留在本机；`settings.json` 导出时剔除 `defaultProvider`、`defaultModel`、`lastChangelogVersion` 和 `extensionChangelogVersions`，逐机的模型选择与更新提示状态不进入仓库。
+
+运行目录与仓库的漂移按两类处理：受管源码（`APPEND_SYSTEM`、suite 源码、`agents/` 角色、维护与检查脚本、`settings.json` 的共享项）以仓库为准回填运行目录；个人配置只保留在本机。可用临时副本执行 `node scripts/export-config.mjs --apply --source=<AgentRoot>` 后与 `agent/` 比对，结果应为空，用于确认没有未分类的漂移。
