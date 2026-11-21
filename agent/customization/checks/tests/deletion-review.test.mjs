@@ -92,6 +92,25 @@ test('AUTO deletion needs one explicit reviewer decision per invocation and fail
   assert.equal(confirmations, 1);
 });
 
+test('inline browser code receives per-call review without a cleanup hold for detaching an element', async () => {
+  const calls = [];
+  const h = await harness(async (_ctx, name) => {
+    calls.push(name);
+    return { approved: calls.length === 2, source: 'subagent', reason: 'fixture decision' };
+  });
+  h.state.mode = 'act';
+  const name = 'mcp__playwright__browser_run_code_unsafe';
+  const input = { code: 'async page => { const rows = await page.context().cookies(); for (const row of rows) { const a = document.createElement("a"); a.remove(); } }' };
+  assert.equal((await h.call(name, input)).block, true);
+  assert.equal(h.state.approvalHold, false);
+  assert.equal(await h.call('write', { path: './unrelated.txt', content: 'unchanged ACT permissions' }), undefined);
+  await h.input('Review the next exact call.');
+  assert.equal(await h.call(name, input), undefined);
+  assert.equal((await h.call(name, { code: 'fs.rmSync("./cache", { recursive: true })' })).block, true);
+  assert.equal(h.state.approvalHold, true);
+  assert.deepEqual(calls, [`operation:execution:${name}`, `operation:execution:${name}`, `deletion:${name}`]);
+});
+
 test('ACT uses internal deletion approval; ASK confirms manually and PLAN stays read-only', async () => {
   let reviews = 0, confirms = 0, allow = false;
   const h = await harness(async () => { reviews++; return { approved: allow, source: 'subagent' }; });

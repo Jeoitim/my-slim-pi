@@ -1,5 +1,6 @@
 # Private state and generated files
 .local/
+.npm-cache/
 **/node_modules/
 **/.npmrc
 **/secrets/

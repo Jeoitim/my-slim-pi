@@ -28,7 +28,7 @@ test('rounded composer fits narrow and wide terminals without wrapping metrics',
   assert.equal(u.input, 1300); assert.equal(u.output, 220); assert.equal(u.cacheRead, 8000); assert.ok(Math.abs(u.cost - .12) < 1e-12);
 });
 
-test('composer displays model name verbatim and permission colors stay distinct', async () => {
+test('composer preserves model names, mode colors and cached editor rows', async t => {
   const { installComposer } = await jiti.import(join(agentDir, 'extensions/my-slim-pi-suite/composer.ts'));
   const { permissionBadge } = await jiti.import(join(agentDir, 'extensions/my-slim-pi-suite/permissions.ts'));
   const { visibleWidth } = await jiti.import(join(modules, '@earendil-works/pi-tui/dist/index.js'));
@@ -42,6 +42,11 @@ test('composer displays model name verbatim and permission colors stay distinct'
   for (const fn of hooks.get('session_start')) await fn({}, ctx);
   await new Promise(r => setTimeout(r, 10));
   assert.ok(headerKeys,'the public editor factory supplies header keybindings');
+  const baseEditor = Object.getPrototypeOf(Object.getPrototypeOf(editor));
+  const renderBase = baseEditor.render;
+  t.mock.method(baseEditor, 'render', function (width) {
+    return Object.freeze(renderBase.call(this, width));
+  });
   editor.setText('中文输入 🙂');
   for (const width of [40, 80, 120]) {
     const lines = editor.render(width);

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { writeFileSync, mkdirSync, symlinkSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { root, suite, jiti, harness, APPROVE } from './auto-harness.mjs';
@@ -14,7 +14,7 @@ const uncertain = '{"approved":false,"confidence":0.3,"reason":"无法确认实�
 
 test('reviewer reads generated source and a dependency before deciding, without executing them', async () => {
   const h = await harness((ctx, n) => {
-    assert.deepEqual(ctx.tools.map(t => t.name), ['read', 'ls']);
+    assert.deepEqual(ctx.tools.map(t => t.name), ['read', 'ls', 'stat']);
     if (n === 1) return request('read', { path: './generated.mjs', offset: 2, limit: 2 });
     if (n === 2) {
       assert.match(result(ctx).content[0].text, /import.*helper/);
@@ -87,6 +87,41 @@ test('directory changes invalidate approval and context cancellation does not re
   assert.equal(blocked.block, true); assert.match(blocked.reason, /cancelled/);
 });
 
+test('exact metadata survives sibling changes but rejects replacement during human approval', async () => {
+  const h = await harness((ctx, n) => {
+    if (n % 2) return request('stat', { path: 'test-cookies.txt' });
+    assert.match(result(ctx).content[0].text, /file exists/);
+    assert.doesNotMatch(result(ctx).content[0].text, /SYNTHETIC-SECRET/);
+    writeFileSync(join(h.ctx.cwd, 'unrelated.txt'), 'unrelated');
+    return n === 2 ? APPROVE : uncertain;
+  });
+  const path = join(h.ctx.cwd, 'test-cookies.txt');
+  writeFileSync(path, 'SYNTHETIC-SECRET');
+  const call = { path: './target.txt', content: 'x' };
+  assert.equal(await h.call('write', call), undefined);
+  h.ctx.ui.select = async (_title, rows) => {
+    writeFileSync(path, 'changed since inspection');
+    return rows[0];
+  };
+  const blocked = await h.call('write', call);
+  assert.equal(blocked.block, true);
+  assert.match(blocked.reason, /evidence_changed.*Inspected evidence changed/);
+});
+
+test('PowerShell temp-relative script dependencies reach the first review as live metadata', {skip: process.platform !== 'win32' || !process.env.TEMP}, async () => {
+  const work = mkdtempSync(join(process.env.TEMP, 'pi-review-preflight-'));
+  const prefix = basename(work);
+  writeFileSync(join(work, 'fetch.ps1'), `$inputFile = Join-Path $env:TEMP '${prefix}\\test-cookies.txt'\nGet-Item -LiteralPath $inputFile`);
+  writeFileSync(join(work, 'test-cookies.txt'), 'SYNTHETIC-SECRET');
+  const h = await harness(() => APPROVE);
+  assert.equal(await h.call('powershell', { command: `pwsh -NoProfile -File "$env:TEMP\\${prefix}\\fetch.ps1"` }), undefined);
+  assert.equal(h.requests.length, 1);
+  const prompt = h.requests[0].context.messages[0].content[0].text;
+  assert.match(prompt, /localPathObservations.*test-cookies\.txt.*file exists/);
+  assert.match(prompt, /"sha256":"[a-f0-9]{64}"/);
+  assert.doesNotMatch(prompt, /SYNTHETIC-SECRET/);
+});
+
 test('unavailable tools cannot execute or release a call; repeated inspection is bounded', async () => {
   const unknown = await harness(() => request('powershell', { command: 'Set-Content ./escape.txt x' }, APPROVE));
   assert.equal((await unknown.call('write', { path: './target.txt', content: 'x' })).block, true);
@@ -127,7 +162,7 @@ test('the existing retry keeps already-read source without granting a fresh tool
   assert.notEqual(h.requests[0].options.signal, h.requests[2].options.signal, 'only the existing second attempt gets its own deadline');
 });
 
-test('native inspection enforces scope, credentials, links, regular text files and size limits', async () => {
+test('native inspection enforces scope, credentials, links, regular text files and size limits', async t => {
   const { createApprovalInspection } = await jiti.import(join(suite, 'extensions/my-slim-pi-suite/approval-inspection.ts'));
   const cwd = mkdtempSync(join(tmpdir(), 'pi-review-read-'));
   const outside = mkdtempSync(join(tmpdir(), 'pi-review-outside-'));
@@ -135,21 +170,31 @@ test('native inspection enforces scope, credentials, links, regular text files a
   writeFileSync(join(outside, 'private.txt'), 'OUTSIDE-SECRET');
   writeFileSync(join(cwd, '.env'), 'CREDENTIAL-SECRET');
   writeFileSync(join(cwd, 'auth.json'), 'CREDENTIAL-SECRET');
+  writeFileSync(join(cwd, 'yt-cookies.txt'), 'CREDENTIAL-SECRET');
   writeFileSync(join(cwd, 'binary.txt'), Buffer.from([1, 0, 2]));
   writeFileSync(join(cwd, 'huge.txt'), Buffer.alloc(2 * 1024 * 1024 + 1, 65));
   mkdirSync(join(cwd, 'linked'));
   const signal = new AbortController().signal;
   const run = async (path, input = {}) => createApprovalInspection(cwd, 'operation:bash', input)
     .execute({ id: 'x', name: 'read', arguments: { path } }, signal);
-  for (const path of ['.env', 'auth.json', 'binary.txt', 'huge.txt', '.', join(outside, 'private.txt')]) {
+  for (const path of ['.env', 'auth.json', 'yt-cookies.txt', 'binary.txt', 'huge.txt', '.', join(outside, 'private.txt')]) {
     const value = await run(path);
     assert.equal(value.isError, true, path); assert.doesNotMatch(value.content[0].text, /CREDENTIAL-SECRET|OUTSIDE-SECRET/);
   }
   const explicit = await run(join(outside, 'script.mjs'), { scripts: [{ path: join(outside, 'script.mjs') }] });
   assert.equal(explicit.isError, false); assert.match(explicit.content[0].text, /identified external/);
   // Directory junctions are available without Windows developer-mode file symlink privileges.
-  symlinkSync(outside, join(cwd, 'junction'), process.platform === 'win32' ? 'junction' : 'dir');
-  assert.equal((await run(join(cwd, 'junction/private.txt'))).isError, true);
+  await t.test('rejects junctions that leave the review scope', async linkTest => {
+    try { symlinkSync(outside, join(cwd, 'junction'), process.platform === 'win32' ? 'junction' : 'dir'); }
+    catch (error) {
+      if (process.platform === 'win32' && ['EPERM', 'EACCES'].includes(error.code)) {
+        linkTest.skip('The sandbox does not permit junction creation');
+        return;
+      }
+      throw error;
+    }
+    assert.equal((await run(join(cwd, 'junction/private.txt'))).isError, true);
+  });
   const scope = createApprovalInspection(cwd, 'operation:maintain_pi', { arguments: { changes: [{ path: 'agents/approver.md' }] } });
   const policy = await scope.execute({ id: 'x', name: 'read', arguments: { path: join(root, 'agents/approver.md') } }, signal);
   assert.equal(policy.isError, false, 'exact maintenance source remains inspectable');

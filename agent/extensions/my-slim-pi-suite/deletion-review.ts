@@ -10,12 +10,16 @@ export function inspectDeletionCall(name: string, input: Record<string, any>, cw
   const program = shell ? inspectDeletionScripts(command, cwd, name === "powershell" ? "powershell" : "bash") : { risk: false, destructive:false, opaque: false, scripts: [] };
   const code = /(?:execute|query|sql|python|javascript|run_code|terminal|shell)/i.test(name)
     ? [input.command, input.code, input.query, input.sql, input.expression].filter(v => typeof v === "string").join("\n") : String(input.command || "");
-  const destructive = program.destructive || deletionRisk(code)
+  const inlineExecution = /(?:^|_)run_code(?:_|$)/i.test(name) && typeof input.code === "string";
+  // A zero-argument member remove may only detach an in-memory object. Keep inline
+  // execution under review, without taking the method name as proof of bulk deletion.
+  const destructive = program.destructive || deletionRisk(inlineExecution ? code.replace(/\.\s*remove\s*\(\s*\)/gi, "") : code)
     || /(?:delete|remove|purge)/i.test(name)
     || (/clean/i.test(name) && (/file|folder|directory|path/i.test(name) || input.path || input.paths));
-  if (!destructive && !program.risk) return;
-  const fingerprint = createHash("sha256").update(JSON.stringify({ name, input, cwd, opaque: program.opaque, scripts: program.scripts.map(s => [s.path, s.sha256]) })).digest("hex");
-  return { fingerprint, kind:destructive ? "cleanup" as const : "execution" as const, opaque: program.opaque, scripts: program.scripts };
+  if (!destructive && !program.risk && !inlineExecution) return;
+  const opaque = program.opaque || inlineExecution;
+  const fingerprint = createHash("sha256").update(JSON.stringify({ name, input, cwd, opaque, scripts: program.scripts.map(s => [s.path, s.sha256]) })).digest("hex");
+  return { fingerprint, kind:destructive ? "cleanup" as const : "execution" as const, opaque, scripts: program.scripts };
 }
 
 type Review = (ctx: ExtensionContext, name: string, input: Record<string, unknown>, model?: string) => Promise<{ approved: boolean; source: string; reason?: string }>;
@@ -59,7 +63,7 @@ export async function approveDeletion(mode: string, name: string, input: Record<
         scripts: inspected.scripts,
         staticInspectionIncomplete: inspected.opaque,reviewCategory:inspected.kind,
         callFacts: formatCallFacts(describeCall(name, input, ctx.cwd)),
-        reviewPolicy: "Judge the original statement, complete arguments, scripts, and real human task. Unsupported static parsing, variables or inline syntax do not alone require a human; staticInspectionIncomplete is an evidence flag, not a denial. Approve only this call when its scope and effects are clear and proportional. If target, source or authorization is genuinely missing, use reasonCode authorization or effect and a specific question. Never approve rule bypass, root/home clearing, or credential disclosure.",
+        reviewPolicy: "Judge the original statement, complete arguments, scripts, and real human task. Unsupported static parsing, variables or inline syntax do not alone require a human; staticInspectionIncomplete is an evidence flag, not a denial. Approve only this call when its scope and effects are clear and proportional. Never approve rule bypass, root/home clearing, or credential disclosure.",
       }, model);
       approved = decision.approved === true;
       reason = `${inspected.kind === "cleanup" ? "Deletion" : "Execution"} review did not approve this call (${decision.source}): ${decision.reason || "denied"}`;

@@ -58,7 +58,7 @@ macOS 应走 Bash 版本的适配方向。目前安装器明确支持 Windows / 
 
 - **联网**：`pi-web-access@0.48.0` 原生 `web_search`、`fetch_content`、`get_search_content`；原生 auto 策略，保留全部免 Key 供应商和已有平台凭据，自动激活，保留内容缓存。
 - **模型**：用 `/login` 或自己的 `models.json` 配置供应商，`/model` 选择模型。
-- **工具显示**：`pi-tidy@0.9.8` 将连续工具调用折叠为可展开摘要，`Ctrl+O` 展开全部；Hashline 编辑与写入保持可见。启动页、工作状态与常用别名由本地 my-slim-pi-suite 提供，不再安装 pi-cc-extensions。
+- **工具显示**：`pi-tidy@0.11.0` 将连续工具调用折叠为可展开摘要，`Ctrl+O` 展开全部；Hashline 编辑与写入保持可见。启动页、工作状态与常用别名由本地 my-slim-pi-suite 提供，不再安装 pi-cc-extensions。
 - **主题**：`/theme` 预览并保存；Ayu Light / Dark、Catppuccin Latte / Frappé / Macchiato / Mocha、Gruvbox 深浅各三种对比度，以及 GitHub Light / Dark 和 Claude Warm。配色来源及旧名称兼容见[主题说明](docs/theme-palettes.md)。
 - **关键澄清**：`pi-ask-user@0.17.2` 先调查再按需提问；AUTO / ACT 问答 90 秒未完成自动采用第一项推荐方案继续，ASK / PLAN 不自动选择。提问不代替审批或委派授权。
 - **权限**：提供 AUTO / ACT / ASK / PLAN；ASK 的非只读操作逐次人工确认，PLAN 保持只读。
@@ -78,6 +78,6 @@ macOS 应走 Bash 版本的适配方向。目前安装器明确支持 Windows / 
 
 ## 关于此仓库
 
-当前固定版本为 **Pi 1.5.2**，包含十个社区组件；不包含个人模型、密钥、会话或记忆数据库。具体版本见 [distribution.json](distribution.json)。
+当前固定版本为 **Pi 1.6.0**，包含十个社区组件；不包含个人模型、密钥、会话或记忆数据库。具体版本见 [distribution.json](distribution.json)。
 
 [维护仓库](docs/MAINTAINING.md) · [双平台验证报告](docs/CROSS-PLATFORM.md) · [架构审计](docs/extension-first-audit.md)

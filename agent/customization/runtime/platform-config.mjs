@@ -16,6 +16,7 @@ export function configurePlatform(root, platform=process.platform) {
   migrateThemeSettings(settings);
   // Preserve the previous tidy appearance when its newer defaults are adopted.
   if(settings.tidy && typeof settings.tidy==='object'){
+    settings.tidy.style ??= 'frame';
     if(settings.tidy.frameUserMessages===false && settings.tidy.userMessageStyle===undefined)settings.tidy.userMessageStyle='off';
     if(settings.tidy.collapseTurns===undefined)settings.tidy.collapseTurns='off';
     if(settings.tidy.finalReplyStyle===undefined && settings.tidy.frameFinalReply===undefined)settings.tidy.finalReplyStyle='off';

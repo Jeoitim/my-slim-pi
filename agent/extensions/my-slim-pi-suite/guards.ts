@@ -40,7 +40,25 @@ const INTERPRETERS = /^(?:powershell|pwsh|cmd|bash|zsh|sh|node|deno|bun|npx|pyth
 const PROGRAM_PREFIXES = /^(?:&|call|source|\.)$/i;
 const unquote = (token: string) => token.replace(/^(['"])([\s\S]*)\1$/, "$2").replace(/''/g, "'").replace(/""/g, '"');
 const basename = (token: string) => token.replace(/^.*[\\/]/, "");
-const commandTokens = (text: string) => (text.match(/"[^"]*"|'[^']*'|[^\s]+/g) || []).map(unquote);
+const commandTokens = (text: string, shell = "bash") => (text.match(/"[^"]*"|'[^']*'|[^\s]+/g) || [])
+  .map(token => (shell === "powershell" && token.startsWith('"') ? powerShellEnvironmentPath(unquote(token)) : undefined) ?? unquote(token));
+
+function powerShellEnvironmentPath(text: string): string | undefined {
+  const match = /^\$env:(TEMP|TMP|USERPROFILE|APPDATA|LOCALAPPDATA)(?=$|[\\/])([^$`%*?{}\r\n]*)$/i.exec(text);
+  const base = match && process.env[match[1].toUpperCase()];
+  if (base && isAbsolute(base) && !/^(?:\\\\|\/\/)/.test(base) && !match[2].includes(":")) return base + match[2];
+}
+
+/** Only stat references we can resolve without evaluating PowerShell. */
+export function powerShellPathReferences(source: string): string[] {
+  const paths = new Set<string>();
+  for (const match of source.matchAll(/"(\$env:[^"\r\n]+)"|\bJoin-Path\s+(\$env:[A-Za-z0-9_]+)[ \t]+(['"])([^'"$`%*?{}\r\n]+)\3/gi)) {
+    const path = match[1] ? powerShellEnvironmentPath(match[1]) : powerShellEnvironmentPath(`${match[2]}\\${match[4]}`);
+    if (path) paths.add(path);
+    if (paths.size >= 8) break;
+  }
+  return [...paths];
+}
 
 /** Include .exe, absolute interpreter paths and any number of command-line switches. */
 function stdinInterpreter(text: string): boolean {
@@ -72,10 +90,10 @@ function opaqueExecution(text: string): boolean {
  * interpreter. A path that only appears as input to a reader (`Get-Content`, Select-String)
  * is inert evidence, not an executed program.
  */
-export function executedScriptPaths(text: string): string[] {
+export function executedScriptPaths(text: string, shell = "bash"): string[] {
   const found: string[] = [];
   for (const segment of text.split(/\s*(?:\r?\n|[|;&])\s*/)) {
-    const tokens = commandTokens(segment);
+    const tokens = commandTokens(segment, shell);
     let i = 0;
     while (i < tokens.length && PROGRAM_PREFIXES.test(tokens[i])) i++;
     const leader = tokens[i];
@@ -88,8 +106,8 @@ export function executedScriptPaths(text: string): string[] {
 }
 
 /** Paths to read and hash: executed programs, plus every mention when code is piped into a shell. */
-function scriptInvocations(text: string): string[] {
-  const executed = executedScriptPaths(text);
+function scriptInvocations(text: string, shell: string): string[] {
+  const executed = executedScriptPaths(text, shell);
   if (!stdinInterpreter(text)) return executed;
   return [...new Set([...executed, ...(text.match(MENTIONED) || []).map(unquote)])];
 }
@@ -120,8 +138,8 @@ export function inspectDeletionScripts(command: string, cwd: string, shell = "ba
     risk ||= deletionRisk(literal);
   }
   const seen = new Set<string>();
-  const scan = (text: string, base: string, depth: number) => {
-    for (const token of scriptInvocations(text)) {
+  const scan = (text: string, base: string, depth: number, syntax = shell) => {
+    for (const token of scriptInvocations(text, syntax)) {
       const name = token.replace(/^['"]|['"]$/g, "").replace(/%~dp0/gi, base + "/").replace(/\$PSScriptRoot/gi, base);
       if (/[$%]/.test(name)) { opaque = true; continue; }
       const file = resolve(base, name);
@@ -142,8 +160,9 @@ export function inspectDeletionScripts(command: string, cwd: string, shell = "ba
         // JavaScript/Python string literals and template fixtures are not shell invocations.
         // Review their complete source instead of pretending a shell tokenizer parses these languages.
         if (/\.(?:ps1|sh|bat|cmd)$/i.test(file)) {
-          if (depth < 2) scan(source, resolve(file, ".."), depth + 1);
-          else if (scriptInvocations(source).length) opaque = true;
+          const childShell = /\.ps1$/i.test(file) ? "powershell" : "bash";
+          if (depth < 2) scan(source, resolve(file, ".."), depth + 1, childShell);
+          else if (scriptInvocations(source, childShell).length) opaque = true;
         } else {
           // Existing, literal referenced scripts are supplementary evidence. Never expand template fixtures.
           const refs = [...source.matchAll(/['"]([^'"\r\n]+\.(?:ps1|py|js|mjs|cjs|sh|cmd|bat))['"]/gi)]

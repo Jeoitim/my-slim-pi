@@ -1,22 +1,24 @@
 # Windows / Linux 原生验证
 
-核对日期：2026-11-16。基线为 Pi 1.5.2，十个组件的精确版本见 [distribution.json](../distribution.json)。Windows 使用 Node 24.22.1 / PowerShell 7；WSL2 Arch Linux 使用独立的原生目录、Node 24.22.0 / Bash 和依赖。
+核对日期为 2026-11-21。仓库固定 Pi 1.6.0，插件版本见 [distribution.json](../distribution.json)。Windows 使用 Node 24.22.1 和 PowerShell 7。
 
-| 检查 | Windows | WSL2 Linux |
+| 检查 | Windows 隔离安装 | WSL2 Linux |
 | --- | --- | --- |
-| 独立构建、离线启动和组件集成 | 通过 | 通过 |
-| 完整离线回归 | 185 通过、3 跳过 | 184 通过、4 跳过 |
-| 事务集成（备份、重建、精确回滚） | 通过 | 通过 |
-| 仓库 npm test | 42 通过、3 跳过 | 34 通过、11 跳过 |
-| 分享审计 | 108 个文件通过 | 108 个文件通过 |
-| 实际运行目录 | 升级后离线启动检查 | 升级后离线启动检查 |
+| 依赖安装、扩展重建、启动 | 通过，Pi 1.6.0，零扩展加载错误 | 通过，Pi 1.6.0，零扩展加载错误 |
+| 扩展回归 | 隔离运行 187 通过、4 跳过、1 失败；失败项已在日常 PowerShell 单独重跑通过 | 187 通过、5 跳过、0 失败 |
+| 组件集成检查 | 通过 | 通过 |
+| 仓库 `npm test` | 42 通过、3 跳过 | 通过，补齐 `examples/` 后续跑成功 |
+| `npm run audit:share` | 108 个白名单文件通过 | 108 个白名单文件通过 |
 
-完整回归覆盖权限模式、审批及人工回退、任务代理授权与撤销、网页访问权限、提供方回退、抓取与缓存、记忆、界面、五位编辑锚点和过期锚点拒绝，以及会话命名：首条指令命名、首轮重估、复述与空泛标题的改写、压缩摘要作为证据、`/auto-rename`、手工改名让位、离线与无模型不调用模型。测试采用隔离数据和模拟服务，不证明真实模型的费用、供应商在线服务或真实终端鼠标交互。
+Windows 隔离运行中，原生 Web 集成测试的回环代理连接返回 `EACCES`。同一测试在用户的 PowerShell 单独重跑，1 项通过、0 失败。`pi-tidy` 0.11.0 的默认边框改变后，安装迁移会为未选择样式的现有配置填入 `frame`，显式配置的 `rail` 会保留。圆角、工具折叠和编辑结果的回归检查已通过。
 
-维护入口给子进程的硬超时由 3 分钟放宽到 10 分钟：完整回归在负载较高的机器上已接近原上限，超时会让检查在中途被终止并只留下半份日志。上限仍然存在，不会掩盖真正的挂起。
+Linux 验证使用 WSL 的 Linux 原生目录、Node 24 和 Bash。将仓库源码连同 `examples/` 复制到 Linux 原生目录后，从该目录执行以下命令，安装目标是该副本自己的 `.local`。
 
-上游编辑工具可从锚点定位文件，本地权限边界要求 replace、insert 和 replace_match 显式提供目标路径，防止绕开受保护路径检查。新 pi-tidy 的嵌套源码纳入构建失效检查，升级时保留原有界面偏好。新旧扩展共享宿主 SDK；Pi 和 Hermes 的必要补丁继续执行结构检查和失败回退，不能称为零补丁。
+```bash
+export npm_config_cache="$PWD/.npm-cache"
+bash install.sh --agent-root "$PWD/.local/pi-1.6.0" --non-interactive --no-path --skip-search-keys --full-check
+npm test
+npm run audit:share
+```
 
-锁文件记录 registry.npmjs.org 的下载地址，两个安装器都以 `--replace-registry-host=never` 按锁文件安装，避免镜像 CDN 证书异常中断 npm ci。Windows 的入口同时接受 `npm.cmd` 与 `npm` 可执行入口，兼容 nvm 等包装器。
-
-安装器在更新前保存配置与核心源码快照，并保留旧宿主版本。回退时还须恢复旧 npm 清单和锁文件、按旧锁安装依赖并重建；普通配置 Restore 不自动恢复依赖。双平台独立安装和完整测试不使用真实 AgentRoot，不修改用户 PATH。
+仓库的锁文件使用 `registry.npmjs.org` 下载地址。Windows 和 Linux 安装器按锁文件安装，并设置 `--replace-registry-host=never`。Windows 日用安装已升级到 Pi 1.6.0。部署前已保存配置与核心源码快照，并保留旧宿主目录。回滚时恢复快照和 1.5.2 版本指针，从旧插件锁执行 `npm ci`，再重建并验证 `pi --version`。

@@ -111,7 +111,7 @@ export function installComposer(pi: ExtensionAPI, permissions: { mode: Permissio
         terminalTheme = `${ctx.ui.theme.name}:${ctx.ui.theme.appearance}`;
         queueMicrotask(applyTerminalTheme);
       }
-      const lines = super.render(width);
+      const lines = [...super.render(width)];
       const bottomIndex = lines.indexOf(this.bottom);
       if (width >= 6 && bottomIndex > 1) {
         const border = ctx.ui.theme.fg("border", "│");

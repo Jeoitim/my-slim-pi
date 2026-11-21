@@ -168,7 +168,7 @@ export function describeCall(name: string, input: Record<string, any>, cwd: stri
     commands.push(...commandNames(command));
     const literals = tool.toLowerCase() === "powershell" ? powerShellLiteralPaths(command) : bashLiteralPaths(command);
     for (const literal of [...new Set(literals)].slice(0, 10)) addTarget(literal, "literal");
-    for (const script of executedScriptPaths(command).slice(0, 6)) {
+    for (const script of executedScriptPaths(command, tool.toLowerCase()).slice(0, 6)) {
       const target = callTarget(script, cwd, "script");
       if (target) { targets.push(target); scripts.push(`${target.path}${target.exists ? "" : " (missing)"}`); }
       else unresolved.push(oneLine(script));
@@ -388,6 +388,6 @@ export function approvalEvidence(ctx: ExtensionContext, name: string, input: Rec
     recentConversation: conversation,
     callFacts: callFactsText(name, input, ctx.cwd),
     ...(["fetch_content","web_search"].includes(name) ? {webAccessEffects:"This native Web call is not covered by the read-only exemption. Depending on arguments and configuration it may read local files or browser credentials, clone Git repositories, write PDFs to temporary directories, run video processing or model analysis, send content through a configured proxy, or perform these during includeContent background fetching. A public URL alone is not enough to approve; route unclear effects to the human."} : {}),
-    ...(name.startsWith("deletion:") ? { ...input, currentUserRequest: request } : { tool: name, arguments: argumentsWithoutDuplicate }),
+    ...(/^(?:deletion|execution):/.test(name) ? { ...input, currentUserRequest: request } : { tool: name, arguments: argumentsWithoutDuplicate }),
   };
 }

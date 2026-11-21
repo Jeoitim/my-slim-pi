@@ -17,7 +17,7 @@ import { expandApprovalEvidence, evidenceGrew, boundedText, humanEvidenceRecords
 
 export interface ReviewDecision {
   approved: boolean;
-  source: "subagent" | "human" | "cache" | "fallback" | "error" | "paused";
+  source: "subagent" | "human" | "cache" | "fallback" | "error" | "paused" | "evidence_changed";
   reason?: string;
   reasonCode?: "decision" | "missing_context" | "authorization" | "effect";
   question?: string;
@@ -188,7 +188,7 @@ async function askModel(
       if (response.stopReason === "aborted") return { problem: "Approval request was cancelled" };
       if (response.stopReason === "error") return { problem: shortError(response.errorMessage) };
       if (calls.length) {
-        if (!canInspect || calls.length > 6 || calls.some(call => !["read", "ls"].includes(call.name))) return { problem: "Reviewer requested unavailable tools or exceeded inspection limits" };
+        if (!canInspect || calls.length > 6 || calls.some(call => !inspection.tools.some(tool => tool.name === call.name))) return { problem: "Reviewer requested unavailable tools or exceeded inspection limits" };
         messages.push(response);
         const results: Message[] = [];
         for (const call of calls) {
@@ -244,10 +244,19 @@ export function createApprovalReviewer(pi: ExtensionAPI, options?: {humanFallbac
       return uncertain(ctx, name, input, "Approval model, reviewer rules, or host review API is unavailable");
     }
     const policyKey = createHash("sha256").update(JSON.stringify([ctx.cwd, model.provider, model.id, systemPrompt])).digest("hex");
+    const inspection = createApprovalInspection(ctx.cwd, name, input);
+    const localPaths = await inspection.preflight();
+    if (ctx.signal?.aborted) return cancelled();
+    const release = async (decision: ReviewDecision): Promise<ReviewDecision> => {
+      if (decision.approved && inspection.used && !await inspection.unchanged()) {
+        return { approved: false, source: "evidence_changed", reason: "Inspected evidence changed during approval; this call did not run. Review the current files again." };
+      }
+      return ctx.signal?.aborted ? cancelled() : decision;
+    };
     const serialized = JSON.stringify(input, null, 2);
     const risky = deletionRisk(serialized);
     // 删除、维护与风险审批不复用结论；其余相同完整证据在 2 分钟内复用成功结论。
-    const cacheKey = name.startsWith("deletion:") || name === 'operation:maintain_pi' || risky ? "" : createHash("sha256").update(`${policyKey}\n${name}\n${serialized}`).digest("hex");
+    const cacheKey = localPaths.length || /^(?:deletion:|operation:execution:)|^operation:maintain_pi$/.test(name) || risky ? "" : createHash("sha256").update(`${policyKey}\n${name}\n${serialized}`).digest("hex");
     if (cacheKey) {
       const hit = cache.get(cacheKey);
       if (hit && Date.now() - hit.at < CACHE_TTL_MS) return { ...hit.decision, source: "cache" };
@@ -258,9 +267,9 @@ export function createApprovalReviewer(pi: ExtensionAPI, options?: {humanFallbac
       humanEvidenceRecords(branch)])).digest('hex');
     const preferExpanded = historyKey === expandedHistory;
     const initialInput = preferExpanded ? expandApprovalEvidence(ctx, input) : input;
-    const inspection = createApprovalInspection(ctx.cwd, name, initialInput);
     const inspectionHistory: Message[] = [];
-    const evidence = approvalPrompt(name, initialInput, ctx.cwd);
+    const prompt = (evidence: Record<string, unknown>) => approvalPrompt(name, localPaths.length ? { ...evidence, localPathObservations: localPaths } : evidence, ctx.cwd);
+    const evidence = prompt(initialInput);
     const attempts = [
       { budget: FIRST_BUDGET_MS, options: { reasoning: "off" }, prompt: evidence, expanded: preferExpanded, inspectionHistory },
       { budget: RETRY_BUDGET_MS, options: {}, prompt: `${evidence}\nThe previous response had no parseable decision. Return only the specified JSON object.`, expanded: preferExpanded, inspectionHistory },
@@ -283,18 +292,16 @@ export function createApprovalReviewer(pi: ExtensionAPI, options?: {humanFallbac
           const expanded = expandApprovalEvidence(ctx, input);
           if (evidenceGrew(input.humanInputCoverage, expanded.humanInputCoverage as { omitted?: number; truncated?: boolean; currentTruncated?: boolean })) {
             // Reuse the existing retry budget; explicit denial and absent source bytes never retry.
-            attempts[1].prompt = `${approvalPrompt(name, expanded, ctx.cwd)}\nPreviously omitted or truncated human records have been added. Review again under the same rules.`;
+            attempts[1].prompt = `${prompt(expanded)}\nPreviously omitted or truncated human records have been added. Review again under the same rules.`;
             attempts[1].expanded = true;
             expandedHistory = historyKey;
             continue;
           }
         }
         if (decision.confidence < CONFIDENCE_THRESHOLD) {
-          return uncertain(ctx, name, input, `Reviewer uncertain (confidence ${decision.confidence.toFixed(2)}): ${decision.reason || "no reason given"}`, decision.question, decision.reasonCode);
+          return release(await uncertain(ctx, name, input, `Reviewer uncertain (confidence ${decision.confidence.toFixed(2)}): ${decision.reason || "no reason given"}`, decision.question, decision.reasonCode));
         }
-        const result: ReviewDecision = { approved: decision.approved, source: "subagent", reason: decision.reason, ...(decision.reasonCode ? { reasonCode: decision.reasonCode } : {}), ...(decision.question ? { question: decision.question } : {}), ...(decision.taskAgentAuthorization ? { taskAgentAuthorization: decision.taskAgentAuthorization } : {}) };
-        if (result.approved && inspection.used && !await inspection.unchanged()) return { approved: false, source: "error", reason: "Inspected evidence changed during approval; this call did not run. Review the current files again." };
-        if (ctx.signal?.aborted) return cancelled();
+        const result = await release({ approved: decision.approved, source: "subagent", reason: decision.reason, ...(decision.reasonCode ? { reasonCode: decision.reasonCode } : {}), ...(decision.question ? { question: decision.question } : {}), ...(decision.taskAgentAuthorization ? { taskAgentAuthorization: decision.taskAgentAuthorization } : {}) });
         // File/listing evidence is live state beyond the original cache key.
         if (result.approved && cacheKey && !attempt.expanded && !inspection.used) {
           if (cache.size > 64) cache.delete(cache.keys().next().value as string);
@@ -324,7 +331,7 @@ export function createApprovalReviewer(pi: ExtensionAPI, options?: {humanFallbac
     }
     if (outageChoice === "pause") return {approved:false,source:"error",reason:"Approval service is unavailable. The user chose to pause this pending call; review again after a fix, model change, or new user instruction."};
     // 熔断仅减少重复请求，不授予任何权限。逐条人工模式仍须确认当前完整调用。
-    return escalate(pi,ctx, name, input, `Approval model did not complete the review: ${problem}`);
+    return release(await escalate(pi,ctx, name, input, `Approval model did not complete the review: ${problem}`));
   };
   return Object.assign(review, { status: (ctx?: ExtensionContext) => {
     let current = true;

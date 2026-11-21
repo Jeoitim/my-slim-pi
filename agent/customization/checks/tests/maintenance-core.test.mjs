@@ -97,9 +97,11 @@ test('tidy upgrade preserves the previous appearance and explicit newer choices'
   put(root,'settings.json',JSON.stringify({tidy:{frameUserMessages:false}}));
   configurePlatform(root,'linux');
   let tidy=read().tidy;
+  assert.equal(tidy.style,'frame');
   assert.equal(tidy.userMessageStyle,'off');assert.equal(tidy.collapseTurns,'off');assert.equal(tidy.finalReplyStyle,'off');
-  put(root,'settings.json',JSON.stringify({tidy:{frameUserMessages:false,userMessageStyle:'rail',collapseTurns:'live',finalReplyStyle:'frame'}}));
+  put(root,'settings.json',JSON.stringify({tidy:{style:'rail',frameUserMessages:false,userMessageStyle:'rail',collapseTurns:'live',finalReplyStyle:'frame'}}));
   configurePlatform(root,'linux');
   tidy=read().tidy;
+  assert.equal(tidy.style,'rail');
   assert.equal(tidy.userMessageStyle,'rail');assert.equal(tidy.collapseTurns,'live');assert.equal(tidy.finalReplyStyle,'frame');
 });
